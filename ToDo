@@ -1,0 +1,66 @@
+ * Better linking to surface form
+
+
+ * prettier TDL (lisp, syntax high-lighting)
+ * TDL in roots.xml <IMPOSSIBLE>
+
+ * sortable tables  (in ERG_1212, need to move to src)
+http://stackoverflow.com/questions/876092/jquery-tablesorter-comma-digit-parser-not-working
+ * do my own catalogue
+ * check frequency ordering
+ ** different for just 3 and for more
+ 
+ ** don't use commas for separating words
+
+ * push to src/lkb
+ * provenance (store .tdl)
+
+ * link to other resources --IDFORM 
+
+ * link to wordnet and play (talk to David)
+
+ * add idiom
+
+ * generate examples for lexical types
+
+ * expose log
+
+ * curated search
+
+ * Release
+
+ * link to grammar configuration code (DONEish)
+
+ * add in some html for the trees
+
+ * share paramaters with www (vie META)
+   echo "(setf tsdb::*www-introduction* \"jacy\")";
+     '((:parse \"http://www.delph-in.net/jacy\")	
+
+ * use jquery table to make the tables orderable
+ * check how to add default zero in sqlite3
+
+ * pretty print css
+ * make canonical citation prettier
+
+
+
+
+DONE:
+-----
+ * link to demo
+ * check irule
+ * Add roots!  (*root-entries*)
+ * TDL in roots.xml
+ * put on compling
+ * check irule
+ * read all type files
+
+ * add daughter look-up
+ * handle gzipped profiles
+ * release to the waiting world
+ * Change type of lexical types
+ * Check description for <br> where is that coming from?
+ * Add rules as subtypes to type_tbl
+ * put commas in frequencies
+ * hyper link types
