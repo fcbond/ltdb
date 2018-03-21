@@ -2,9 +2,16 @@
 #
 # ToDo: parametrize special values (HEAD VALENCE CONTENT)
 #
-unset DISPLAY;
-unset LUI;
-export PYTHONPATH=~/svn/pydelphin:${PYTHONPATH}
+
+###
+### Change this
+###
+MAKECAT=`locate -b "\create-catalogue-entry.sh"`
+echo "Found Grammar Catalogue Creator: " ${MAKECAT}
+
+###
+### get the grammar directory
+###
 
 while [ $# -gt 0 -a "${1#-}" != "$1" ]; do
   case ${1} in
@@ -15,7 +22,48 @@ while [ $# -gt 0 -a "${1#-}" != "$1" ]; do
   esac
 done
 
-source ltdb-conf.bash
+echo "Grammar directory is " ${grammardir}
+
+###
+### set things up
+###
+
+treebanks=`ls -d ${grammardir}/tsdb/gold/*`
+now=`date --rfc-3339=date`
+
+
+### Constants
+LTDB_FILE="lt.db"
+LINGUISTICS_FILE="linguistics.xml"
+TYPES_FILE="types.xml"
+RULES_FILE="rules.xml"
+ROOTS_FILE="roots.xml"
+LRULES_FILE="lrules.xml"
+LEXICON_FILE="lex.tab"
+TB_FILE="result"
+
+### I really don't want to do this!
+if [ -f  $grammardir/Version.lsp ]; then
+    versionfile=$grammardir/Version.lsp
+else
+    versionfile=$grammardir/Version.lisp
+fi
+
+version=`perl -ne 'if (/^\(defparameter\s+\*grammar-version\*\s+\"(.*)\s+\((.*)\)\"/) {print "$1_$2"}' $versionfile`
+if [ -z "$version" ]; then
+    echo "Don't know the version, will use 'something'"
+    version=something
+fi
+
+
+if [ -z "${LOGONTMP}" ]; then
+  export LOGONTMP=/tmp
+fi
+outdir=${LOGONTMP}/$version
+log=${outdir}/log
+
+HTML_DIR=$HOME/public_html/ltdb/$version
+CGI_DIR=$HOME/public_html/cgi-bin/$version
 
 #outdir=/tmp/new
 
@@ -45,8 +93,15 @@ mkdir -p $outdir
 
 db=${outdir}/${LTDB_FILE}
 
+lkbdir=${LOGONROOT}/lingo/lkb
+
+
 ### dump  the lex-types
 echo "Dumping lex-type definitions and lexicon (slow but steady)" 
+
+
+unset DISPLAY;
+unset LUI;
 
 { 
  cat 2>&1 <<- LISP
