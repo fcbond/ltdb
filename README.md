@@ -55,7 +55,7 @@ We assume that Sentence IDs are unique
 
 
 In ubuntu:
-```
+```bash
 sudo apt-get install libdbd-sqlite3-perl sp libxml-dom-perl apache2
 sudo apt-get install xmlstarlet
 ```
@@ -64,8 +64,10 @@ sudo apt-get install xmlstarlet
 ### Enable local directories in Apache2:
 
 
+```bash
 sudo a2enmod userdir
 sudo a2enmod cgi
+```
 
 
 
@@ -79,7 +81,9 @@ Put this in /etc/apache2/sites-available/000-default.conf
 ```
 
 And then restart Apache2
+```bash
 sudo service apache2 restart
+```
 
 ## Todo
 
