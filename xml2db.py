@@ -183,13 +183,14 @@ print("Types (%s/roots.xml) entered into the DB (%s)\n" % (xmldir, dbfile),
 
 ### Description
 try:
-    t = etree.parse('%s/linguistics.xml' % xmldir)
+    t = etree.parse('%s/linguistics.xml' % xmldir,
+                    parser=etree.XMLParser(remove_comments=True))
     print("Parsed %s/linguistics.xml" % xmldir, file=sys.stderr)
 except:
     print("Couldn't parse %s/linguistics.xml" % xmldir, file=sys.stderr)
 
 for typ in t.getroot():
-    print(etree.tostring(typ, pretty_print=True))
+    #print(etree.tostring(typ, pretty_print=True))
     lname = None
     for el in typ.iter('name'):
         lname = el.text
