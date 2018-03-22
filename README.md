@@ -65,15 +65,21 @@ sudo apt-get install xmlstarlet
 
 
 sudo a2enmod userdir
+sudo a2enmod cgi
 
-Put this in /etc/apache2/httpd.conf and restart
+
+
+
+Put this in /etc/apache2/sites-available/000-default.conf
 ```xml
 <Directory /home/*/public_html/cgi-bin/>
-   Options ExecCGI
-   SetHandler cgi-script
+   Options +ExecCGI
+   AddHandler cgi-script .cgi
 </Directory>
 ```
 
+And then restart Apache2
+sudo service apache2 restart
 
 ## Todo
 
