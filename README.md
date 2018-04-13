@@ -45,7 +45,7 @@ Everything is installed to `~/public_html/`
   * Apache
   * LKB/Lisp		for db dump
   * xmlstarlet		for validating lisp
-  * python 2.7, python 3, pydelphin
+  * python 2.7, python 3, pydelphin, docutils
   * grammar-catalogue
 
   * jquery, jquery tablesorter (patched)

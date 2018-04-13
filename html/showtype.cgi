@@ -7,6 +7,7 @@ import sys,codecs
 sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 from collections import defaultdict as dd
 import ltdb
+import docutils.core
 
 form = cgi.FieldStorage()
 #synset = form.getfirst("synset", "")
@@ -46,6 +47,22 @@ if (typ):
         todo=None
         definition=None
 
+    dscp = ""
+    for l in description:
+
+        if l.startswith('+') or l.startswith('-'): 
+            dscp += l
+        else:
+            dscp += l
+            # dscp += ltdb.hlall(l)
+            
+        
+    # LETS CONVERT DESCRIPTION FROM RTS TO HTML
+    description_html = docutils.core.publish_parts(dscp,writer_name='html',
+                                     settings_overrides= {'table_style':'colwidths-auto',
+                                                          'initial_header_level':'3'})['body']
+
+    
     print ("""
 <div id="contents">
 <h1>%s (%s)</h1>""" % (typ, status)) ## FIXME show headedness
@@ -58,7 +75,8 @@ if (typ):
         else:
             cr= ''
         print("""<h2>Linguistic Documentation</h2><p>%s%s<p>%s""" % (
-                ltdb.hlall(description),
+                # ltdb.hlall(description),    #ADD LINKS LATER
+                description_html,
                 cr,
                 reference))
     ###

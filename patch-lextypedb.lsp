@@ -177,6 +177,7 @@
  (let* ((def (ltype-local-constraint type-struct))
         (parents (ltype-parents type-struct))
 	(children (ltype-daughters type-struct))
+	(comment (ltype-comment type-struct))
 	(tdfs (ltype-tdfs type-struct))
 	(synsem (mrs::path-value 
 	      (tdfs-indef tdfs) '(SYNSEM)))
@@ -233,7 +234,11 @@
    ;;; print escaped TDL
 ;;    (format stream (lkb::xml-escape 
 ;; 		   (with-output-to-string (plain-tdl)
-;; 		     (output-type-as-tdl name type-struct plain-tdl))))
+   ;; 		     (output-type-as-tdl name type-struct plain-tdl))))
+   ;;; print comment
+   (if comment
+       (format stream "~%<comment>~%~(~a~)~%</comment>"
+	       (lkb::xml-escape comment)))
    ;;; print  TDL as CDATA
    (format stream "~%<![CDATA[")
    (output-type-as-tdl name type-struct stream)

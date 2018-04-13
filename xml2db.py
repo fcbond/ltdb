@@ -6,6 +6,8 @@
 import sqlite3, sys
 from lxml import etree
 from collections import defaultdict as dd
+# import docutils
+import docutils.core
 
 if (len(sys.argv) < 3):
     # prints standard error msg (stderr)
@@ -141,18 +143,35 @@ for typ in t.getroot():
         status = 'ltype'
     else:
         status = 'type'
+
+
+    descript = ""     # Let's assume empty comment to start
+    for child in typ: # For now, only comments are expected, but we never know
+        if child.tag == "comment":
+            descript = child.text
+
+
+            # descript = descript.replace("\n","<br>") # THIS IS NOT WORKING,
+            # the CGI is probably messing it up at a later stage
+            # sys.stderr.write(child.text + 'spam\n') #TEST#
+
+    # Convert the comment from RST to HTML
+    # descript_html = docutils.core.publish_parts(descript,writer_name='html',
+    #                 settings_overrides= {'table_style':'colwidths-auto'})['body']
+            
     try:
         c.execute("""INSERT INTO types 
                  (typ, parents, children, status,
-                  cat, val, cont, definition) 
-                 VALUES (?,?,?,?, ?,?,?,?)""", (typ.get("name"),
-                                                typ.get("parents"),
-                                                children,
-                                                status,
-                                                typ.get("cat"),
-                                                typ.get("val"),
-                                                typ.get("cont"),
-                                                typ.text))
+                  cat, val, cont, definition, description) 
+                 VALUES (?,?,?,?, ?,?,?,?,?)""", (typ.get("name"),
+                                                  typ.get("parents"),
+                                                  children,
+                                                  status,
+                                                  typ.get("cat"),
+                                                  typ.get("val"),
+                                                  typ.get("cont"),
+                                                  typ.text,
+                                                  descript))
     except sqlite3.Error as e:
         print('ERROR:   (%s) of type (%s), type: %s' % \
                   (e, type(e).__name__, typ.get("name")))
