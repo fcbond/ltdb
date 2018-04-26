@@ -41,20 +41,20 @@ if (typ):
     else:
         status='Unknown'
         name=None
-        description=None
+        description=[]
         criteria=None
         reference=None
         todo=None
         definition=None
 
     dscp = ""
-    for l in description:
-
-        if l.startswith('+') or l.startswith('-'): 
-            dscp += l
-        else:
-            dscp += l
-            # dscp += ltdb.hlall(l)
+    if description:
+        for l in description:
+            if l.startswith('+') or l.startswith('-'): 
+                dscp += l
+            else:
+                dscp += l
+                # dscp += ltdb.hlall(l)
             
         
     # LETS CONVERT DESCRIPTION FROM RTS TO HTML
