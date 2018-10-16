@@ -167,3 +167,4 @@ function text(svg, str) {
 	text.bbx = bbx;
 	return text;
 }
+

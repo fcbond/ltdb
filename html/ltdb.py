@@ -268,6 +268,19 @@ def showsents (c, typ, limit, biglimit):
             """.format(sid))
 
         print("</ul>")
+
+        # Make tree nodes clickable
+        print("""
+        <script>
+        $(document).ready(function(){
+          $(".ltdb").click(function(event){
+  	    var elem = event.target;
+	    var title = elem.getAttribute("title");
+            window.open("showtype.cgi?typ=" + title);
+        });
+        });
+        </script>
+        """)
             
     else:
         print ("<p>No examples found for %s" % typ)
