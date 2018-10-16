@@ -12,6 +12,7 @@ import delphin.mrs
 import delphin.derivation
 import delphin.mrs.xmrs
 import delphin.mrs.simplemrs
+import json
 
 if (len(sys.argv) < 3):
     # prints standard error msg (stderr)
@@ -61,14 +62,23 @@ for root, dirs, files in os.walk(golddir):
             pname[pid] = profname
             deriv = row['derivation']  # DERIVATION TREE
             deriv_json = delphin.derivation.Derivation.from_string(deriv).to_dict(fields=['id','entity','score','form','tokens'])            
-            mrs_obj = delphin.mrs.simplemrs.loads(row['mrs'], single=True, version=1.1, strict=False, errors='warn')
             mrs_string = row['mrs']
-            mrs_json = delphin.mrs.xmrs.Mrs.to_dict(mrs_obj)
-            dmrs_json = delphin.mrs.xmrs.Dmrs.to_dict(mrs_obj)
+            try:
+                mrs_obj = delphin.mrs.simplemrs.loads(mrs_string, single=True, version=1.1, strict=False, errors='warn')
+                # mrs_obj = delphin.mrs.simplemrs.loads(row['mrs'], single=True, version=1.1, strict=False, errors='warn')
+                # mrs_string = row['mrs']  # CHANGING
+                mrs_json = delphin.mrs.xmrs.Mrs.to_dict(mrs_obj)
+                dmrs_json = delphin.mrs.xmrs.Dmrs.to_dict(mrs_obj)
+            except:
+                sys.stderr.write("\n\nMRS failed to convert in pydelphin:\n")
+                sys.stderr.write(str(mrs_string))
+                sys.stderr.write("\n\n")
+                mrs_json = dict()
+                dmrs_json = dict()
             
             # STORE gold info IN DB
             c.execute("""INSERT INTO gold (sid, deriv, deriv_json, pst, mrs, mrs_json, dmrs_json, flags) 
-                         VALUES (?,?,?,?,?,?,?,?)""", (pid, deriv, str(deriv_json), None, mrs_string, str(mrs_json), str(dmrs_json), None))
+                         VALUES (?,?,?,?,?,?,?,?)""", (pid, deriv, json.dumps(deriv_json), None, mrs_string, json.dumps(mrs_json), json.dumps(dmrs_json), None))
 
 
             ##print(pid, '\t', deriv)

@@ -39,8 +39,6 @@ Everything is installed to `~/public_html/`
 ### Requirements
 ```
   * Perl
-   * DBD::SQLite
-   * XML::DOM
   * SQLite3
   * Apache
   * LKB/Lisp		for db dump
@@ -54,10 +52,12 @@ We assume that Sentence IDs are unique
 
 
 
-In ubuntu:
+Install dependencies (in ubuntu):
 ```bash
-sudo apt-get install libdbd-sqlite3-perl sp libxml-dom-perl apache2
-sudo apt-get install xmlstarlet
+sudo apt-get install apache2 xmlstarlet
+
+sudo pip install pydelphin
+sudo pip install docutils
 ```
 
 
