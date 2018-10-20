@@ -69,7 +69,7 @@ fi
 outdir=${LOGONTMP}/${version}
 
 log=${outdir}/log
-echo ${log}
+echo Log file at ${log}
 
 HTML_DIR=${HOME}/public_html/ltdb/${version}
 CGI_DIR=${HOME}/public_html/cgi-bin/${version}
