@@ -1,4 +1,4 @@
-###
+### --*-- coding: utf-8 --*--
 ### shared code for the ltdb
 ###
 import sqlite3, collections, cgi, re, urllib
@@ -24,10 +24,10 @@ def hlt (typs):
     l = unicode()
     if typs:
         for t in typs.split():
-            l += "<a href='%s/showtype.cgi?typ=%s'>%s " % (par['cgidir'], 
+            l += "<a href='%s/showtype.cgi?typ=%s'>%s</a> " % (par['cgidir'], 
                                                            urllib.quote(t, ''),
                                                            t)
-            return l
+        return l
     else:
         return '<br'
 
@@ -394,9 +394,12 @@ def footer():
     return """</div> <!-- end of outline -->
   <br>
   <address>
-  <a href='http://moin.delph-in.net/LkbLtdb'>Linguistic Type Database</a> for %s; 
-  By Chikara Hashimoto and Francis Bond; 
-  Maintained by Francis Bond &lt;<a href='mailto:bond@ieee.org'>bond@ieee.org</a>&gt;
+  <a href='http://moin.delph-in.net/LkbLtdb'>Linguistic Type Database</a> 
+    for the grammar %s; 
+  <br>By Chikara Hashimoto, Luis Morgado da Costa and Francis Bond; 
+  Maintained by Francis Bond &lt;<a href='mailto:bond@ieee.org'>bond@ieee.org</a>&gt;;
+    <br>
+    <a href ='https://github.com/fcbond/ltdb'>Source code (GitHub)</a>
   </address>
   </body>
 </html>""" % (par['ver'])
