@@ -3,6 +3,18 @@
 # ToDo: parametrize special values (HEAD VALENCE CONTENT)
 #
 
+# If you want to use LKB_FOS you must set this variable
+# unsetenv LKBFOS
+LKBFOS=~/bin/lkb_fos/lkb.linux_x86_64
+
+if [ ${LKBFOS} ]
+then
+    LISPCOMMAND="${LKBFOS}  2>${log} >${log}"
+else
+    LISPCOMMAND="${LOGONROOT}/bin/logon --binary -I base -locale ja_JP.UTF-8 2>${log} >${log}"    
+fi
+    
+
 ###
 ### Change this
 ###
@@ -102,9 +114,6 @@ mkdir -p "${outdir}"
 
 db=${outdir}/${LTDB_FILE}
 
-lkbdir=${LOGONROOT}/lingo/lkb
-
-
 ### dump  the lex-types
 echo "Dumping lex-type definitions and lexicon (slow but steady)" 
 
@@ -114,8 +123,6 @@ unset LUI;
 
 { 
  cat 2>&1 <<- LISP
-  ;(load "${lkbdir}/src/general/loadup")
-  ;(compile-system "lkb" :force t)
   (lkb::read-script-file-aux  "${grammardir}/lkb/script")
   (lkb::lkb-load-lisp "." "patch-lextypedb.lsp")
   (lkb::output-types :xml "${outdir}/${TYPES_FILE}")
@@ -127,7 +134,7 @@ unset LUI;
   #+allegro        (excl:exit)
   #+sbcl           (sb-ext:quit)
 LISP
-} | ${LOGONROOT}/bin/logon --binary -I base -locale ja_JP.UTF-8 2>${log} >${log}
+} | ${LISPCOMMAND}
 # } | cat 
 
 ###
@@ -165,7 +172,7 @@ echo Install to ${CGI_DIR}
 echo
 mkdir -p ${CGI_DIR}
 mkdir -p ${HTML_DIR}
-cp html/*.cgi html/*.py ${CGI_DIR}/.
+cp html/*.cgi html/*.py html/*.js html/*.css  ${CGI_DIR}/.   # we must copy javascript and css to cgi-bin too
 
 ### CGI
 cp ${outdir}/${LTDB_FILE} ${CGI_DIR}/.
@@ -182,9 +189,9 @@ echo "ver=$version" >> ${CGI_DIR}/params
 mkdir -p ${HTML_DIR}/trees
 
 ### HTML
-cp html/*.css ${HTML_DIR}/.
-cp ${lkbdir}/src/tsdb/css/*.css  ${HTML_DIR}/.
-cp ${lkbdir}/src/tsdb/js/*.js  ${HTML_DIR}/.
+cp html/*.js html/*.css ${HTML_DIR}/.
+# cp ${lkbdir}/src/tsdb/css/*.css  ${HTML_DIR}/.
+# cp ${lkbdir}/src/tsdb/js/*.js  ${HTML_DIR}/.
 
 
 #

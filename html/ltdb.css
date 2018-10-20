@@ -98,9 +98,8 @@ H4 {
 }
 
 .match{
+text-decoration: underline red;
 color: green;
-font-weight: bold;
-background:Gold;
 }
 
 .coref{

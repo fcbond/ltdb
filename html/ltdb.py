@@ -3,6 +3,7 @@
 ###
 import sqlite3, collections, cgi, re, urllib
 from collections import defaultdict as dd
+import json
 
 def getpar (params):
     par=dict()
@@ -72,7 +73,7 @@ def showsents (c, typ, limit, biglimit):
     if results and results[0] > 0:
         total = results[0]
         c.execute("""SELECT sid, kara, made FROM typind 
-                 WHERE typ=? LIMIT ?""", (typ, limit))
+                 WHERE typ=? ORDER BY sid LIMIT ?""", (typ, limit))
         sids = dd(set)
         for (sid, kara, made) in c:
             sids[sid].add((kara, made))
@@ -92,21 +93,197 @@ def showsents (c, typ, limit, biglimit):
         for (prof, sid, wid, word, lexid) in c:
             sents[sid][wid] = (word, lexid)
             profname[sid]=prof
-        for sid in sids:
-            for (kara, made) in sids[sid]:
-                print('<p>{}: '.format(sid))
+
+            
+        print("""<ul style="list-style:none;">""")
+        for sid in sorted(sids):
+
+
+            # fetch json for deriv_tree, mrs and dmrs
+            c.execute("""SELECT mrs, mrs_json, dmrs_json, deriv_json FROM gold 
+                        WHERE sid =  ? """, [sid])
+            for (mrs, mrs_json, dmrs_json, deriv_json) in c:
+                mrs = mrs
+                mrs_json = mrs_json
+                dmrs_json = dmrs_json
+                deriv_json = deriv_json
+
+            for (kara, made) in sorted(sids[sid]):
+                print('<li>{}<sub>{}-{}</sub> &nbsp;&nbsp; '.format(sid,kara,made))
                 for wid in sents[sid]:
                     if wid >= kara and wid < made:
                         print ("<span class='match'>%s</span>" % \
                                    sents[sid][wid][0])
                     else:
                             print (sents[sid][wid][0])
-                print(" (<a href='%s/trees/%s/%s.html'>parse</a>)" % (par['cssdir'], 
-                                                                      profname[sid],
-                                                                      sid))
+                print(" (%s)" % (profname[sid]))
+
+            ##############################################################
+            # PRINT THE VISUALIZATIONS (only once per sentence)
+            ##############################################################
+            
+            sent_text = ""
+            for wid in sents[sid]:
+                sent_text += sents[sid][wid][0] + " "
+
+            # <b>Show/Hide:</b>
+            print("""<span> &nbsp;&nbsp;&nbsp;&nbsp;
+            <button id="toggleMRS{0}">MRS</button>
+            <button id="toggleTree{0}">Tree</button>
+            <button id="toggleDMRS{0}">DMRS</button>
+            <button id="toggleTextMRS{0}">Text_MRS</button>
+            </span>
+            </li>""".format(sid))
+
+
+            
+            print("""
+            <script>
+            $(document).ready(function(){{
+                $("#toggleMRS{0}").click(function(){{
+                    $("#mrs{0}").toggle();
+                }});
+                    //$("#mrs{0}").toggle();
+            }});
+            </script>
+            """.format(sid))
+
+            print("""
+            <script>
+            $(document).ready(function(){{
+                $("#toggleTree{0}").click(function(){{
+                    $("#viztree{0}").toggle();
+                }});
+                    //$("#viztree{0}").toggle();
+            }});
+            </script>
+            """.format(sid))
+
+
+            print("""
+            <script>
+            $(document).ready(function(){{
+                $("#toggleDMRS{0}").click(function(){{
+                    $("#dmrs{0}").toggle();
+                }});
+                    //$("#dmrs{0}").toggle();
+            }});
+            </script>
+            """.format(sid))
+
+            
+            print("""
+            <script>
+            $(document).ready(function(){{
+                $("#toggleTextMRS{0}").click(function(){{
+                    $("#textmrs{0}").toggle();
+                }});
+                    //$("#textmrs{0}").toggle();
+            }});
+            </script>
+            """.format(sid))
+
+            
+            # print("""
+            #     <div id="tooltip" class="tooltip"></div>
+            #     <div id="text-input" style="font-size: 150%%;">%s</div>
+            # """)
+            
+
+            # $( "#myelement" ).click(function() {     
+            #    $('#another-element').toggle("slide", { direction: "right" }, 1000);
+            # });
+
+            ####################################################################
+            # PRINT DERIVATION TREE FROM JSON
+            ####################################################################
+            print("""
+                <script>
+                $( document ).ready(function() {
+                                elem = document.getElementById('viztree%s');
+                                deriv_json_string = '%s';
+                                deriv_json = JSON.parse(deriv_json_string);
+                                drawTree(elem, deriv_json);
+
+                                elemChild = document.createElement('span');
+                                elemChild.innerHTML = '<br><br>';
+                                elem.appendChild(elemChild);
+                                });
+                </script>
+                <div id='viztree%s'><br></div>
+            """ % (sid, deriv_json, sid))
+
+            
+            ####################################################################
+            # PRINT MRS FROM JSON
+            ####################################################################
+            print("""
+                <script>
+                $( document ).ready(function() {{
+                                elem = document.getElementById('mrs{}');
+                                mrs_json_string = '{}';
+                                mrs_json = JSON.parse(mrs_json_string);
+                                MRS(elem, mrs_json);
+                                }});
+                </script>
+            """.format(sid, mrs_json))
+            print("""<div id='mrs{}'><br>""".format(sid))
+            print("""<div id="text-input" style="font-size: 150%%;">%s</div><br>""" % (sent_text))
+            print("""</div>""")
+
+            
+        
+
+            
+            ####################################################################
+            # PRINT DMRS FROM JSON
+            ####################################################################
+            print("""
+                <script>
+                $( document ).ready(function() {
+                                elem = document.getElementById('dmrs%s');
+                                dmrs_json_string = '%s';
+                                dmrs_json = JSON.parse(dmrs_json_string);
+                                DMRS(elem, dmrs_json);
+                                });
+                </script>
+                <div id="tooltip" class="tooltip"></div>
+                <div id='dmrs%s'></div>
+            """ % (sid, dmrs_json, sid))
+
+            print("<div id='textmrs%s'><br>" % (sid))
+            print(mrs)
+            print("<br><br></div>")
+
+            # TOGGLE OFF ALL VISUALS
+            print("""
+            <script>
+            $(document).ready(function(){{
+                $("#mrs{0}").toggle();
+                $("#viztree{0}").toggle();
+                $("#dmrs{0}").toggle();
+                $("#textmrs{0}").toggle();
+            }});
+            </script>
+            """.format(sid))
+
+        print("</ul>")
+
+        # Make tree nodes clickable
+        print("""
+        <script>
+        $(document).ready(function(){
+          $(".ltdb").click(function(event){
+  	    var elem = event.target;
+	    var title = elem.getAttribute("title");
+            window.open("showtype.cgi?typ=" + title);
+        });
+        });
+        </script>
+        """)
+            
     else:
         print ("<p>No examples found for %s" % typ)
-
         
 
 def showlexs (c, lextyp, limit, biglimit):
@@ -153,7 +330,7 @@ FROM lexfreq WHERE lexid in (%s) ORDER BY lexid, freq DESC""" % \
 ## <td><a href='more.cgi?lextyp=%s'>more</a></td>                 lextyp))
         print("</table>")
 #    else:
-#        print ("<p>No examples found for %s (not even in the lexicon)" % lextyp)        
+#        print ("<p>No examples found for %s (not even in the lexicon)" % lextyp)
 
 
 ###
@@ -163,11 +340,21 @@ FROM lexfreq WHERE lexid in (%s) ORDER BY lexid, freq DESC""" % \
 def header():
     return """Content-type: text/html; charset=utf-8\n\n
 <html>
-  <head>	
+  <head>
     <meta http-equiv='Content-Type' content='text/html; charset=utf-8'>
     <title>Linguistic Type Database (%s)</title>
-    <link rel="stylesheet" type="text/css" href="%s/ltdb.css"/>	
-    <script src='tag-wid.js' language='javascript'></script>
+    <link rel="stylesheet" type="text/css" href="%s/ltdb.css"/>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://d3js.org/d3.v3.js"></script>
+
+    <script src='tree.js' language='javascript'></script>
+    <script src='dmrs.js' language='javascript'></script>
+    <script src='mrs.js' language='javascript'></script>
+    <script src='jquery-ui.js' language='javascript'></script>
+    <link rel="stylesheet" type="text/css" href="jquery-ui.css"/>
+    <script src='svg.js' language='javascript'></script>
+    <link rel="stylesheet" type="text/css" href="delphin-viz.css"/>
   </head>
   <body>
 """ % (par['ver'], par['cssdir'])

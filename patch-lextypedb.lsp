@@ -49,8 +49,6 @@
 ;;; Output information on lexical rules for lexical type DB.
 ;;;  (lkb::lrules-to-xml :file "/tmp/lrules.xml")
 
-
-#+:tsdb
 (defun lrules-to-xml  (&key (stream t) file)
   (let ((stream (if file
 		    (open file
