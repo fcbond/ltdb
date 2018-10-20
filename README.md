@@ -26,12 +26,6 @@ The code is in a state of flux at the moment.
 ./make-ltdb.bash --grmdir ~/logon/dfki/jacy
 ```
 
-2. If you have any gold treebanks run 
-```bash
-./make-trees.bash --grmdir  /path/to/grammar
-```
- (slow if you have a lot of trees, needs a fair bit of memory)
-
 Everything is installed to `~/public_html/`
 
 ## Installation

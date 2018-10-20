@@ -2,16 +2,23 @@
 #
 # ToDo: parametrize special values (HEAD VALENCE CONTENT)
 #
+echo
+echo  Welcome to the Linguistic Type Database
+echo
+
 
 # If you want to use LKB_FOS you must set this variable
-# unsetenv LKBFOS
-LKBFOS=~/bin/lkb_fos/lkb.linux_x86_64
+# unset LKBFOS
+LKBFOS=~/delphin/lkb_fos/lkb.linux_x86_64
 
-if [ ${LKBFOS} ]
-then
-    LISPCOMMAND="${LKBFOS}  2>${log} >${log}"
+if [ ${LKBFOS} ]; then
+    LISPCOMMAND="${LKBFOS}"
+    echo We will use $LISPCOMMAND
+elif [ $LOGONROOT ];then
+    LISPCOMMAND="${LOGONROOT}/bin/logon --binary -I base -locale ja_JP.UTF-8"
+    echo We will use $LISPCOMMAND
 else
-    LISPCOMMAND="${LOGONROOT}/bin/logon --binary -I base -locale ja_JP.UTF-8 2>${log} >${log}"    
+    echo we found no suitable LKB
 fi
     
 
@@ -123,9 +130,12 @@ unset LUI;
 
 { 
  cat 2>&1 <<- LISP
+  (format t "~%Read Grammar~%")
   (lkb::read-script-file-aux  "${grammardir}/lkb/script")
   (lkb::lkb-load-lisp "." "patch-lextypedb.lsp")
+  (format t "~%Output types~%")
   (lkb::output-types :xml "${outdir}/${TYPES_FILE}")
+  (format t "~%Output lrules, rules and roots ~%")
   (lkb::lrules-to-xml :file "${outdir}/${LRULES_FILE}")
   (lkb::rules-to-xml :file "${outdir}/${RULES_FILE}")
   (lkb::roots-to-xml :file "${outdir}/${ROOTS_FILE}")
@@ -134,8 +144,8 @@ unset LUI;
   #+allegro        (excl:exit)
   #+sbcl           (sb-ext:quit)
 LISP
-} | ${LISPCOMMAND}
-# } | cat 
+} | ${LISPCOMMAND}   2>${log} >${log}
+# } | cat   
 
 ###
 ### Try to validate the types.xml
@@ -226,6 +236,7 @@ echo "<p>Created on $now</p>"  >> ${HTML_DIR}/index.html
 echo "</html></body>" >> ${HTML_DIR}/index.html
 
 ### All done
+URL=http://localhost/~${USER}/${version}/
 echo
-echo "Done: take a look at $HTML_DIR/index.html"
+echo "Done: take a look at " ${URL}
 echo
