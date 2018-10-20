@@ -72,7 +72,12 @@ else:
         children=''
         arity=None
         head=None
+    c.execute("""SELECT  src, line, tdl, docstring 
+                  FROM tdl WHERE typ=?""", (typ,))
+    tdlinfo = c.fetchall()
 
+        
+        
     dscp = ""
     if description:
         for l in description:
@@ -133,6 +138,14 @@ else:
                             ltdb.hlt(cont),  
                             ltdb.hlt(children) or "<span class=match>LEAF</span>",
                             headedness[(arity,head)]))
+        if tdlinfo:
+            print("""<h3>TDL from pydelphin</h3>""")
+            for src, lineno, tdl, docstring in tdlinfo:
+                print("""<pre class='code'>%s</pre>""" % ltdb.hlall(tdl).replace(',\n',',<br>').replace('&\n','&amp;<br>').replace('\n',''))
+                print("(%s:%s)" % (src, lineno))
+                if docstring:
+                    print("""<h4>docstring</h4>""")
+                    print(docstring)
 
 print ltdb.footer()
 

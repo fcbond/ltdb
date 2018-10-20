@@ -50,3 +50,8 @@ CREATE TABLE lexfreq(lexid TEXT,
                      word TEXT, 
                      freq INTEGER DEFAULT 0);
 
+CREATE TABLE tdl (typ TEXT,
+       	     	  src TEXT,
+		  line INTEGER,
+                  tdl TEXT,
+		  docstring TEXT)

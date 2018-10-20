@@ -174,8 +174,14 @@ echo
 echo "Creating the databases ..."
 echo
 
+### create the db, write in the
+rm $db
 python3 xml2db.py ${outdir} ${db}
+
+python3 tdl2db.py ${grammardir} ${db}  ### add tdl and comments
+
 python3 gold2db.py ${grammardir} ${db}
+
 
 echo
 echo Install to ${CGI_DIR}
