@@ -106,7 +106,7 @@ echo "It will be installed into:"
 echo "   $HTML_DIR"
 echo "   $CGI_DIR"
 echo 
-echo "Would you like to continue (y/n)?"
+echo "Would you like to continue (Y/n)?"
 read
 case ${REPLY} in
    no|n) exit 0;;
@@ -236,7 +236,7 @@ echo "<p>Created on $now</p>"  >> ${HTML_DIR}/index.html
 echo "</html></body>" >> ${HTML_DIR}/index.html
 
 ### All done
-URL=http://localhost/~${USER}/${version}/
+URL=http://localhost/~${USER}/ltdb/${version}/
 echo
 echo "Done: take a look at " ${URL}
 echo
