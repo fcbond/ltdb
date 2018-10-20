@@ -22,12 +22,31 @@ par=ltdb.getpar('params')
 print ltdb.header()
 
 print ltdb.searchbar()
+
+### labels for branching: arity, head
+headedness = {(1,0):('unary: headed'),
+              (1,None):('unary: non-headed'),
+              (2,0):('binary: left-headed'),
+              (2,1):('binary: right-headed'),
+              (2,None):('binary: non-headed'),
+              (None,None):(' ')}
+ 
 ###
 ### Print out the type
 ###
-if (typ):
+if typ == '':
+    print "<br><br><p style='font-size:large;'>Please give me a type (or rule or lexeme)"
+else:
     con = sqlite3.connect(par['db'])
-    c = con.cursor() 
+    c = con.cursor()
+    ### check if it is a lexeme:
+    lexid = ''
+    c.execute("""SELECT typ, orth from lex 
+                 WHERE lexid =? """, (typ,))
+    lexinfo=c.fetchone()
+    if lexinfo:
+        lexid = typ
+        (typ, orth) = lexinfo
     c.execute("""SELECT  parents,  children,  cat,  val,
 	 	         cont, definition,  status, arity, head, 
                  lname, description,
@@ -42,10 +61,17 @@ if (typ):
         status='Unknown'
         name=None
         description=[]
+        parents = []
         criteria=None
         reference=None
         todo=None
         definition=None
+        cat = ''
+        val=''
+        cont=''
+        children=''
+        arity=None
+        head=None
 
     dscp = ""
     if description:
@@ -62,10 +88,15 @@ if (typ):
                                      settings_overrides= {'table_style':'colwidths-auto',
                                                           'initial_header_level':'3'})['body']
 
-    
-    print ("""
+    if lexid:
+        print ("""
 <div id="contents">
-<h1>%s (%s)</h1>""" % (typ, status)) ## FIXME show headedness
+        <h1>%s "%s" is-a %s (%s)</h1>""" % (lexid, orth,
+                                            typ, status))
+    else:
+        print ("""
+        <div id="contents">
+        <h1>%s (%s)</h1>""" % (typ, status)) ## FIXME show headedness
     if name or description or criteria or reference or todo:
         if criteria:
             cr="<p><table>"
@@ -88,19 +119,20 @@ if (typ):
 
 
     ### TDL and type info
-    print("""<h2>Type Information</h2>""")
-    if definition:
-        print("""<pre class='code'>%s</pre>""" % ltdb.hlall(definition).replace(',\n',',<br>').replace('&\n','&amp;<br>').replace('\n',''))
-    print("""<table><tr><th>Supertypes</th><th>Head Category</th>
-<th>Valence</th><th>Content</th><th>Subtypes</th>
-<th>Arity</th><th>head</th></tr>
-<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>
-</tr></table>""" % (ltdb.hlt(parents), 
-                    ltdb.hlt(cat),  
-                    ltdb.hlt(val),  
-                    ltdb.hlt(cont),  
-                    ltdb.hlt(children) or "<span class=match>LEAF</span>",
-                    arity or "<br>", head or "<br>"))
+    if status != 'Unknown':
+        print("""<h2>Type Information</h2>""")
+        if definition:
+            print("""<pre class='code'>%s</pre>""" % ltdb.hlall(definition).replace(',\n',',<br>').replace('&\n','&amp;<br>').replace('\n',''))
+        print("""<table><tr><th>Supertypes</th><th>Head Category</th>
+        <th>Valence</th><th>Content</th><th>Subtypes</th>
+        <th>Headedness</th></tr>
+        <tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>
+        </tr></table>""" % (ltdb.hlt(parents), 
+                            ltdb.hlt(cat),  
+                            ltdb.hlt(val),  
+                            ltdb.hlt(cont),  
+                            ltdb.hlt(children) or "<span class=match>LEAF</span>",
+                            headedness[(arity,head)]))
 
 print ltdb.footer()
 
