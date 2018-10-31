@@ -58,14 +58,13 @@ now=`date --rfc-3339=date`
 
 
 ### Constants
-LTDB_FILE="lt.db"
-LINGUISTICS_FILE="linguistics.xml"
-TYPES_FILE="types.xml"
-RULES_FILE="rules.xml"
-ROOTS_FILE="roots.xml"
-LRULES_FILE="lrules.xml"
-LEXICON_FILE="lex.tab"
-TB_FILE="result"
+LTDB_FILE="lt.db"                     # database
+LINGUISTICS_FILE="linguistics.xml"    # docstrings and more
+TYPES_FILE="types.xml"                # types
+RULES_FILE="rules.xml"                # rules
+ROOTS_FILE="roots.xml"                # roots 
+LRULES_FILE="lrules.xml"              # lexical tules
+LEXICON_FILE="lex.tab"                # lexicon
 
 ### I really don't want to do this!
 if [ -f  ${grammardir}/Version.lsp ]; then
@@ -85,11 +84,13 @@ version=${version// /_}
 if [ -z "${LOGONTMP}" ]; then
   export LOGONTMP=/tmp
 fi
+### write the temporary files to here
 outdir=${LOGONTMP}/${version}
 
 log=${outdir}/log
 echo Log file at ${log}
 
+### write the html here
 HTML_DIR=${HOME}/public_html/ltdb/${version}
 CGI_DIR=${HOME}/public_html/cgi-bin/${version}
 
@@ -122,7 +123,7 @@ mkdir -p "${outdir}"
 db=${outdir}/${LTDB_FILE}
 
 ### dump  the lex-types
-echo "Dumping lex-type definitions and lexicon (slow but steady)" 
+echo "Dumping lex-type definitions and lexicon using the LKB (slow but steady)" 
 
 
 unset DISPLAY;
@@ -163,6 +164,7 @@ else
 fi
 echo
 echo "Dumping type descriptions for " `ls ${grammardir}/*.tdl`
+echo "Soon to be redundant"
 echo
 ./description2xml.perl ${grammardir}/*.tdl > ${outdir}/${LINGUISTICS_FILE}
 
@@ -175,11 +177,16 @@ echo "Creating the databases ..."
 echo
 
 ### create the db, write in the
-rm $db
+echo "Adding in the info from the lisp"
+echo
 python3 xml2db.py ${outdir} ${db}
 
+echo "Adding in the info from the tdl with pydelphin"
+echo
 python3 tdl2db.py ${grammardir} ${db}  ### add tdl and comments
 
+echo "Adding in the info from the gold trees"
+echo
 python3 gold2db.py ${grammardir} ${db}
 
 
@@ -188,9 +195,11 @@ echo Install to ${CGI_DIR}
 echo
 mkdir -p ${CGI_DIR}
 mkdir -p ${HTML_DIR}
-cp html/*.cgi html/*.py html/*.js html/*.css  ${CGI_DIR}/.   # we must copy javascript and css to cgi-bin too
 
-### CGI
+###  copy cgi, javascript and css to cgi-bin
+cp html/*.cgi html/*.py html/*.js html/*.css  ${CGI_DIR}/.   
+
+### copy database to cgi-bin
 cp ${outdir}/${LTDB_FILE} ${CGI_DIR}/.
 
 ### params
@@ -201,45 +210,12 @@ echo "db=$CGI_DIR/lt.db" >> ${CGI_DIR}/params
 echo "cssdir=http://$dbhost/~$USER/ltdb/$version" >> ${CGI_DIR}/params
 echo "cgidir=http://$dbhost/~$USER/cgi-bin/$version" >> ${CGI_DIR}/params
 echo "ver=$version" >> ${CGI_DIR}/params
-### trees
-mkdir -p ${HTML_DIR}/trees
 
 ### HTML
 cp html/*.js html/*.css ${HTML_DIR}/.
-# cp ${lkbdir}/src/tsdb/css/*.css  ${HTML_DIR}/.
-# cp ${lkbdir}/src/tsdb/js/*.js  ${HTML_DIR}/.
 
+python3 makehome.py ${version}  ${grammardir} > ${HTML_DIR}/index.html
 
-#
-# Make the IndexPage
-#
-
-echo "<html><body><h1>Welcome to $version</h1>" > ${HTML_DIR}/index.html
-echo "<head><link rel='stylesheet' type='text/css' href='lextypedb.css'/></head>" >> ${HTML_DIR}/index.html
-echo "<ul>  <li>  <a href='../../cgi-bin/$version/search.cgi'>Lexical Type Database for $version</a> ( <a href='../../cgi-bin/$version/search.cgi'>Search</a>)"  >> ${HTML_DIR}/index.html
-
-echo "  <li>  <a href='http://wiki.delph-in.net/moin/LkbLtdb'>Lexical Type Database Wiki</a>"   >> ${HTML_DIR}/index.html
-
-if [ -n "$grammarurl" ]; then
-echo "  <li>  <a href='$grammarurl'>Grammar Home Page</a>"  >> ${HTML_DIR}/index.html
-fi
-
-echo "  <li>  <a href='http://www.delph-in.net/'>DELPH-IN Network</a>"  >> ${HTML_DIR}/index.html
-
-echo "  <li>  <a href='http://wiki.delph-in.net/moin/FrontPage'>DELPH-IN Wiki</a>" >> ${HTML_DIR}/index.html
-echo "</ul>" >> ${HTML_DIR}/index.html
-
-
-
-if [ ${MAKECAT} ]
-then
-    bash ${MAKECAT} -w ${grammardir} >> ${HTML_DIR}/index.html
-fi
-
-
-
-echo "<p>Created on $now</p>"  >> ${HTML_DIR}/index.html
-echo "</html></body>" >> ${HTML_DIR}/index.html
 
 ### All done
 URL=http://localhost/~${USER}/ltdb/${version}/
