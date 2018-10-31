@@ -5,6 +5,9 @@
 ##
 ## Actually does the lexicon too :-)
 ##
+## ToDo:
+##   * add mrs in error log
+##
 import sqlite3, sys, re, os
 from collections import defaultdict as dd
 from delphin import itsdb
@@ -40,6 +43,10 @@ mroot=re.compile(r'^\(([-a-zA-z0-9_+]+?)\s+\(')
 mrule=re.compile(r'\([0-9]+ ([^ ]+) [-0-9.]+ ([0-9]+) ([0-9]+) ')
 mlex=re.compile(r'\([0-9]+ ([^ ]+) [-0-9.]+ [0-9]+ [0-9]+ \("(.*?)" ')
 
+log = open("gold.log", 'w')
+
+
+
 golddir = '%s/tsdb/gold' % grmdir
 typefreq=dd(int)                  # typefreq[type] = freq
 lexfreq=dd(lambda: dd(int))       # lexfreq[lexid][surf] = freq
@@ -64,15 +71,21 @@ for root, dirs, files in os.walk(golddir):
             deriv_json = delphin.derivation.Derivation.from_string(deriv).to_dict(fields=['id','entity','score','form','tokens'])            
             mrs_string = row['mrs']
             try:
-                mrs_obj = delphin.mrs.simplemrs.loads(mrs_string, single=True, version=1.1, strict=False, errors='warn')
+                mrs_obj = delphin.mrs.simplemrs.loads(mrs_string, single=True, version=1.1, errors='strict')
                 # mrs_obj = delphin.mrs.simplemrs.loads(row['mrs'], single=True, version=1.1, strict=False, errors='warn')
                 # mrs_string = row['mrs']  # CHANGING
                 mrs_json = delphin.mrs.xmrs.Mrs.to_dict(mrs_obj)
                 dmrs_json = delphin.mrs.xmrs.Dmrs.to_dict(mrs_obj)
-            except:
-                sys.stderr.write("\n\nMRS failed to convert in pydelphin:\n")
-                sys.stderr.write(str(mrs_string))
-                sys.stderr.write("\n\n")
+            except Exception as e:
+                log.write("\n\nMRS failed to convert in pydelphin:\n")
+                log.write("{}: {}\n".format(root, pid))
+                log.write(str(mrs_string))
+                log.write("\n\n")
+                if hasattr(e, 'message'):
+                    log.write(e.message)
+                else:
+                    log.write(str(e))
+                log.write("\n\n")
                 mrs_json = dict()
                 dmrs_json = dict()
             

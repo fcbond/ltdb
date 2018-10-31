@@ -3,6 +3,11 @@
 ##
 ## Actually does the lexicon too :-)
 ##
+##  Creates the database
+##  Reads in the lexicon
+##  Add the types: rules, lrules, general, roots
+##
+
 import sqlite3, sys
 from lxml import etree
 from collections import defaultdict as dd
