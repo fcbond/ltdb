@@ -34,19 +34,30 @@ for root, dirs, files in os.walk(grmdir):
             if 'pet' in f or 'qc' in f or 'config' in f:
                 continue
             print("Processing %s" % f, file=sys.stderr)
-            for event, obj, lineno in delphin.tdl.iterparse(os.path.join(root, f)): # assume utf-8
+            try:
+                for event, obj, lineno in delphin.tdl.iterparse(os.path.join(root, f)): # assume utf-8
                 #print(lineno, event, sep = '\t')
-                if event in ['TypeDefinition',  'TypeAddendum',
-                'LexicalRuleDefinition']:
-                    tdls.append((obj.identifier,
-                                f, lineno,
-                                tdl.format(obj),
-                                obj.docstring))
-                elif event not in ['LineComment', 'BlockComment']:
-                    ## ToDo log properly
-                    print('Unknown Event', event, obj, fl, lineno,
-                          sep = '\t',
-                          file=sys.stderr)
-c.executemany("""INSERT INTO tdl
-                 VALUES (?,?,?,?,?)""", tdls)
-conn.commit()
+                    if event in ['TypeDefinition',  'TypeAddendum',
+                                 'LexicalRuleDefinition']:
+                        tdls.append((obj.identifier,
+                                     f, lineno,
+                                     tdl.format(obj),
+                                     obj.docstring))
+                    elif event not in ['LineComment', 'BlockComment']:
+                        ## ToDo log properly
+                        print('Unknown Event', event, obj, fl, lineno,
+                              sep = '\t',
+                        file=sys.stderr)
+            except Exception as e:
+                print("Unable to parse tdl for {}".format(os.path.join(root, f)),
+                      file=sys.stderr)
+                if hasattr(e, 'message'):
+                    print(e.message)
+                else:
+                    print(str(e))
+
+                
+if tdls:                        
+    c.executemany("""INSERT INTO tdl
+                     VALUES (?,?,?,?,?)""", tdls)
+    conn.commit()
