@@ -23,18 +23,6 @@ fi
     
 
 ###
-### Change this
-###
-MAKECAT=`locate -b "\create-catalogue-entry.sh"`
-if [ ${MAKECAT} ]
-then
-    echo "Found Grammar Catalogue Creator: " ${MAKECAT}
-else
-    printf "\033[1;31m Couldn't find Grammar Catalogue Creator \033[0m \n" #RED
-    printf "\033[1;31m Install from https://github.com/delph-in/grammar-catalogue.git \033[0m \n" #RED
-fi
-
-###
 ### get the grammar directory
 ###
 
