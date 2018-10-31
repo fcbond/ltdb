@@ -43,7 +43,8 @@ mroot=re.compile(r'^\(([-a-zA-z0-9_+]+?)\s+\(')
 mrule=re.compile(r'\([0-9]+ ([^ ]+) [-0-9.]+ ([0-9]+) ([0-9]+) ')
 mlex=re.compile(r'\([0-9]+ ([^ ]+) [-0-9.]+ [0-9]+ [0-9]+ \("(.*?)" ')
 
-log = open("gold.log", 'w')
+### make a log in the same directory as the database
+log = open(os.path.join(os.path.dirname(dbfile),"gold.log"), 'w')
 
 
 

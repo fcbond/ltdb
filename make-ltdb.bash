@@ -75,7 +75,7 @@ fi
 ### write the temporary files to here
 outdir=${LOGONTMP}/${version}
 
-log=${outdir}/log
+log=${outdir}/lkb.log
 echo Log file at ${log}
 
 ### write the html here
@@ -171,7 +171,7 @@ python3 xml2db.py ${outdir} ${db}
 
 echo "Adding in the info from the tdl with pydelphin"
 echo
-python3 tdl2db.py ${grammardir} ${db}  ### add tdl and comments
+python3 tdl2db.py ${grammardir} ${db}   ### add tdl and comments
 
 echo "Adding in the info from the gold trees"
 echo
@@ -190,6 +190,7 @@ cp html/*.cgi html/*.py html/*.js html/*.css  ${CGI_DIR}/.
 ### copy database to cgi-bin
 cp ${outdir}/${LTDB_FILE} ${CGI_DIR}/.
 
+
 ### params
 dbhost=`hostname -f`
 echo "charset=utf-8" > ${CGI_DIR}/params
@@ -199,8 +200,9 @@ echo "cssdir=http://$dbhost/~$USER/ltdb/$version" >> ${CGI_DIR}/params
 echo "cgidir=http://$dbhost/~$USER/cgi-bin/$version" >> ${CGI_DIR}/params
 echo "ver=$version" >> ${CGI_DIR}/params
 
-### HTML
+### HTML and logs
 cp html/*.js html/*.css ${HTML_DIR}/.
+cp ${outdir}/*.log ${HTML_DIR}
 
 python3 makehome.py ${version}  ${grammardir} > ${HTML_DIR}/index.html
 
