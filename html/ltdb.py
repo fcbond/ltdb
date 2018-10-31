@@ -33,7 +33,7 @@ def hlt (typs):
 
 
 
-retyp=re.compile(r"\b([-A-Za-z_+*0-9]+)\b")
+retyp=re.compile(r"(?<![#])\b([-A-Za-z_+*0-9]+)\b")
 
 def hltyp(match):
     types=set()
@@ -45,7 +45,7 @@ def hltyp(match):
     #print types
     t = unicode(match.group(0))
     #print "<br>%s %s\n" % (t, t in types)
-    if t in types:
+    if t in types and not t.startswith('#'):
         return "<a href='{}/showtype.cgi?typ={}'>{}</a>".format(par['cgidir'], 
                                                                 urllib.quote(t,''),
                                                                 t)
@@ -56,7 +56,8 @@ def hltyp(match):
 def hlall (typs):
     "hyperlink all types in a description or documentation"
     if typs:
-        typs=re.sub(r'(#[0-9][a-z][A-Z]+)', r"<span class='coref'>\1</span>", typs)
+        ### Definition from http://moin.delph-in.net/TdlRfc
+        typs=re.sub(r'(#[\w_+*?-]+)', "<span class='coref'>\\1</span>", typs)
         return retyp.sub(hltyp, typs)
     else:
         return '<br>'

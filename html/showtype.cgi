@@ -126,8 +126,15 @@ else:
     ### TDL and type info
     if status != 'Unknown':
         print("""<h2>Type Information</h2>""")
-        if definition:
-            print("""<pre class='code'>%s</pre>""" % ltdb.hlall(definition).replace(',\n',',<br>').replace('&\n','&amp;<br>').replace('\n',''))
+        print("""<div class='tdl'>""")
+        if tdlinfo:
+            for src, lineno, tdl, docstring in tdlinfo:
+                print("""<pre class='code'>%s</pre>""" % ltdb.hlall(tdl))
+                print("(%s: %s)" % (src, lineno))
+                if docstring:
+                    print("""<h4>docstring</h4>""")
+                    print(docstring)
+        print("</div>")
         print("""<table><tr><th>Supertypes</th><th>Head Category</th>
         <th>Valence</th><th>Content</th><th>Subtypes</th>
         <th>Headedness</th></tr>
@@ -138,14 +145,9 @@ else:
                             ltdb.hlt(cont),  
                             ltdb.hlt(children) or "<span class=match>LEAF</span>",
                             headedness[(arity,head)]))
-        if tdlinfo:
-            print("""<h3>TDL from pydelphin</h3>""")
-            for src, lineno, tdl, docstring in tdlinfo:
-                print("""<pre class='code'>%s</pre>""" % ltdb.hlall(tdl).replace(',\n',',<br>').replace('&\n','&amp;<br>').replace('\n',''))
-                print("(%s:%s)" % (src, lineno))
-                if docstring:
-                    print("""<h4>docstring</h4>""")
-                    print(docstring)
+        if definition:
+            print("""<h3>TDL from LKB comment</h3>""")
+            print("""<pre class='code'>%s</pre>""" % ltdb.hlall(definition))
 
 print ltdb.footer()
 
