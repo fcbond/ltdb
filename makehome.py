@@ -65,19 +65,26 @@ except FileNotFoundError:
 
 print("<table>")
 print("  <caption>Metadata for {}<caption>".format(version))
-print("<table>")
 for a,v in md.items():
+    a=a.replace('_',' ')
     if a not in 'VCS BCP_47':
         a=a.title()
-    a=a.replace('_','')
     if v.startswith('http'):
         print("<tr><td>{0}</td><td><a href='{1}'>{1}</a></td></tr>".format(a,v))
-    if a.endswith('Email'):
+    elif a.endswith('Email'):
         print("<tr><td>{0}</td><td><a href='mailto:{1}?subject={2}'>{1}</a></td></tr>".format(a,v,version))
     else:
         print("<tr><td>{}</td><td>{}</td></tr>".format(a,v))
 print("</table>")
-      
+
+print("""
+<h3>Logs</h3>
+<ul>
+   <li><a href='lkb.log'>LKB conversion log</a>
+   <li><a href='tdl.log'>TDL conversion log</a>
+   <li><a href='gold.log'>Gold profiles conversion log</a>
+</ul>
+""")
 
     
 print("""  <p>Created on {}</p>
