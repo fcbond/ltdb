@@ -150,13 +150,6 @@ else
     echo "   sudo apt-get install xmlstarlet"
     echo
 fi
-echo
-echo "Dumping type descriptions for " `ls ${grammardir}/*.tdl`
-echo "Soon to be redundant"
-echo
-./description2xml.perl ${grammardir}/*.tdl > ${outdir}/${LINGUISTICS_FILE}
-
-xmlstarlet val -e ${outdir}/${LINGUISTICS_FILE}
 ###
 ### make the databases
 ###

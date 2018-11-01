@@ -205,54 +205,6 @@ print("Types (%s/roots.xml) entered into the DB (%s)\n" % (xmldir, dbfile),
       file=sys.stderr)
 
 
-### Description
-try:
-    t = etree.parse('%s/linguistics.xml' % xmldir,
-                    parser=etree.XMLParser(remove_comments=True))
-    print("Parsed %s/linguistics.xml" % xmldir, file=sys.stderr)
-except:
-    print("Couldn't parse %s/linguistics.xml" % xmldir, file=sys.stderr)
-
-for typ in t.getroot():
-    #print(etree.tostring(typ, pretty_print=True))
-    lname = None
-    for el in typ.iter('name'):
-        lname = el.text
-    description=None
-    for el in typ.iter('description'):
-        description = el.text
-    todo=None
-    for el in typ.iter('todo'):
-        todo = el.text
-    exes = list()
-    for el in typ.iter('ex'):
-        if el.text:
-            exes.append('ex\t%s' % el.text)
-    for el in typ.iter('nex'):
-        if el.text:
-            exes.append('nex\t%s' % el.text)
-    criteria = '\n'.join(exes)
-    typname = typ.get('val')
-    if typname not in alltypes:
-        print('ERROR:  unknown type (%s) in linguistics.xml' % \
-                      typname)
-    ##print (typname, lname, description, criteria)
-    if typname:
-        try:
-            c.execute("""UPDATE types SET
-           lname =?, description =?, criteria =?,
-		   reference =?, todo =?
-           WHERE typ=?""" , (lname,
-                             description,
-                             criteria,
-                             None,
-                             todo,
-                             typname))
-        except sqlite3.Error as e:
-            print('ERROR:   (%s) of type (%s), type: %s' % \
-                      (e, type(e).__name__, typ.get("name")))
-print("Descriptions (%s/linguistics.xml) entered into the DB (%s)\n" % (xmldir, dbfile), 
-      file=sys.stderr)
 
         
 conn.commit()
