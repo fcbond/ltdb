@@ -26,14 +26,14 @@ Everything is installed to `~/public_html/`
 
 ### Requirements
 ```
+  * python 2.7, python 3, pydelphin, docutils
   * Perl
   * SQLite3
   * Apache
   * LKB/Lisp		for db dump
   * xmlstarlet		for validating lisp
-  * python 2.7, python 3, pydelphin, docutils
 
-  * jquery, jquery tablesorter (patched)
+  * jquery, jquery tablesorter (patched, we include)
 ``` 
 
 We prefer that Sentence IDs are unique, if we see two sentences in the
@@ -43,9 +43,10 @@ gold treebank with the same ID, we only store the first one.
 Install dependencies (in ubuntu):
 ```bash
 sudo apt-get install apache2 xmlstarlet
+sudo apt-get install python-docutils python3-docutils 
 
 sudo pip install pydelphin
-sudo pip install docutils
+sudo pip3 install pydelphin
 ```
 
 
@@ -72,6 +73,12 @@ And then restart Apache2
 ```bash
 sudo service apache2 restart
 ```
+
+You may have to change the path to the LKB inside {{{make-ltdb.bash}}}
+```bash
+LKBFOS=~/delphin/lkb_fos/lkb.linux_x86_64
+```
+
 
 ## Todo
 
