@@ -25,11 +25,11 @@ print ltdb.searchbar()
 if (lemma):
     con = sqlite3.connect(par['db'])
     c = con.cursor()
-    c.execute("""SELECT lex.typ,  types.lname, words, lfreq, cfreq 
+    c.execute("""SELECT lex.typ,  types.lname, words, lfreq, cfreq, lex.lexid 
                  FROM ltypes LEFT JOIN lex 
                  ON ltypes.typ = lex.typ 
                  LEFT JOIN types ON lex.typ = types.typ
-                 WHERE orth = ?""", (lemma,) )
+                 WHERE orth GLOB ?""", ('*{}*'.format(lemma),) )
     results = c.fetchall()
     if results:
         print """
@@ -38,11 +38,14 @@ if (lemma):
 %d Type(s) found.
 """ % (lemma, par['ver'], len(results))
         print "<table>"
-        print "<tr><th>%s</th><th>%s</th><th>%s</th></tr>" % ("Lexical Type", 
-                                                              "Name", 
-                                                              "Example (Lexicon, Corpus)")
+        print ("""<tr>
+        <th>{}</th><th>{}</th><th>{}</th><th>{}</th>
+        </tr>""".format("Lexical Entry",
+                        "Lexical Type",
+                        "Name", 
+                        "Example (Lexicon, Corpus)"))
         for (typ,  name,
-             words, typefreq, tokenfreq) in results:
+             words, typefreq, tokenfreq, lexid) in results:
             ## FIXME ':' -> '\t'
             if not name:
                 name = '<br>'
@@ -50,9 +53,13 @@ if (lemma):
             if words:
                 wrds = ", ".join(["<span title='%s (%s)'>%s</a>" % tuple(r.split('\t')) for 
                                   r in words.split('\n')])
-            print """<tr><td>%s</td><td>%s</td>
-                     <td>%s (%s, %s)</td></tr>""" % (ltdb.hlt(typ), name,
-                                                     wrds, typefreq, tokenfreq)
+            print("""<tr>
+   <td><a href='showtype.cgi?typ={}'>{}</a></td>
+   <td>{}</td>
+   <td>{}</td>
+   <td>{} ({}, {})</td>
+</tr>""".format(lexid, lexid, ltdb.hlt(typ), name,
+                 wrds, typefreq, tokenfreq))
         print "</table>"
     else:
         print "<p>No matches found for lemma %s in %s."  % (lemma, par['ver'])

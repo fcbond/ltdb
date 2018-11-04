@@ -1,20 +1,21 @@
 ### --*-- coding: utf-8 --*--
 ### shared code for the ltdb
 ###
+from __future__ import unicode_literals
+
 import sqlite3, collections, cgi, re, urllib
 from collections import defaultdict as dd
 import json
 
 def getpar (params):
     par=dict()
-    f = open(params)
-    for l in f:
-        (ft,vl)=l.strip().split('=')
-        par[ft]=vl
-    # par['css']='http://ronf/~bond/ltdb/Jacy_1301'
-    # par['cgi']='http://ronf/~bond/cgi-bin/Jacy_1301'
-    # par['db']='/home/bond/public_html/cgi-bin/Jacy_1301/lt.db'
-    # par['ver']='Jacy_1301'
+    try:
+        f = open(params)
+        for l in f:
+            (ft,vl)=l.strip().split('=')
+            par[ft]=vl
+    except:
+        pass
     return par
 
 par=getpar('params')
@@ -68,18 +69,31 @@ def hlall (typs):
 ### Show example sentences:
 ### * take a dict with sets of (tfrom, tto), show all sentences
 ### sids = dd(set)
-def showsents (c, typ, limit, biglimit):
-    c.execute("SELECT freq FROM typfreq WHERE typ=?", (typ,))
-    results = c.fetchone()
+def showsents (c, typ, lexid, limit, biglimit):
+    if lexid:
+        c.execute("SELECT count(sid) FROM sent WHERE lexid=?", (lexid,))
+        results = c.fetchone()
+    else:
+        c.execute("SELECT freq FROM typfreq WHERE typ=?", (typ,))
+        results = c.fetchone()
     if results and results[0] > 0:
         total = results[0]
-        c.execute("""SELECT sid, kara, made FROM typind 
-                 WHERE typ=? ORDER BY sid LIMIT ?""", (typ, limit))
         sids = dd(set)
-        for (sid, kara, made) in c:
-            sids[sid].add((kara, made))
+        if lexid:
+            c.execute("""SELECT sid, wid FROM sent 
+                         WHERE lexid=? ORDER BY sid LIMIT ?""", (lexid, limit))
+            for (sid, wid) in c:
+                sids[sid].add((wid, wid+1))
+        else:
+            c.execute("""SELECT sid, kara, made FROM typind 
+                         WHERE typ=? ORDER BY sid LIMIT ?""", (typ, limit))
+            for (sid, kara, made) in c:
+                sids[sid].add((kara, made))
         if limit < total and biglimit > limit:
-            limtext= "({:,} out of {:,}: <a href='more.cgi?typ={}&limit={}'>more</a>)".format(limit, total, urllib.quote(typ,''), biglimit)
+            limtext= "({:,} out of {:,}: <a href='more.cgi?typ={}&lexid={}&limit={}'>more</a>)".format(limit, total,
+                                                                                                       urllib.quote(typ,''),
+                                                                                                       lexid,
+                                                                                                       biglimit)
         elif limit < total:
             limtext= "({:,} out of {:,})".format(limit, total)
         else:
@@ -101,13 +115,15 @@ def showsents (c, typ, limit, biglimit):
 
 
             # fetch json for deriv_tree, mrs and dmrs
-            c.execute("""SELECT mrs, mrs_json, dmrs_json, deriv_json FROM gold 
+            c.execute("""SELECT mrs, mrs_json, dmrs_json, deriv_json, sent, comment FROM gold 
                         WHERE sid =  ? """, [sid])
-            for (mrs, mrs_json, dmrs_json, deriv_json) in c:
+            for (mrs, mrs_json, dmrs_json, deriv_json, sent, comment) in c:
                 mrs = mrs
                 mrs_json = mrs_json
                 dmrs_json = dmrs_json
                 deriv_json = deriv_json
+                sent=sent
+                #comment unused
 
             for (kara, made) in sorted(sids[sid]):
                 print('<li>{}<sub>{}-{}</sub> &nbsp;&nbsp; '.format(sid,kara,made))
@@ -123,9 +139,6 @@ def showsents (c, typ, limit, biglimit):
             # PRINT THE VISUALIZATIONS (only once per sentence)
             ##############################################################
             
-            sent_text = ""
-            for wid in sents[sid]:
-                sent_text += sents[sid][wid][0] + " "
 
             # <b>Show/Hide:</b>
             print("""<span> &nbsp;&nbsp;&nbsp;&nbsp;
@@ -229,7 +242,7 @@ def showsents (c, typ, limit, biglimit):
                 </script>
             """.format(sid, mrs_json))
             print("""<div id='mrs{}'><br>""".format(sid))
-            print("""<div id="text-input" style="font-size: 150%%;">%s</div><br>""" % (sent_text))
+            print("""<div id="text-input" style="font-size: 150%%;">%s</div><br>""" % (sent))
             print("""</div>""")
 
             
@@ -287,18 +300,33 @@ def showsents (c, typ, limit, biglimit):
         print ("<p>No examples found for %s" % typ)
         
 
-def showlexs (c, lextyp, limit, biglimit):
-    c.execute("""SELECT count(lexid) FROM lex 
-WHERE typ=?""", (lextyp,))
-    results = c.fetchone()
+def showlexs (c, lextyp, lexid, limit, biglimit):
+    if lexid:
+        c.execute("""SELECT count(lexid) FROM lex 
+        WHERE lexid=?""", (lexid,))
+        results = c.fetchone()
+    else:
+        c.execute("""SELECT count(lexid) FROM lex 
+        WHERE typ=?""", (lextyp,))
+        results = c.fetchone()
     if results and results[0] > 0:
         total = results[0]
-        c.execute("""SELECT lex.lexid, orth, freq FROM lex 
-LEFT JOIN lexfreq ON lex.lexid = lexfreq.lexid
-WHERE typ=? ORDER BY freq DESC LIMIT ?""", (lextyp, 5 * limit))
         lem = dd(unicode) # lemma
-        for (lexid, orth, freq) in c:
-            lem[lexid] = cgi.escape(orth, quote=True)
+
+        if lexid:
+            c.execute("""SELECT lex.lexid, orth, freq FROM lex 
+            LEFT JOIN lexfreq ON lex.lexid = lexfreq.lexid
+            WHERE lex.lexid=?""", (lexid,))
+            for (lexid, orth, freq) in c:
+                lem[lexid] = cgi.escape(orth, quote=True)
+        else:
+            c.execute("""SELECT lex.lexid, orth, freq FROM lex 
+            LEFT JOIN lexfreq ON lex.lexid = lexfreq.lexid
+            WHERE typ=? ORDER BY freq DESC LIMIT ?""", (lextyp, 5 * limit))
+            for (lexid, orth, freq) in c:
+                lem[lexid] = cgi.escape(orth, quote=True)
+
+                
         c.execute("""SELECT lexid,  word, freq
 FROM lexfreq WHERE lexid in (%s) ORDER BY lexid, freq DESC""" % \
                       ','.join('?'*len(lem)), 
@@ -311,13 +339,16 @@ FROM lexfreq WHERE lexid in (%s) ORDER BY lexid, freq DESC""" % \
                 word=orth
             if not freq:
                 freq=0
-            sf[lexid] += "<span title='freq=%s'>%s</span>, " % (freq, 
+            sf[lexid] += "<span title='freq=%s'>%s</span>  " % (freq, 
                                                                 cgi.escape(word, quote=True))
             lf[lexid] +=freq
         #lf=lf[:50]
         #sf=sf[:50]
         if limit < total and biglimit > limit:
-            limtext= "({:,} out of {:,}: <a href='more.cgi?lextyp={}&limit={}'>more</a>)".format(limit, total, urllib.quote(lextyp, ''), biglimit)
+            limtext= "({:,} out of {:,}: <a href='more.cgi?lextyp={}&lexid=?&limit={}'>more</a>)".format(limit, total,
+                                                                                                         urllib.quote(lextyp, ''),
+                                                                                                         lexid,
+                                                                                                         biglimit)
         elif limit < total:
             limtext= "({:,} out of {:,})".format(limit, total)
         else:
@@ -326,8 +357,8 @@ FROM lexfreq WHERE lexid in (%s) ORDER BY lexid, freq DESC""" % \
         print("""<table><th>lexid</th><th>Lemma</th><th>Surface</th>
 <th>Frequency</th></tr>""")  ### FIXME <th>Sentences
         for lexid in sorted(lf.keys()[:min(len(lf),limit)], key = lambda x: lf[x], reverse=True):
-            print(u"""<td>{}</td><td>{}</td><td>{}</td>
-<td align='right'>{:,}</td></tr>""".format(lexid, lem[lexid], sf[lexid], lf[lexid]))
+            print(u"""<td><a href='showtype.cgi?typ={}'>{}</a></td><td>{}</td><td>{}</td>
+            <td align='right'>{:,d}</td></tr>""".format(lexid, lexid, lem[lexid], sf[lexid], lf[lexid]))
 ## <td><a href='more.cgi?lextyp=%s'>more</a></td>                 lextyp))
         print("</table>")
 #    else:
@@ -404,3 +435,44 @@ def footer():
   </address>
   </body>
 </html>""" % (par['ver'])
+
+
+def munge_desc(typ,description):
+    """parse the description and return: description.rst, examples, names
+
+    <ex>an example
+    becomes
+    #. an example 
+    and the example is ('an example', typ, 1) 
+    <nex>bad example
+    becomes
+    #. * bad example 
+    and the example is ('bad example', typ, 0) 
+
+    <name lang='en'>Bare Noun Phrase</name>
+    becomes (typ, en, 'Bare Noun Phrase')
+    """
+    exes = []
+    nams = []
+    namere=re.compile(r"""<name\s+lang=["'](.*)['"]>(.*)</name>""")
+    desc = []
+    count = 1
+    for l in description.splitlines():
+        l = l.strip()
+        if l.startswith("<ex>"):
+            exes.append((l[4:].strip(),typ,1))
+            desc.append("\n{:d}. {}\n".format(count,l[4:].strip()))
+            count += 1
+        elif l.startswith("<nex>"):
+            exes.append((l[5:].strip(),typ,0))
+            desc.append("\n{:d}. \* {}\n".format(count,l[5:].strip()))
+            count += 1
+        else:
+            m = namere.search(l)
+            if m:
+                nams.append((typ,m.group(1),m.group(2)))
+            else:
+                desc.append(l)
+    
+    #print("\n".join(desc),exes,nams)
+    return "\n".join(desc), exes, nams 

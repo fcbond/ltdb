@@ -12,8 +12,10 @@ http://stackoverflow.com/questions/876092/jquery-tablesorter-comma-digit-parser-
  
  ** don't use commas for separating words
 
- * push to src/lkb
- * provenance (store .tdl)
+ * use token list to get cfrom/cto (+FROM, +TO) and show the actual sentence
+
+ * add examples
+ * use tdl comments from pydelphin
 
  * link to other resources --IDFORM 
 
@@ -23,15 +25,12 @@ http://stackoverflow.com/questions/876092/jquery-tablesorter-comma-digit-parser-
 
  * generate examples for lexical types
 
- * expose log
 
  * curated search
 
  * Release
 
  * link to grammar configuration code (DONEish)
-
- * add in some html for the trees
 
  * share paramaters with www (vie META)
    echo "(setf tsdb::*www-introduction* \"jacy\")";

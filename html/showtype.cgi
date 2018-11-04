@@ -1,5 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import cgi
 import cgitb; cgitb.enable()  # for troubleshooting
 import sqlite3, collections
@@ -26,9 +28,12 @@ print ltdb.searchbar()
 ### labels for branching: arity, head
 headedness = {(1,0):('unary: headed'),
               (1,None):('unary: non-headed'),
+              (1,'nil'):('unary: non-headed'),
               (2,0):('binary: left-headed'),
               (2,1):('binary: right-headed'),
+              (2,'nil'):('binary: non-headed'),
               (2,None):('binary: non-headed'),
+              ('nil','nil'):(' '),
               (None,None):(' ')}
  
 ###
@@ -75,23 +80,13 @@ else:
     c.execute("""SELECT  src, line, tdl, docstring 
                   FROM tdl WHERE typ=?""", (typ,))
     tdlinfo = c.fetchall()
-
+    
         
         
-    dscp = ""
-    if description:
-        for l in description:
-            if l.startswith('+') or l.startswith('-'): 
-                dscp += l
-            else:
-                dscp += l
-                # dscp += ltdb.hlall(l)
+  
             
         
     # LETS CONVERT DESCRIPTION FROM RTS TO HTML
-    description_html = docutils.core.publish_parts(dscp,writer_name='html',
-                                     settings_overrides= {'table_style':'colwidths-auto',
-                                                          'initial_header_level':'3'})['body']
 
     if lexid:
         print ("""
@@ -102,24 +97,34 @@ else:
         print ("""
         <div id="contents">
         <h1>%s (%s)</h1>""" % (typ, status)) ## FIXME show headedness
-    if name or description or criteria or reference or todo:
-        if criteria:
-            cr="<p><table>"
-            for crit in criteria.split('\n'):
-                cr += "<tr><th>%s</th><td>%s</td></tr>" % tuple(crit.split('\t')) 
-            cr +="</table>"
-        else:
-            cr= ''
-        print("""<h2>Linguistic Documentation</h2><p>%s%s<p>%s""" % (
-                # ltdb.hlall(description),    #ADD LINKS LATER
-                description_html,
-                cr,
-                reference))
+    # if name or description or criteria or reference or todo:
+    #     if criteria:
+    #         cr="<p><table>"
+    #         for crit in criteria.split('\n'):
+    #             cr += "<tr><th>%s</th><td>%s</td></tr>" % tuple(crit.split('\t')) 
+    #         cr +="</table>"
+    #     else:
+    #         cr= ''
+    if description:
+        print("""<h2>Linguistic Documentation</h2>
+        {}""".format(docutils.core.publish_parts("\n"+ description +"\n",
+                                                 writer_name='html',
+                                                 settings_overrides= {'table_style':'colwidths-auto',
+                                                                      'initial_header_level':'3'})['body']))
+    else:
+        for  src, line, tdl, docstring in  tdlinfo:
+            if docstring:
+                print("""<h2>Linguistic Documentation (TDL)</h2>
+                {}""".format(docutils.core.publish_parts("\n"+ docstring +"\n",
+                                                         writer_name='html',
+                                                         settings_overrides= {'table_style':'colwidths-auto',
+                                                                              'initial_header_level':'3'})['body']))
+
     ###
     ### Corpus examples of lextype, type
     ###
-    ltdb.showlexs(c, typ,  maxexe, 50) 
-    ltdb.showsents(c, typ,  maxexe, 50)
+    ltdb.showlexs(c, typ,  lexid, maxexe, 50) 
+    ltdb.showsents(c, typ,  lexid, maxexe, 50)
 
 
 
@@ -131,9 +136,9 @@ else:
             for src, lineno, tdl, docstring in tdlinfo:
                 print("""<pre class='code'>%s</pre>""" % ltdb.hlall(tdl))
                 print("(%s: %s)" % (src, lineno))
-                if docstring:
-                    print("""<h4>docstring</h4>""")
-                    print(docstring)
+                # if docstring:
+                #     print("""<h4>docstring</h4>""")
+                #     print(docstring)
         print("</div>")
         print("""<table><tr><th>Supertypes</th><th>Head Category</th>
         <th>Valence</th><th>Content</th><th>Subtypes</th>

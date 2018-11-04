@@ -65,6 +65,9 @@ for root, dirs, files in os.walk(golddir):
         print("Processing %s" % root, file=sys.stderr)
         profile = itsdb.ItsdbProfile(root)
         head, profname = os.path.split(root)
+        items = {}
+        for  row in profile.read_table('item'):
+            items[row['i-id']] = (row['i-input'], row['i-comment'])
         for row in profile.read_table('result'):
             pid = row['parse-id']
             pname[pid] = profname
@@ -80,6 +83,8 @@ for root, dirs, files in os.walk(golddir):
             except Exception as e:
                 log.write("\n\nMRS failed to convert in pydelphin:\n")
                 log.write("{}: {}\n".format(root, pid))
+                log.write(items[pid][0])
+                log.write("\n\n")
                 log.write(str(mrs_string))
                 log.write("\n\n")
                 if hasattr(e, 'message'):
@@ -91,49 +96,53 @@ for root, dirs, files in os.walk(golddir):
                 dmrs_json = dict()
             
             # STORE gold info IN DB
-            c.execute("""INSERT INTO gold (sid, deriv, deriv_json, pst, mrs, mrs_json, dmrs_json, flags) 
-                         VALUES (?,?,?,?,?,?,?,?)""", (pid, deriv, json.dumps(deriv_json), None, mrs_string, json.dumps(mrs_json), json.dumps(dmrs_json), None))
-
-
-            ##print(pid, '\t', deriv)
-            ##print('\n\n')
-            ### Leaves (store as both type and token)
-            ### lexemes, lexical types
-            m = re.findall(mlex,deriv)
-            lexids=set()
-            if m:
-                #print('leaves')
-                #print(m)
-                wid =0
-                for (lexid, surf) in m:
-                    lexids.add(lexid)
-                    lexfreq[lexid][surf] +=1
-                    sent[pid].append((surf, lexid))
-                    if ltypes[lexid]:
-                        typefreq[ltypes[lexid]]  += 1
-                        lxidfreq[ltypes[lexid]][lexid]   += 1
-                        typind[ltypes[lexid]][pid].add((wid, wid+1))
-                    wid+=1
+            try:
+                c.execute("""INSERT INTO gold (sid, sent, comment, 
+                                         deriv, deriv_json, pst, 
+                                         mrs, mrs_json, dmrs_json, flags) 
+                                         VALUES (?,?,?,?,?,?,?,?,?,?)""", (pid, items[pid][0],  items[pid][1], 
+                                                                           deriv, json.dumps(deriv_json), None,
+                                                                           mrs_string, json.dumps(mrs_json),
+                                                                           json.dumps(dmrs_json), None))
+                ### ToDo use pydelphin to walk down tree
+                ### leaves
+                m = re.findall(mlex,deriv)
+                lexids=set()
+                if m:
+                    #print('leaves')
+                    #print(m)
+                    wid =0
+                    for (lexid, surf) in m:
+                        lexids.add(lexid)
+                        lexfreq[lexid][surf] +=1
+                        sent[pid].append((surf, lexid))
+                        if ltypes[lexid]:
+                            typefreq[ltypes[lexid]]  += 1
+                            lxidfreq[ltypes[lexid]][lexid]   += 1
+                            typind[ltypes[lexid]][pid].add((wid, wid+1))
+                        wid+=1
             ### rules (store as type)
-            m = re.findall(mrule,deriv)
-            if m:
-                for (typ, frm, to) in m:
-                    if typ not in lexids: ## counted these!
-                        typefreq[typ]  += 1
-                        typind[typ][pid].add((frm, to))
+                m = re.findall(mrule,deriv)
+                if m:
+                    for (typ, frm, to) in m:
+                        if typ not in lexids: ## counted these!
+                            typefreq[typ]  += 1
+                            typind[typ][pid].add((frm, to))
                 #print('rule')
                 #print(m)
             ### Root (treat as another type)
-            m = re.search(mroot,deriv)
-            if m:
+                m = re.search(mroot,deriv)
+                if m:
                 #print('root {}'.format(root))
                 #print(m.groups()[0])
                 #print(deriv)
                 #print()
-                roots[pid] = m.groups()[0]
+                    roots[pid] = m.groups()[0]
 
             ##print('\n\n\n')
-
+            except sqlite3.Error as e:
+                log.write('ERROR:   ({}) of type ({}), {}: {}'.format(e, type(e).__name__,
+                                                                      root, pid))
 
 ### each sentence should have a root
 for s in sent:
@@ -195,11 +204,6 @@ for t in typind:
         for (k, m) in typind[t][s]:
             c.execute("""INSERT INTO typind (typ, sid, kara, made) 
                  VALUES (?,?,?,?)""", (t, s, k, m))
-
-### bit of a hack, but my lisp foo is weak
-# for r in allroots:
-#     c.execute("""INSERT INTO types (typ, status) 
-#                  VALUES (?,?)""", (r, 'root'))
 
    
 

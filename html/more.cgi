@@ -16,6 +16,8 @@ typ = form.getfirst("typ", "")
 typ = typ.strip().decode('utf-8')
 lextyp = form.getfirst("lextyp", "")
 lextyp = lextyp.strip().decode('utf-8')
+lexid = form.getfirst("lexid", "")
+lexid = lexid.strip().decode('utf-8')
 limit = int(form.getfirst("limit", 50))
 
 
@@ -32,15 +34,13 @@ if (typ):
     print(u"<h1>{}</h2>".format(typ))
     con = sqlite3.connect(par['db'])
     c = con.cursor() 
-    ltdb.showsents(c, typ,  limit, 50)
+    ltdb.showsents(c, typ, lexid, limit, 50)
 elif(lextyp):
     print(u"<h1>{}</h2>".format(lextyp))
     con = sqlite3.connect(par['db'])
     c = con.cursor() 
-    ltdb.showlexs(c, lextyp,  limit, 50) 
+    ltdb.showlexs(c, lextyp, lexid, limit, 50)
 else:
-    print("<p>More examples of what?" %(typ, 
-                                              lextyp, 
-                                              limit))
+    print("<p>More examples of what?")
 print("</div>")
 print ltdb.footer()

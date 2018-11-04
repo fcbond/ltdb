@@ -8,8 +8,11 @@
 import sqlite3, sys, os
 from delphin import tdl
 import delphin
-#from collections import defaultdict as dd
-#from delphin import itsdb
+cwd = os.getcwd()
+### get some local utilities
+sys.path.append(cwd + '/html')
+import ltdb
+
 
 if (len(sys.argv) < 3):
     # prints standard error msg (stderr)
@@ -42,13 +45,20 @@ for root, dirs, files in os.walk(grmdir):
                 #print(lineno, event, sep = '\t')
                     if event in ['TypeDefinition',  'TypeAddendum',
                                  'LexicalRuleDefinition']:
+                        if obj.docstring:
+                            descript,exes,nams= ltdb.munge_desc(obj.identifier,obj.docstring)
+                            obj.docstring=None
+                        else:
+                            descript = ''
                         tdls.append((obj.identifier,
                                      f, lineno,
                                      tdl.format(obj),
-                                     obj.docstring))
-                    elif event not in ['LineComment', 'BlockComment']:
+                                     descript))
+                    elif event not in ['LineComment', 'BlockComment',
+                                       'BeginEnvironment', 'EndEnvironment',
+                                       'FileInclude' ]:
                         ## ToDo log properly
-                        print('Unknown Event', event, obj, fl, lineno,
+                        print('Unknown Event', event, obj, f, lineno,
                               sep = '\t',
                         file=log)
             except Exception as e:

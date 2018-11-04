@@ -8,11 +8,15 @@
 ##  Add the types: rules, lrules, general, roots
 ##
 
-import sqlite3, sys
+import sqlite3, sys, os
 from lxml import etree
 from collections import defaultdict as dd
 # import docutils
 import docutils.core
+cwd = os.getcwd()
+### get some local utilities
+sys.path.append(cwd + '/html')
+import ltdb
 
 if (len(sys.argv) < 3):
     # prints standard error msg (stderr)
@@ -54,6 +58,8 @@ for l in f:
     except sqlite3.Error as e:
         print('ERROR:   (%s) of type (%s), lexid: %s' % \
                   (e, type(e).__name__, lexid))
+
+                                                             
 print("Lexicon (%s/lex.tab) entered into the DB (%s)\n" % (xmldir, dbfile), 
       file=sys.stderr)
 
@@ -153,17 +159,7 @@ for typ in t.getroot():
     descript = ""     # Let's assume empty comment to start
     for child in typ: # For now, only comments are expected, but we never know
         if child.tag == "comment":
-            descript = child.text
-
-
-            # descript = descript.replace("\n","<br>") # THIS IS NOT WORKING,
-            # the CGI is probably messing it up at a later stage
-            # sys.stderr.write(child.text + 'spam\n') #TEST#
-
-    # Convert the comment from RST to HTML
-    # descript_html = docutils.core.publish_parts(descript,writer_name='html',
-    #                 settings_overrides= {'table_style':'colwidths-auto'})['body']
-            
+            descript,exes,nams= ltdb.munge_desc(typ.get("name"),child.text)
     try:
         c.execute("""INSERT INTO types 
                  (typ, parents, children, status,

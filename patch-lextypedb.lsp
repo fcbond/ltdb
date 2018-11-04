@@ -235,7 +235,7 @@
    ;; 		     (output-type-as-tdl name type-struct plain-tdl))))
    ;;; print comment
    (if comment
-       (format stream "~%<comment>~%~(~a~)~%</comment>"
+       (format stream "~%<comment>~%~a~%</comment>"
 	       (lkb::xml-escape comment)))
    ;;; print  TDL as CDATA
    (format stream "~%<![CDATA[")
