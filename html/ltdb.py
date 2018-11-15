@@ -2,8 +2,10 @@
 ### shared code for the ltdb
 ###
 from __future__ import unicode_literals
+from __future__ import print_function
 
-import sqlite3, collections, cgi, re, urllib
+
+import sqlite3, collections, cgi, re, urllib, sys
 from collections import defaultdict as dd
 import json
 
@@ -446,8 +448,12 @@ def munge_desc(typ,description):
     and the example is ('an example', typ, 1) 
     <nex>bad example
     becomes
-    #. * bad example 
+    #. ∗ bad example 
     and the example is ('bad example', typ, 0) 
+    <mex>bad example that we parse
+    becomes
+    #. ⊛ bad example that we parse
+    and the example is ('bad example that we parse', typ, 1) 
 
     <name lang='en'>Bare Noun Phrase</name>
     becomes (typ, en, 'Bare Noun Phrase')
@@ -459,13 +465,23 @@ def munge_desc(typ,description):
     count = 1
     for l in description.splitlines():
         l = l.strip()
-        if l.startswith("<ex>"):
-            exes.append((l[4:].strip(),typ,1))
-            desc.append("\n{:d}. {}\n".format(count,l[4:].strip()))
-            count += 1
-        elif l.startswith("<nex>"):
-            exes.append((l[5:].strip(),typ,0))
-            desc.append("\n{:d}. \* {}\n".format(count,l[5:].strip()))
+        if l.startswith("<ex>") or l.startswith("<nex>") \
+           or l.startswith("<mex>"):
+            if l.startswith("<ex>"):
+                ex = l[4:].strip()
+                exes.append((ex,typ,1))
+                desc.append("\n{:d}. {}\n".format(count, ex))
+            elif l.startswith("<nex>"):
+                ex = l[5:].strip()
+                exes.append((ex,typ,0))
+                desc.append("\n{:d}. ∗ {}\n".format(count, ex))
+            else: # l.startswith("<mex>")
+                ex = l[5:].strip()
+                exes.append((ex,typ,1))
+                desc.append("\n{:d}. ⊛ {}\n".format(count, ex))
+            if ex.startswith('*'):
+                print("Warning: don't use '*' in examples, just use <nex>:", l,
+                      file=sys.stderr)
             count += 1
         else:
             m = namere.search(l)
