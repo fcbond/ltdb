@@ -32,6 +32,7 @@ CREATE TABLE sent (sid INTEGER,
 		   wid INTEGER,
 		   word TEXT,
 		   lexid TEXT);
+-- Information from the gold profiles
 CREATE TABLE gold (sid INTEGER primary key,
        	     	   sent TEXT,
 		   comment TEXT,
@@ -51,9 +52,9 @@ CREATE TABLE typfreq(typ TEXT,
 CREATE TABLE lexfreq(lexid TEXT, 
                      word TEXT, 
                      freq INTEGER DEFAULT 0);
-
+-- TDL extracted by PyDelphin
 CREATE TABLE tdl (typ TEXT,
        	     	  src TEXT,
 		  line INTEGER,
                   tdl TEXT,
-		  docstring TEXT)
+		  docstring TEXT);
