@@ -141,7 +141,7 @@ for root, dirs, files in os.walk(golddir):
 
             ##print('\n\n\n')
             except sqlite3.Error as e:
-                log.write('ERROR:   ({}) of type ({}), {}: {}'.format(e, type(e).__name__,
+                log.write('ERROR:   ({}) of type ({}), {}: {}\n'.format(e, type(e).__name__,
                                                                       root, pid))
 
 ### each sentence should have a root
