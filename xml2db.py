@@ -7,10 +7,13 @@
 ##  Reads in the lexicon
 ##  Add the types: rules, lrules, general, roots
 ##
-
+## Fixme --- make a single routine for all the files
+## Fixme --- read the names and use them
+##
 import sqlite3, sys, os
 from lxml import etree
 from collections import defaultdict as dd
+import datetime
 # import docutils
 import docutils.core
 cwd = os.getcwd()
@@ -26,6 +29,7 @@ if (len(sys.argv) < 3):
 else:
     (script, xmldir, dbfile) = sys.argv
 
+    
 conn = sqlite3.connect(dbfile)    # loads dbfile as con
 c = conn.cursor()    # creates a cursor object that can perform SQL commands with c.execute("...")
 
@@ -40,6 +44,14 @@ try:
 except:
     pass # handle the error
 conn.commit()
+
+###
+### Remember the examples
+###
+### example[typ] = { (sent, wf) } 
+###
+example = dd(set)
+
 
 ### 
 ### Start with the lexicon as we need it to tell the lexical types
@@ -160,6 +172,9 @@ for typ in t.getroot():
     for child in typ: # For now, only comments are expected, but we never know
         if child.tag == "comment":
             descript,exes,nams= ltdb.munge_desc(typ.get("name"),child.text)
+            for (s,t,wf) in exes:
+                example[t].add((s, wf))
+                
     try:
         c.execute("""INSERT INTO types 
                  (typ, parents, children, status,
@@ -200,6 +215,18 @@ for typ in t.getroot():
 print("Types (%s/roots.xml) entered into the DB (%s)\n" % (xmldir, dbfile), 
       file=sys.stderr)
 
+
+item = open(os.path.join(os.path.dirname(dbfile),"item"), 'w')
+iid = 1
+now = datetime.datetime.isoformat(datetime.datetime.now())
+for t in example:
+    ### FIXME escape the examples or use PyDelphin
+    for s, w in example[t]:
+        print(str(iid), '', '', '', '', 
+              t, s, '', '', '',
+              str(w), '', '', 'ltdb', now,
+              file = item, sep='@')
+        iid += 1
 
 
         
