@@ -84,6 +84,14 @@ print("""
    <li><a href='tdl.log'>TDL conversion log</a>
    <li><a href='gold.log'>Gold profiles conversion log</a>
 </ul>
+<h3>Linguistic Type Database</h3>
+<ul>
+   <li><a href='lt.db.7z'>Compressed SQLITE Database: lt.db.7z</a>
+   <li>Schema Diagram
+<br>
+   <img src='lt-diagram.png'>
+</ul>
+
 """)
 
     

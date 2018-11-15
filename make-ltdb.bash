@@ -194,7 +194,7 @@ echo "cgidir=http://$dbhost/~$USER/cgi-bin/$version" >> ${CGI_DIR}/params
 echo "ver=$version" >> ${CGI_DIR}/params
 
 ### HTML and logs
-cp html/*.js html/*.css ${HTML_DIR}/.
+cp doc/lt-diagram.png html/*.js html/*.css ${HTML_DIR}/.
 cp ${outdir}/*.log ${HTML_DIR}
 
 python3 makehome.py ${version}  ${grammardir} > ${HTML_DIR}/index.html
@@ -203,5 +203,12 @@ python3 makehome.py ${version}  ${grammardir} > ${HTML_DIR}/index.html
 ### All done
 URL=http://localhost/~${USER}/ltdb/${version}/
 echo
-echo "Done: take a look at " ${URL}
 echo
+echo
+echo "Almost done!  Take a look at " ${URL}
+echo
+echo
+echo
+echo "Still compressing the db for download" 
+7z a ${HTML_DIR}/${LTDB_FILE}.7z ${CGI_DIR}/${LTDB_FILE}
+echo "Really Done"

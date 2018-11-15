@@ -1,5 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import cgi
 import cgitb; cgitb.enable()  # for troubleshooting
 import sqlite3, collections
@@ -18,9 +20,9 @@ typ = typ.strip().decode('utf-8')
 
 par=ltdb.getpar('params')
 
-print ltdb.header()
+print (ltdb.header())
 
-print ltdb.searchbar()
+print (ltdb.searchbar())
 
 if (lemma):
     con = sqlite3.connect(par['db'])
