@@ -304,29 +304,34 @@ def showsents (c, typ, lexid, limit, biglimit):
 
 def showlexs (c, lextyp, lexid, limit, biglimit):
     if lexid:
+        ## You want a specific word
         c.execute("""SELECT count(lexid) FROM lex 
         WHERE lexid=?""", (lexid,))
         results = c.fetchone()
     else:
+        ## You want a lexical type
         c.execute("""SELECT count(lexid) FROM lex 
         WHERE typ=?""", (lextyp,))
         results = c.fetchone()
+        
     if results and results[0] > 0:
         total = results[0]
         lem = dd(unicode) # lemma
 
         if lexid:
+            ## You want a specific word
             c.execute("""SELECT lex.lexid, orth, freq FROM lex 
             LEFT JOIN lexfreq ON lex.lexid = lexfreq.lexid
             WHERE lex.lexid=?""", (lexid,))
             for (lexid, orth, freq) in c:
                 lem[lexid] = cgi.escape(orth, quote=True)
         else:
+            ## You want a lexical type
             c.execute("""SELECT lex.lexid, orth, freq FROM lex 
             LEFT JOIN lexfreq ON lex.lexid = lexfreq.lexid
             WHERE typ=? ORDER BY freq DESC LIMIT ?""", (lextyp, 5 * limit))
-            for (lexid, orth, freq) in c:
-                lem[lexid] = cgi.escape(orth, quote=True)
+            for (lxid, orth, freq) in c:
+                lem[lxid] = cgi.escape(orth, quote=True)
 
                 
         c.execute("""SELECT lexid,  word, freq
@@ -335,19 +340,19 @@ FROM lexfreq WHERE lexid in (%s) ORDER BY lexid, freq DESC""" % \
                   lem.keys())
         lf = dd(int) # frequency
         sf = dd(unicode) # surface forms
-        for (lexid, word,freq) in c:
+        for (lxid, word,freq) in c:
         ### if the word was not in the corpus
             if not word:
                 word=orth
             if not freq:
                 freq=0
-            sf[lexid] += "<span title='freq=%s'>%s</span>  " % (freq, 
+            sf[lxid] += "<span title='freq=%s'>%s</span>  " % (freq, 
                                                                 cgi.escape(word, quote=True))
-            lf[lexid] +=freq
+            lf[lxid] +=freq
         #lf=lf[:50]
         #sf=sf[:50]
         if limit < total and biglimit > limit:
-            limtext= "({:,} out of {:,}: <a href='more.cgi?lextyp={}&lexid=?&limit={}'>more</a>)".format(limit, total,
+            limtext= "({:,} out of {:,}: <a href='more.cgi?lextyp={}&lexid={}&limit={}'>more</a>)".format(limit, total,
                                                                                                          urllib.quote(lextyp, ''),
                                                                                                          lexid,
                                                                                                          biglimit)
@@ -355,13 +360,18 @@ FROM lexfreq WHERE lexid in (%s) ORDER BY lexid, freq DESC""" % \
             limtext= "({:,} out of {:,})".format(limit, total)
         else:
             limtext ='({:,})'.format(total)
-        print ("""<h2>Lexical Examples: {:,} {}</h2>""".format(min(len(lf),limit), limtext))
+            
+        print ("""<h2>Lexical Examples: {:,} {}</h2>""".format(min(len(lf),limit),
+                                                               limtext))
         print("""<table><th>lexid</th><th>Lemma</th><th>Surface</th>
 <th>Frequency</th></tr>""")  ### FIXME <th>Sentences
-        for lexid in sorted(lf.keys()[:min(len(lf),limit)], key = lambda x: lf[x], reverse=True):
-            print(u"""<td><a href='showtype.cgi?typ={}'>{}</a></td><td>{}</td><td>{}</td>
-            <td align='right'>{:,d}</td></tr>""".format(lexid, lexid, lem[lexid], sf[lexid], lf[lexid]))
-## <td><a href='more.cgi?lextyp=%s'>more</a></td>                 lextyp))
+        for lxid in sorted(lf.keys()[:min(len(lf),limit)], key = lambda x: lf[x], reverse=True):
+            print(u"""<td><a href='showtype.cgi?lexid={}'>{}</a></td>
+<td>{}</td>
+<td>{}</td>
+<td align='right'>{:,d}</td></tr>""".format(lxid,  lxid,
+                                            lem[lxid], sf[lxid],
+                                            lf[lxid]))
         print("</table>")
 #    else:
 #        print ("<p>No examples found for %s (not even in the lexicon)" % lextyp)

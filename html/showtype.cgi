@@ -1,5 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+###
+### Show the type or lexeme
+###
 from __future__ import unicode_literals
 
 import cgi
@@ -17,6 +20,8 @@ form = cgi.FieldStorage()
 # lemma = lemma.strip().decode('utf-8')
 typ = form.getfirst("typ", "")
 typ = typ.strip().decode('utf-8')
+lexid = form.getfirst("lexid", "")
+lexid = lexid.strip().decode('utf-8')
 maxexe = 3
 
 par=ltdb.getpar('params')
@@ -35,76 +40,60 @@ headedness = {(1,0):('unary: headed'),
               (2,None):('binary: non-headed'),
               ('nil','nil'):(' '),
               (None,None):(' ')}
- 
-###
-### Print out the type
-###
-if typ == '':
-    print "<br><br><p style='font-size:large;'>Please give me a type (or rule or lexeme)"
-else:
-    con = sqlite3.connect(par['db'])
-    c = con.cursor()
-    ### check if it is a lexeme:
-    lexid = ''
-    c.execute("""SELECT typ, orth from lex 
-                 WHERE lexid =? """, (typ,))
-    lexinfo=c.fetchone()
-    if lexinfo:
-        lexid = typ
-        (typ, orth) = lexinfo
+
+def get_typinfo (typ, c):
+    """Information about a type, instance or class"""
     c.execute("""SELECT  parents,  children,  cat,  val,
 	 	         cont, definition,  status, arity, head, 
                  lname, description,
                  criteria, reference, todo  
                  FROM types WHERE typ=? limit 1""", (typ,))
-    typinfo=c.fetchone()
-    if typinfo:
-        (parents,  children,  cat,  val,  
-         cont, definition,  status, arity, head,
-         name, description, criteria, reference, todo ) = typinfo
+    row = c.fetchone()
+    if row:
+       return row
     else:
-        status='Unknown'
-        name=None
-        description=[]
-        parents = []
-        criteria=None
-        reference=None
-        todo=None
-        definition=None
-        cat = ''
-        val=''
-        cont=''
-        children=''
-        arity=None
-        head=None
-    c.execute("""SELECT  src, line, tdl, docstring 
-                  FROM tdl WHERE typ=?""", (typ,))
-    tdlinfo = c.fetchall()
-    
-        
-        
-  
-            
-        
-    # LETS CONVERT DESCRIPTION FROM RTS TO HTML
+        return ()
 
-    if lexid:
-        print ("""
-<div id="contents">
-        <h1>%s "%s" is-a %s (%s)</h1>""" % (lexid, orth,
-                                            typ, status))
-    else:
-        print ("""
-        <div id="contents">
-        <h1>%s (%s)</h1>""" % (typ, status)) ## FIXME show headedness
-    # if name or description or criteria or reference or todo:
-    #     if criteria:
-    #         cr="<p><table>"
-    #         for crit in criteria.split('\n'):
-    #             cr += "<tr><th>%s</th><td>%s</td></tr>" % tuple(crit.split('\t')) 
-    #         cr +="</table>"
-    #     else:
-    #         cr= ''
+def get_tdlinfo (typ, c):
+    """TDL for a type (extracted by python)"""
+    c.execute("""SELECT  src, line, tdl, docstring 
+                 FROM tdl WHERE typ=?""", (typ,))
+    return c.fetchall()
+
+def get_lexinfo (lexid, c):
+    c.execute("""SELECT typ, orth from lex 
+                 WHERE lexid =? """, (lexid,))
+    return c.fetchone()
+
+
+def showtype (typinfo, tdlinfo):
+    """print the type summary"""
+    (parents,  children,  cat,  val, cont, definition,  status, arity, head, name, description, criteria, reference, todo) = typinfo
+    print("""<h2>Type Information</h2>""")
+    print("""<div class='tdl'>""")
+    if tdlinfo:
+        print("""<h3>TDL from docstrings with pydelphin</h3>""")
+        for src, lineno, tdl, docstring in tdlinfo:
+            print("""<pre class='code'>%s</pre>""" % ltdb.hlall(tdl))
+            print("(%s: %s)" % (src, lineno))
+    print("</div>")
+    print("""<table><tr><th>Supertypes</th><th>Head Category</th>
+    <th>Valence</th><th>Content</th><th>Subtypes</th>
+    <th>Headedness</th></tr>
+    <tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>
+    </tr></table>""" % (ltdb.hlt(parents), 
+                        ltdb.hlt(cat),  
+                        ltdb.hlt(val),  
+                        ltdb.hlt(cont),  
+                        ltdb.hlt(children) or "<span class=match>LEAF</span>",
+                        headedness[(arity,head)]))
+    if definition:
+        print("""<h3>TDL from LKB comment</h3>""")
+        print("""<pre class='code'>%s</pre>""" % ltdb.hlall(definition))    ### TDL and type info
+
+def show_description(description, tdlinfo):
+    """print out the linguistic description in the doscstring
+       use the value from the LKB if possible, if not then from pydelphin"""
     if description:
         print("""<h2>Linguistic Documentation</h2>
         {}""".format(docutils.core.publish_parts("\n"+ description +"\n",
@@ -120,39 +109,65 @@ else:
                                                          settings_overrides= {'table_style':'colwidths-auto',
                                                                               'initial_header_level':'3'})['body']))
 
-    ###
-    ### Corpus examples of lextype, type
-    ###
-    ltdb.showlexs(c, typ,  lexid, maxexe, 50) 
-    ltdb.showsents(c, typ,  lexid, maxexe, 50)
+                
+###
+### Print out the type
+###
+con = sqlite3.connect(par['db'])
+c = con.cursor()
+if lexid <> '':
+    ## Show the lexeme
+    lexinfo = get_lexinfo(lexid,c)
+    if not lexinfo:
+        print ("<p>Unknown lexical identifier: {}".format(lexid))
+    else:
+        (typ, orth) = lexinfo
+        description = ''
+        tdlinfo = get_tdlinfo(lexid, c)
+        ### Header
+        print ("""<div id="contents">
+        <h1>{0} (<a href='showtype.cgi?typ={1}'>{1}</a>)</h1>""".format(lexid, typ))
+       
+        ### Show docstring 
+        show_description(description, tdlinfo)
+        ### Corpus examples of lextype, type
+        ltdb.showlexs(c, typ, lexid, maxexe, 50) 
+        ltdb.showsents(c, typ, lexid, maxexe, 50)
 
-
-
-    ### TDL and type info
-    if status != 'Unknown':
-        print("""<h2>Type Information</h2>""")
-        print("""<div class='tdl'>""")
+        ### TDL and type info
+        #showtype(typinfo, tdlinfo)
         if tdlinfo:
+            print("""<h3>TDL from docstrings with pydelphin</h3>""")
             for src, lineno, tdl, docstring in tdlinfo:
                 print("""<pre class='code'>%s</pre>""" % ltdb.hlall(tdl))
                 print("(%s: %s)" % (src, lineno))
-                # if docstring:
-                #     print("""<h4>docstring</h4>""")
-                #     print(docstring)
-        print("</div>")
-        print("""<table><tr><th>Supertypes</th><th>Head Category</th>
-        <th>Valence</th><th>Content</th><th>Subtypes</th>
-        <th>Headedness</th></tr>
-        <tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>
-        </tr></table>""" % (ltdb.hlt(parents), 
-                            ltdb.hlt(cat),  
-                            ltdb.hlt(val),  
-                            ltdb.hlt(cont),  
-                            ltdb.hlt(children) or "<span class=match>LEAF</span>",
-                            headedness[(arity,head)]))
-        if definition:
-            print("""<h3>TDL from LKB comment</h3>""")
-            print("""<pre class='code'>%s</pre>""" % ltdb.hlall(definition))
+        
+elif typ <> '':
+    typinfo = get_typinfo(typ, c)
+    if not typinfo:
+        print ("<p>Unknown type: {}".format(typ))
+    else:
+        (parents,  children,  cat,  val, cont, definition,  status, arity, head, name, description, criteria, reference, todo) = typinfo
+
+        tdlinfo = get_tdlinfo(typ, c)
+        
+        ### Header
+        print ("""<div id="contents">
+        <h1>%s (%s)</h1>""" % (typ, status)) ## FIXME show headedness
+
+        ### Show docstring 
+        show_description(description, tdlinfo)
+        ### Corpus examples of lextype, type
+        ltdb.showlexs(c, typ, lexid, maxexe, 50) 
+        ltdb.showsents(c, typ, lexid, maxexe, 50)
+
+        ### TDL and type info
+        showtype(typinfo, tdlinfo)
+    
+else:
+    ## no type or lexid given
+    print "<br><br><p style='font-size:large;'>Please give me a type (or rule or lexeme)"
+    
 
 print ltdb.footer()
 
