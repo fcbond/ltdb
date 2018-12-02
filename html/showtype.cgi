@@ -54,16 +54,6 @@ def get_typinfo (typ, c):
     else:
         return ()
 
-def get_tdlinfo (typ, c):
-    """TDL for a type (extracted by python)"""
-    c.execute("""SELECT  src, line, tdl, docstring 
-                 FROM tdl WHERE typ=?""", (typ,))
-    return c.fetchall()
-
-def get_lexinfo (lexid, c):
-    c.execute("""SELECT typ, orth from lex 
-                 WHERE lexid =? """, (lexid,))
-    return c.fetchone()
 
 
 def showtype (typinfo, tdlinfo):
@@ -117,13 +107,13 @@ con = sqlite3.connect(par['db'])
 c = con.cursor()
 if lexid <> '':
     ## Show the lexeme
-    lexinfo = get_lexinfo(lexid,c)
+    lexinfo = ltdb.get_lexinfo(lexid,c)
     if not lexinfo:
         print ("<p>Unknown lexical identifier: {}".format(lexid))
     else:
         (typ, orth) = lexinfo
         description = ''
-        tdlinfo = get_tdlinfo(lexid, c)
+        tdlinfo = ltdb.get_tdlinfo(lexid, c)
         ### Header
         print ("""<div id="contents">
         <h1>{0} (<a href='showtype.cgi?typ={1}'>{1}</a>)</h1>""".format(lexid, typ))
@@ -149,7 +139,7 @@ elif typ <> '':
     else:
         (parents,  children,  cat,  val, cont, definition,  status, arity, head, name, description, criteria, reference, todo) = typinfo
 
-        tdlinfo = get_tdlinfo(typ, c)
+        tdlinfo = ltdb.get_tdlinfo(typ, c)
         
         ### Header
         print ("""<div id="contents">

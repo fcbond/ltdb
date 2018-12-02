@@ -423,15 +423,17 @@ Lemma:&nbsp;<input type="text" name="lemma" size=15
 <div class='form'>
 
 <form name="frm2" action="%s/search.cgi" method="GET">
-Type:&nbsp;<input type="text" name="typ" size=15
- placeholder="lextype, rule or type">
+Type:&nbsp;<input type="text" name="typ" size=20
+ placeholder="lextype, lexid, rule or type">
 <input type="submit" value="Go" name="submitbtn">
 </form>
 </div>
 </div> <!-- end of confusing -->
-</div> <!-- end of header -->"""  %  (par['cssdir'], 
+</div> <!-- end of header -->
+"""  %  (par['cssdir'], 
                                       par['cgidir'], par['cgidir'], 
                                       par['cgidir'], par['cgidir'])
+
 
     
 def footer():
@@ -502,3 +504,33 @@ def munge_desc(typ,description):
     
     #print("\n".join(desc),exes,nams)
     return "\n".join(desc), exes, nams 
+
+
+def get_lexinfo (lexid, c):
+    c.execute("""SELECT typ, orth from lex 
+                 WHERE lexid =? """, (lexid,))
+    return c.fetchone()
+
+def get_tdlinfo (typ, c):
+    """TDL for a type (extracted by python)"""
+    c.execute("""SELECT  src, line, tdl, docstring 
+                 FROM tdl WHERE typ=?""", (typ,))
+    return c.fetchall()
+
+def get_typsum (typ, c):
+    """get lemmas, globbed, ordered by exact match"""
+    c.execute("""SELECT types.typ,  lname, status, freq 
+    FROM types LEFT JOIN typfreq ON types.typ=typfreq.typ
+    WHERE types.typ GLOB ?
+    ORDER BY types.typ = ? DESC""", ('*{0}*'.format(typ), typ))
+    return c.fetchall()
+    
+def get_leminfo (lemma,c):
+    """get lemmas, globbed, ordered by exact match"""
+    c.execute("""SELECT lex.typ, orth,  types.lname, words, lfreq, cfreq, lex.lexid 
+                 FROM ltypes LEFT JOIN lex 
+                 ON ltypes.typ = lex.typ 
+                 LEFT JOIN types ON lex.typ = types.typ
+                 WHERE orth GLOB ?
+    ORDER BY orth = ? DESC""", ('*{0}*'.format(lemma), lemma))
+    return c.fetchall()
