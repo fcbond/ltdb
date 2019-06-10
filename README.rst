@@ -33,7 +33,7 @@ Requirements
 
 ::
 
-      * python 2.7, python 3, pydelphin, docutils
+      * python 2.7, python 3, pydelphin, docutils, lxml
       * Perl
       * SQLite3
       * Apache
@@ -48,7 +48,7 @@ Install dependencies (in ubuntu):
 .. code:: bash
 
     sudo apt-get install apache2 xmlstarlet
-    sudo apt-get install python-docutils python3-docutils 
+    sudo apt-get install python-docutils python3-docutils python3-lxml
 
     sudo pip install pydelphin --upgrade
     sudo pip3 install pydelphin --upgrade
