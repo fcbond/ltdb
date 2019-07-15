@@ -194,7 +194,7 @@ echo "cgidir=http://$dbhost/~$USER/cgi-bin/$version" >> ${CGI_DIR}/params
 echo "ver=$version" >> ${CGI_DIR}/params
 
 ### HTML and logs
-cp doc/lt-diagram.png html/*.js html/*.css ${HTML_DIR}/.
+cp doc/lt-diagram.png html/*.js html/*.css html/ltdb.png ${HTML_DIR}/.
 cp ${outdir}/*.log ${HTML_DIR}
 
 python3 makehome.py ${version}  ${grammardir} > ${HTML_DIR}/index.html

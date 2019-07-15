@@ -399,9 +399,11 @@ def header():
     <link rel="stylesheet" type="text/css" href="jquery-ui.css"/>
     <script src='svg.js' language='javascript'></script>
     <link rel="stylesheet" type="text/css" href="delphin-viz.css"/>
-  </head>
+
+    <link rel="icon"  type="image/png"  href="%s/ltdb.png"/>
+  </head> 
   <body>
-""" % (par['ver'], par['cssdir'])
+""" % (par['ver'], par['cssdir'], par['cssdir'])
 
 def searchbar():
     return """
