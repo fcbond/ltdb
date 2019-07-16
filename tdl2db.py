@@ -45,8 +45,8 @@ for root, dirs, files in os.walk(grmdir):
                 #print(lineno, event, sep = '\t')
                     if event in ['TypeDefinition',  'TypeAddendum',
                                  'LexicalRuleDefinition']:
-                        if obj.docstring:
-                            descript,exes,nams= ltdb.munge_desc(obj.identifier,obj.docstring)
+                        if obj.documentation(): ### The tdl has a docstring
+                            descript,exes,nams= ltdb.munge_desc(obj.identifier,obj.documentation())
                             obj.docstring=None
                         else:
                             descript = ''
