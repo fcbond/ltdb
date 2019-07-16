@@ -43,6 +43,9 @@ Requirements
 We prefer that Sentence IDs are unique, if we see two sentences in the
 gold treebank with the same ID, we only store the first one.
 
+Only the new LKB-FOS (http://moin.delph-in.net/LkbFos) suppoorts the new docstring comments.  We assume it is installed in
+``LKBFOS=~/delphin/lkb_fos/lkb.linux_x86_64``.
+
 Install dependencies (in ubuntu):
 
 .. code:: bash
