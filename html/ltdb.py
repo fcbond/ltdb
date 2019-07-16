@@ -5,7 +5,8 @@ from __future__ import unicode_literals
 from __future__ import print_function
 
 
-import sqlite3, collections, cgi, re, urllib, sys
+import sqlite3, collections
+import cgi, re, urllib, sys
 from collections import defaultdict as dd
 import json
 
@@ -32,7 +33,7 @@ def hlt (typs):
                                                            t)
         return l
     else:
-        return '<br'
+        return '<br>'
 
 
 
@@ -59,6 +60,7 @@ def hltyp(match):
 def hlall (typs):
     "hyperlink all types in a description or documentation"
     if typs:
+        typs = cgi.escape(typs)
         ### Definition from http://moin.delph-in.net/TdlRfc
         typs=re.sub(r'(#[\w_+*?-]+)', "<span class='coref'>\\1</span>", typs)
         return retyp.sub(hltyp, typs)
