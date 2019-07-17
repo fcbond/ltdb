@@ -10,6 +10,18 @@ import cgi, re, urllib, sys
 from collections import defaultdict as dd
 import json
 
+
+### labels for branching: arity, head
+headedness = {(1,0):('▲', 'unary: headed'),
+              (1,None):('△', 'unary: non-headed'),
+              (1,'nil'):('△', 'unary: non-headed'),
+              (2,0):('◭', 'binary: left-headed'),
+              (2,1):('◮', 'binary: right-headed'),
+              (2,'nil'):('◬', 'binary: non-headed'),
+              (2,None):('◬', 'binary: non-headed'),
+              ('nil','nil'):(' ', ' '),
+              (None,None):(' ', ' ')}
+
 def getpar (params):
     par=dict()
     try:

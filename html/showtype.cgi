@@ -30,16 +30,7 @@ print ltdb.header()
 
 print ltdb.searchbar()
 
-### labels for branching: arity, head
-headedness = {(1,0):('unary: headed'),
-              (1,None):('unary: non-headed'),
-              (1,'nil'):('unary: non-headed'),
-              (2,0):('binary: left-headed'),
-              (2,1):('binary: right-headed'),
-              (2,'nil'):('binary: non-headed'),
-              (2,None):('binary: non-headed'),
-              ('nil','nil'):(' '),
-              (None,None):(' ')}
+
 
 def get_typinfo (typ, c):
     """Information about a type, instance or class"""
@@ -70,13 +61,14 @@ def showtype (typinfo, tdlinfo):
     print("""<table><tr><th>Supertypes</th><th>Head Category</th>
     <th>Valence</th><th>Content</th><th>Subtypes</th>
     <th>Headedness</th></tr>
-    <tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>
+    <tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s (%s)</td>
     </tr></table>""" % (ltdb.hlt(parents), 
                         ltdb.hlt(cat),  
                         ltdb.hlt(val),  
                         ltdb.hlt(cont),  
                         ltdb.hlt(children) or "<span class=match>LEAF</span>",
-                        headedness[(arity,head)]))
+                        ltdb.headedness[(arity,head)][0],
+                        ltdb.headedness[(arity,head)][1]))
     if definition:
         print("""<h3>TDL from LKB comment</h3>""")
         print("""<pre class='code'>%s</pre>""" % ltdb.hlall(definition))    ### TDL and type info
