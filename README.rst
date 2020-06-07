@@ -17,11 +17,17 @@ the DELPH-IN Wiki.
 Usage
 -----
 
-1. Run ``./make-ltdb.bash --grmdir /path/to/grammar``
+1. Run ``./make-ltdb.bash --script /path/to/grammar/lkb/script``
+
+or (somewhat experimental but gets more docstrings)
+
+2. Run ``./make-ltdb.bash --grmtdl /path/to/grammar/grammar.tdl``
+   
 
 .. code:: bash
 
-    ./make-ltdb.bash --grmdir ~/logon/dfki/jacy
+    ./make-ltdb.bash --script ~/logon/dfki/jacy/lkb/script
+    ./make-ltdb.bash --grmtdl ~/logon/dfki/jacy/japanese.tdl
 
 Everything is installed to ``~/public_html/``
 
@@ -43,7 +49,7 @@ Requirements
 We prefer that Sentence IDs are unique, if we see two sentences in the
 gold treebank with the same ID, we only store the first one.
 
-Only the new LKB-FOS (http://moin.delph-in.net/LkbFos) suppoorts the new docstring comments.  We assume it is installed in
+Only the new LKB-FOS (http://moin.delph-in.net/LkbFos) supports the new docstring comments.  We assume it is installed in
 ``LKBFOS=~/delphin/lkb_fos/lkb.linux_x86_64``.
 
 Install dependencies (in ubuntu):
@@ -114,15 +120,15 @@ Types, instances in the same table, distinguished by status.
 +==========+====================================+===================+======+
 |type      |normal type                         |                   |      |
 +----------+------------------------------------+-------------------+------+
-|ltype     |lexical type                        |type + in lexicon  | _lt  |
+|lex-type  |lexical type                        |type + in lexicon  | _lt  |
 +----------+------------------------------------+-------------------+------+
 |lex-entry |lexical entry                       |                   | _le  |   
 +----------+------------------------------------+-------------------+------+
 |rule      |syntactic construction/grammar rule | LKB:\*RULES       | _c   |
 +----------+------------------------------------+-------------------+------+
-|lrule	   |lexical rule                        | LKB:\*LRULES      | lr   |
+|lex-rule  | lexical rule                       | LKB:\*LRULES      | lr   |
 +----------+------------------------------------+-------------------+------+
-|irule	   |inflectional rule                   | LKB:\*LRULES +    | ilr  | 
+|inf-rule  |inflectional rule                   | LKB:\*LRULES +    | ilr  | 
 +----------+------------------------------------+-------------------+------+
 |          |            (inflectional-rule-pid )|                   |      |
 +----------+------------------------------------+-------------------+------+

@@ -26,9 +26,9 @@ maxexe = 3
 
 par=ltdb.getpar('params')
 
-print ltdb.header()
+print (ltdb.header())
 
-print ltdb.searchbar()
+print (ltdb.searchbar())
 
 
 
@@ -151,5 +151,5 @@ else:
     print "<br><br><p style='font-size:large;'>Please give me a type (or rule or lexeme)"
     
 
-print ltdb.footer()
+print (ltdb.footer(par['ver']))
 

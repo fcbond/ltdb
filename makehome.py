@@ -9,7 +9,9 @@
 import sys, os
 import datetime
 from collections import OrderedDict
-#import html/ltdb
+### get some local utilities
+sys.path.append(os.getcwd() + '/html')
+from ltdb import statuses, footer
 
 (script, version, grmdir) = sys.argv
 
@@ -18,6 +20,7 @@ print("""
 <head>
   <title>{0} ltdb</title>
   <link rel='stylesheet' type='text/css' href='lextypedb.css'/>
+  <link rel="icon"  type="image/png"  href="%s/ltdb.png"/>
 </head>
 <body>
 <h1>Welcome to {0}</h1>
@@ -77,13 +80,30 @@ for a,v in md.items():
         print("<tr><td>{}</td><td>{}</td></tr>".format(a,v))
 print("</table>")
 
+###
+### Statuses
+###
+print("""<h3>Types and Instances in the Database</h3>
+""")
+print("<table>")
+for (typ, desc) in statuses.items():
+    print(f"<tr><td>{typ}</td><td>{desc}</td></tr>")
+print("</table>")
+###
+### Links to Logs
+###
 print("""
 <h3>Logs</h3>
 <ul>
    <li><a href='lkb.log'>LKB conversion log</a>
    <li><a href='tdl.log'>TDL conversion log</a>
    <li><a href='gold.log'>Gold profiles conversion log</a>
-</ul>
+</ul>""")
+
+###
+### Links to ltdb
+###
+print("""
 <h3>Linguistic Type Database</h3>
 <ul>
    <li><a href='lt.db.7z'>Compressed SQLITE Database: lt.db.7z</a>
@@ -95,6 +115,6 @@ print("""
 """)
 
     
-print("""  <p>Created on {}</p>
-  </html>
-</body>""".format(datetime.datetime.now()))
+print("""  <p>Created on {}</p>""".format(datetime.datetime.now()))
+
+print(footer(version))

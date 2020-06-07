@@ -20,13 +20,16 @@ CREATE TABLE lex (lexid TEXT primary key,
 		  typ TEXT,
 		  orth TEXT,
 		  pred TEXT,
-		  altpred TEXT);
+		  altpred TEXT,
+		  carg TEXT,
+		  altcarg TEXT,
+		  docstring TEXT);
 -- preprocess this
 CREATE TABLE ltypes (typ TEXT primary key,
 		     words TEXT,
 		     lfreq INTEGER default 0,
 		     cfreq INTEGER DEFAULT 0);
--- sentences in the database (assumes unique sid)
+-- sentences in the database (assumes unique profile+sid)
 CREATE TABLE sent (sid INTEGER,
                    profile TEXT,
 		   wid INTEGER,
@@ -34,6 +37,7 @@ CREATE TABLE sent (sid INTEGER,
 		   lexid TEXT);
 -- Information from the gold profiles
 CREATE TABLE gold (sid INTEGER primary key,
+       	     	   profile TEXT,				
        	     	   sent TEXT,
 		   comment TEXT,
 		   deriv TEXT,
@@ -44,6 +48,7 @@ CREATE TABLE gold (sid INTEGER primary key,
 		   dmrs_json TEXT,
 		   flags TEXT);
 CREATE TABLE typind (typ TEXT,
+       	     	     profile TEXT,	    
                      sid INTEGER,
 		     kara INTEGER,
                      made INTEGER);
@@ -56,5 +61,9 @@ CREATE TABLE lexfreq(lexid TEXT,
 CREATE TABLE tdl (typ TEXT,
        	     	  src TEXT,
 		  line INTEGER,
+		  kind TEXT,
                   tdl TEXT,
 		  docstring TEXT);
+-- Hierarchy extracted by PyDelphin		 
+CREATE TABLE hie (child TEXT,
+                  parent TEXT);

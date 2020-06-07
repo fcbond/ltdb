@@ -43,4 +43,4 @@ elif(lextyp):
 else:
     print("<p>More examples of what?")
 print("</div>")
-print ltdb.footer()
+print ltdb.footer(par['ver'])

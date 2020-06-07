@@ -117,10 +117,10 @@ tr {background:#F3FFF3} /* FCB likes green */
 td {padding:4pt}
 caption { font-weight:bold; font-size: 18pt;}
 /* check colors */
-tr.irule {background:#EEEEEE}
+tr.inf-rule {background:#EEEEEE}
 tr.rule {background:#FFAAAA}
-tr.lrule {background:#AAAAFF}
-tr.ltype {background:#AAFFAA}
+tr.lex-rule {background:#AAAAFF}
+tr.lex-type {background:#AAFFAA}
 tr.root {background:#FFAAFF}
 
 pre.code {

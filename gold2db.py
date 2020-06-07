@@ -1,7 +1,7 @@
 #export PYTHONPATH=~/svn/pydelphin
 # python3 gold2db.py
 ##
-## takes two paramaters -- directory with the xml and database
+## takes two paramaters -- directory with the grammar and database
 ##
 ## Actually does the lexicon too :-)
 ##
@@ -10,11 +10,8 @@
 ##
 import sqlite3, sys, re, os
 from collections import defaultdict as dd
-from delphin import itsdb
-import delphin.mrs
-import delphin.derivation
-import delphin.mrs.xmrs
-import delphin.mrs.simplemrs
+from delphin import itsdb, derivation, dmrs
+from delphin.codecs import simplemrs, dmrsjson, mrsjson
 import json
 
 if (len(sys.argv) < 3):
@@ -41,114 +38,124 @@ for (lexid, typ, orth) in c:
 
 mroot=re.compile(r'^\(([-a-zA-z0-9_+]+?)\s+\(')
 mrule=re.compile(r'\([0-9]+ ([^ ]+) [-0-9.]+ ([0-9]+) ([0-9]+) ')
-mlex=re.compile(r'\([0-9]+ ([^ ]+) [-0-9.]+ [0-9]+ [0-9]+ \("(.*?)" ')
+#mlex=re.compile(r'\([0-9]+ ([^ ]+) [-0-9.]+ [0-9]+ [0-9]+ \("(.*?)" ')
 
 ### make a log in the same directory as the database
 log = open(os.path.join(os.path.dirname(dbfile),"gold.log"), 'w')
-
-
 
 golddir = '%s/tsdb/gold' % grmdir
 typefreq=dd(int)                  # typefreq[type] = freq
 lexfreq=dd(lambda: dd(int))       # lexfreq[lexid][surf] = freq
 lxidfreq=dd(lambda: dd(int))      # lxidfreq[typ][lexid] = freq
-typind=dd(lambda: dd(set))        # typind[type][sid]((frm, to), ...)
-sent=dd(list)                     # sent[sid][(surf, lexid)]
-pname=dict()                      # pname[sid]=profile 
+typind=dd(lambda: dd(set))        # typind[type][(profile, sid)]((frm, to), ...)
+sent=dd(list)                     # sent[(profile, sid)][(surf, lexid)]
 roots=dd(lambda: 'rootless')
 allroots=set()
 for root, dirs, files in os.walk(golddir):
+    #if not root.endswith('e'): for debugging, don't load everything
+    #    continue
     ### find valid profiles
     if 'result' in files or 'result.gz' in files:
         # if 'mrs' not in root: ## debug
         #     continue
         print("Processing %s" % root, file=sys.stderr)
-        profile = itsdb.ItsdbProfile(root)
-        head, profname = os.path.split(root)
-        items = {}
-        for  row in profile.read_table('item'):
-            items[row['i-id']] = (row['i-input'], row['i-comment'])
-        for row in profile.read_table('result'):
-            pid = row['parse-id']
-            pname[pid] = profname
-            deriv = row['derivation']  # DERIVATION TREE
-            deriv_json = delphin.derivation.Derivation.from_string(deriv).to_dict(fields=['id','entity','score','form','tokens'])            
-            mrs_string = row['mrs']
-            try:
-                mrs_obj = delphin.mrs.simplemrs.loads(mrs_string, single=True, version=1.1, errors='strict')
-                # mrs_obj = delphin.mrs.simplemrs.loads(row['mrs'], single=True, version=1.1, strict=False, errors='warn')
-                # mrs_string = row['mrs']  # CHANGING
-                mrs_json = delphin.mrs.xmrs.Mrs.to_dict(mrs_obj)
-                dmrs_json = delphin.mrs.xmrs.Dmrs.to_dict(mrs_obj)
-            except Exception as e:
-                log.write("\n\nMRS failed to convert in pydelphin:\n")
-                log.write("{}: {}\n".format(root, pid))
-                log.write(items[pid][0])
-                log.write("\n\n")
-                log.write(str(mrs_string))
-                log.write("\n\n")
-                if hasattr(e, 'message'):
-                    log.write(e.message)
-                else:
-                    log.write(str(e))
-                log.write("\n\n")
-                mrs_json = dict()
-                dmrs_json = dict()
+        ts = itsdb.TestSuite(root)
+        for response in ts.processed_items():
+            sid=response['i-id']
+            profile = ts.path.name 
+            if response['readings'] > 0:
+                try:
+                    first_result=response.result(0)
+                    deriv = first_result.derivation()
+                    mrs_obj=first_result.mrs()
+                    mrs_str = first_result['mrs']
+                    tree = first_result.get('tree', '')
+                    deriv_str = deriv.to_udf(indent=None)
+                    deriv_json = json.dumps(deriv.to_dict(fields=['id','entity','score','form','tokens']))
+                except Exception as e:
+                    log.write("\n\nSomething went wrong getting the result:\n")
+                    log.write("{}: {} {}\n".format(root, profile, sid))
+                    deriv = ''
+                    mrs_obj = None
+                    mrs_str =''
+                    tree=''
+                    deriv_str = ''
+                    derv_json = ''
+                try:
+                    mrs_obj=first_result.mrs()
+                except Exception as e:
+                    log.write("\n\nMRS couldn't be retrieved in pydelphin:\n")
+                    log.write("{}: {} {}\n".format(root, profile, sid))
+                    mrs_obj = None 
+                try:
+                    dmrs_obj=dmrs.from_mrs(mrs_obj)
+                    mrs_json = mrsjson.encode(mrs_obj)
+                    dmrs_json = dmrsjson.encode(dmrs_obj)
+                except Exception as e:
+                    log.write("\n\nMRS failed to convert in pydelphin:\n")
+                    log.write("{}: {} {}\n".format(root, profile, sid))
+                    log.write(response['i-input']) ### FIXME
+                    log.write("\n\n")
+                    if mrs_obj:
+                        log.write(simplemrs.encode(mrs_obj,indent=True))
+                    log.write("\n\n")
+                    log.write(repr(e))
+                    if hasattr(e, 'message'):
+                        log.write(e.message)
+                    # else:
+                    #     log.write(str(e))
+                    log.write("\n\n")
+                    mrs_json = '{}'
+                    dmrs_json = '{}'
             
             # STORE gold info IN DB
             try:
-                c.execute("""INSERT INTO gold (sid, sent, comment, 
+                c.execute("""INSERT INTO gold (profile, sid, sent, comment, 
                                          deriv, deriv_json, pst, 
                                          mrs, mrs_json, dmrs_json, flags) 
-                                         VALUES (?,?,?,?,?,?,?,?,?,?)""", (pid, items[pid][0],  items[pid][1], 
-                                                                           deriv, json.dumps(deriv_json), None,
-                                                                           mrs_string, json.dumps(mrs_json),
-                                                                           json.dumps(dmrs_json), None))
-                ### ToDo use pydelphin to walk down tree
-                ### leaves
-                m = re.findall(mlex,deriv)
-                lexids=set()
-                if m:
-                    #print('leaves')
-                    #print(m)
-                    wid =0
-                    for (lexid, surf) in m:
-                        lexids.add(lexid)
+                                         VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                        (profile,
+                         sid,
+                         response['i-input'],
+                         response['i-comment'],
+                         deriv_str,
+                         deriv_json,
+                         tree,
+                         mrs_str,
+                         mrs_json,
+                         dmrs_json,
+                         None))
+                ##leaves
+                if deriv:
+                    for (preterminal, terminal) in zip(deriv.preterminals(),deriv.terminals()):
+                        lexid=preterminal.entity
+                        surf=terminal.form
+                        start=preterminal.start
+                        end=preterminal.end
                         lexfreq[lexid][surf] +=1
-                        sent[pid].append((surf, lexid))
+                        sent[(profile, sid)].append((surf, lexid))
                         if ltypes[lexid]:
                             typefreq[ltypes[lexid]]  += 1
                             lxidfreq[ltypes[lexid]][lexid]   += 1
-                            typind[ltypes[lexid]][pid].add((wid, wid+1))
-                        wid+=1
-            ### rules (store as type)
-                m = re.findall(mrule,deriv)
-                if m:
-                    for (typ, frm, to) in m:
-                        if typ not in lexids: ## counted these!
-                            typefreq[typ]  += 1
-                            typind[typ][pid].add((frm, to))
-                #print('rule')
-                #print(m)
-            ### Root (treat as another type)
-                m = re.search(mroot,deriv)
-                if m:
-                #print('root {}'.format(root))
-                #print(m.groups()[0])
-                #print(deriv)
-                #print()
-                    roots[pid] = m.groups()[0]
+                            typind[ltypes[lexid]][(profile, sid)].add((start, end))
+                ### internal node (store as type)
+                    for node in deriv.internals():
+                        typ =  node.entity
+                        start= node.start
+                        end=   node.end
+                        typefreq[typ]  += 1
+                        typind[typ][(profile, sid)].add((start, end))
 
             ##print('\n\n\n')
             except sqlite3.Error as e:
                 log.write('ERROR:   ({}) of type ({}), {}: {}\n'.format(e, type(e).__name__,
-                                                                      root, pid))
+                                                                      root, sid))
 
-### each sentence should have a root
-for s in sent:
-    allroots.add(roots[s])
-    typind[roots[s]][s].add((0, len(sent[s])))
-    typefreq[roots[s]] += 1
+# ### each sentence should have a root
+# for s in sent:
+#     allroots.add(roots[s])
+#     typind[roots[s]][s].add((0, len(sent[s])))
+#     typefreq[roots[s]] += 1
 
 ### calculate the lexical type frequencies
 for typ in lxidfreq:
@@ -190,20 +197,20 @@ for l in lexfreq:
         c.execute("""INSERT INTO lexfreq (lexid, word, freq) 
                  VALUES (?,?,?)""", (l, w, lexfreq[l][w]))
 
-for s in sent:
+for p,s in sent:
     ##print(s, " ".join([surf for (surf, lexid) in sent[s]]))
-    for i, (w, l) in enumerate(sent[s]):
+    for i, (w, l) in enumerate(sent[(p,s)]):
         c.execute("""INSERT INTO sent (profile, sid, wid, word, lexid) 
-                 VALUES (?,?,?,?,?)""", (pname[s], s, i, w, l))
+                 VALUES (?,?,?,?,?)""", (p, s, i, w, l))
 
  
 
 for t in typind:
-    for s in typind[t]:
+    for p,s in typind[t]:
         ##print("%s\t%s\t%s" % (t, s, typind[t][s]))
-        for (k, m) in typind[t][s]:
-            c.execute("""INSERT INTO typind (typ, sid, kara, made) 
-                 VALUES (?,?,?,?)""", (t, s, k, m))
+        for (k, m) in typind[t][(p, s)]:
+            c.execute("""INSERT INTO typind (typ, profile, sid, kara, made) 
+                 VALUES (?,?,?,?,?)""", (t, p, s, k, m))
 
    
 

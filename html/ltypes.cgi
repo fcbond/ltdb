@@ -26,7 +26,7 @@ con = sqlite3.connect(par['db'])
 c = con.cursor()
 c.execute("""SELECT types.typ, lname, words, lfreq, cfreq 
              FROM types LEFT JOIN ltypes ON types.typ=ltypes.typ  
-             WHERE status ='ltype' ORDER BY types.typ""")
+             WHERE status ='lex-type' ORDER BY types.typ""")
 results = c.fetchall()
 if results:
     print """
@@ -60,5 +60,5 @@ if results:
     print "</table>"
 
 
-print ltdb.footer()
+print (ltdb.footer(par['ver']))
 

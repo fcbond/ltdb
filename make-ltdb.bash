@@ -7,6 +7,51 @@ echo  Welcome to the Linguistic Type Database
 echo
 
 
+
+###
+### get the grammar directory
+###
+
+while [ $# -gt 0 -a "${1#-}" != "$1" ]; do
+  case ${1} in
+      --script)
+	  lkbscript=${2};
+	  shift 2;
+	  ;;
+      --grmtdl)
+	  grammartdl=${2};
+	  shift 2;
+	  ;;
+      *)
+	  echo """You need to give a grammar directory or script file (or both)
+    --script path/to/lkb/script
+    --grmtdl path/to/grammar.tdl
+"""
+	  exit 0	
+  esac
+done
+
+
+if [ ${lkbscript} ]
+then
+    echo "LKB script file is" ${lkbscript}
+    grammardir=`dirname ${lkbscript}`
+    grammardir=`dirname ${grammardir}`
+    echo "Grammar directory is " ${grammardir}
+elif [ ${grammartdl} ]
+then
+    echo "Grammar file is " ${grammartdl}
+    grammardir=`dirname ${grammartdl}`
+    echo "Grammar directory is " ${grammardir}
+else
+    echo """You need to give a grammar directory or script file
+    --script path/to/lkb/script
+    --grmtdl path/to/grammar.tdl
+"""
+    exit 0
+fi
+
+
 # If you want to use LKB_FOS you must set this variable
 # unset LKBFOS
 LKBFOS=~/delphin/lkb_fos/lkb.linux_x86_64
@@ -22,20 +67,6 @@ else
 fi
     
 
-###
-### get the grammar directory
-###
-
-while [ $# -gt 0 -a "${1#-}" != "$1" ]; do
-  case ${1} in
-    --grmdir)
-      grammardir=${2};
-      shift 2;
-      ;;
-  esac
-done
-
-echo "Grammar directory is " ${grammardir}
 
 ###
 ### set things up
@@ -110,17 +141,19 @@ mkdir -p "${outdir}"
 
 db=${outdir}/${LTDB_FILE}
 
-### dump  the lex-types
-echo "Dumping lex-type definitions and lexicon using the LKB (slow but steady)" 
-
-
-unset DISPLAY;
-unset LUI;
-
+if [ ${lkbscript} ]
+then
+    ### dump  the lex-types
+    echo "Dumping lex-type definitions and lexicon using the LKB (slow but steady)" 
+    
+    
+    unset DISPLAY;
+    unset LUI;
+    
 { 
  cat 2>&1 <<- LISP
   (format t "~%Read Grammar~%")
-  (lkb::read-script-file-aux  "${grammardir}/lkb/script")
+  (lkb::read-script-file-aux  "${lkbscript}")
   (lkb::lkb-load-lisp "." "patch-lextypedb.lsp")
   (format t "~%Output types~%")
   (lkb::output-types :xml "${outdir}/${TYPES_FILE}")
@@ -135,20 +168,21 @@ unset LUI;
 LISP
 } | ${LISPCOMMAND}   2>${log} >${log}
 # } | cat   
-
-###
-### Try to validate the types.xml
-###
-if which xmlstarlet  &> /dev/null; then
-    xmlstarlet val  -e ${outdir}/${TYPES_FILE}
-    xmlstarlet val  -e ${outdir}/${RULES_FILE}
-    xmlstarlet val  -e ${outdir}/${LRULES_FILE}
-    xmlstarlet val  -e ${outdir}/${ROOTS_FILE}
-else 
-    echo
-    echo "   types files not validated, please install xmlstarlet."
-    echo "   sudo apt-get install xmlstarlet"
-    echo
+    
+    ###
+    ### Try to validate the types.xml
+    ###
+    if which xmlstarlet  &> /dev/null; then
+        xmlstarlet val  -e ${outdir}/${TYPES_FILE}
+        xmlstarlet val  -e ${outdir}/${RULES_FILE}
+        xmlstarlet val  -e ${outdir}/${LRULES_FILE}
+        xmlstarlet val  -e ${outdir}/${ROOTS_FILE}
+    else 
+        echo
+        echo "   types files not validated, please install xmlstarlet."
+        echo "   sudo apt-get install xmlstarlet"
+        echo
+    fi
 fi
 ###
 ### make the databases
@@ -157,17 +191,25 @@ echo
 echo "Creating the databases ..."
 echo
 
-### create the db, write in the
-echo "Adding in the info from the lisp"
-echo
-python3 xml2db.py ${outdir} ${db}
+sqlite3 ${db} < tables.sql
 
-echo "Adding in the info from the tdl with pydelphin"
-echo
-python3 tdl2db.py ${grammardir} ${db}   ### add tdl and comments
+###
+if [ ${lkbscript} ]
+then
+    echo "Adding in the info from the lisp"
+    echo
+    python3 xml2db.py ${outdir} ${db}
+fi
 
-echo "Adding in the info from the gold trees"
-echo
+if [ ${grammartdl} ]
+then
+    echo "Adding in the info from the tdl with pydelphin"
+    echo
+    python3 tdl2db.py ${grammartdl} ${db}   ### add tdl and comments
+fi
+
+#echo "Adding in the info from the gold trees"
+#echo
 python3 gold2db.py ${grammardir} ${db}
 
 

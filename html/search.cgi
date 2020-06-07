@@ -108,4 +108,4 @@ elif(typ):
   </div>""".format(typ, par['ver']))
 
 
-print ltdb.footer()
+print (ltdb.footer(par['ver']))

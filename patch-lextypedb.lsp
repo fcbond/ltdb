@@ -66,7 +66,7 @@
           (format
            stream
            "  <type name=\"~(~a~)\" parents=\"~(~a~)\" status=\"~a\" cat=\"~(~a~)\" val=\"~(~a~)\" cont=\"~(~a~)\" arity=\"~(~a~)\" head=\"~(~a~)\"/>~%"
-           id type (if (inflectional-rule-p id) "irule" "lrule")
+           id type (if (inflectional-rule-p id) "inf-rule" "lex-rule")
 	   (lkb::dag-type (mrs::path-value (tdfs-indef tdfs) 
 					   '(SYNSEM LOCAL CAT HEAD)))
 	   (lkb::dag-type (mrs::path-value (tdfs-indef tdfs) 

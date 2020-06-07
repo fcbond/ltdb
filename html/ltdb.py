@@ -8,6 +8,7 @@ from __future__ import print_function
 import sqlite3, collections
 import cgi, re, urllib, sys
 from collections import defaultdict as dd
+from collections import OrderedDict as od
 import json
 
 
@@ -21,6 +22,33 @@ headedness = {(1,0):('▲', 'unary: headed'),
               (2,None):('◬', 'binary: non-headed'),
               ('nil','nil'):(' ', ' '),
               (None,None):(' ', ' ')}
+
+### the different kinds of things we deal with
+statuses = od()
+
+##things used when parsing
+statuses["lex-rule"] = "Lexical Rules"
+statuses["rule"] = "Syntactic Rules"
+statuses["token-mapping-rule"] = "Rules for token mapping"
+statuses["root"] = "Root Conditions for well formed utterances"
+
+## Lexical entries
+statuses["lex-entry"] = "Lexical Entries"
+statuses["generic-lex-entry"] = "Generic Lexical Entries"
+
+## types 
+statuses["lex-type"] = "Types for lexical entries (immediate supertypes of lex-entries)"
+statuses["type"] = "Other Internal Types"
+
+## pre and post processing
+statuses["lexical-filtering-rule"] = "lexical filtering rule"
+statuses["post-generation-mapping-rule"] = "post generation mapping rule"
+
+## interface 
+statuses["labels"] = "Labels for trees in the (parse-nodes)"
+
+
+
 
 def getpar (params):
     par=dict()
@@ -452,19 +480,19 @@ Type:&nbsp;<input type="text" name="typ" size=20
 
 
     
-def footer():
+def footer(version):
     return """</div> <!-- end of outline -->
   <br>
   <address>
   <a href='http://moin.delph-in.net/LkbLtdb'>Linguistic Type Database</a> 
-    for the grammar %s; 
-  <br>By Chikara Hashimoto, Luis Morgado da Costa and Francis Bond; 
+    for the grammar {}; 
+  <br>By Chikara Hashimoto, Luis Morgado da Costa, Michael Goodman and Francis Bond; 
   Maintained by Francis Bond &lt;<a href='mailto:bond@ieee.org'>bond@ieee.org</a>&gt;;
     <br>
     <a href ='https://github.com/fcbond/ltdb'>Source code (GitHub)</a>
   </address>
   </body>
-</html>""" % (par['ver'])
+</html>""".format(version)
 
 
 def munge_desc(typ,description):
