@@ -1,12 +1,11 @@
 ### --*-- coding: utf-8 --*--
 ### shared code for the ltdb
 ###
-from __future__ import unicode_literals
-from __future__ import print_function
 
 
 import sqlite3, collections
-import cgi, re, urllib, sys
+import cgi, re,  sys
+from html import escape
 from collections import defaultdict as dd
 from collections import OrderedDict as od
 import json
@@ -65,11 +64,11 @@ par=getpar('params')
 
 def hlt (typs):
     "hyperlink a list of space seperated types"
-    l = unicode()
+    l = str()
     if typs:
         for t in typs.split():
             l += "<a href='%s/showtype.cgi?typ=%s'>%s</a> " % (par['cgidir'], 
-                                                           urllib.quote(t, ''),
+                                                           escape(t, ''),
                                                            t)
         return l
     else:
@@ -87,11 +86,11 @@ def hltyp(match):
     for typ in c:
         types.add(typ[0])
     #print types
-    t = unicode(match.group(0))
+    t = str(match.group(0))
     #print "<br>%s %s\n" % (t, t in types)
     if t in types and not t.startswith('#'):
         return "<a href='{}/showtype.cgi?typ={}'>{}</a>".format(par['cgidir'], 
-                                                                urllib.quote(t,''),
+                                                                escape(t,''),
                                                                 t)
     else:
         return t
@@ -100,7 +99,7 @@ def hltyp(match):
 def hlall (typs):
     "hyperlink all types in a description or documentation"
     if typs:
-        typs = cgi.escape(typs)
+        typs = escape(typs)
         ### Definition from http://moin.delph-in.net/TdlRfc
         typs=re.sub(r'(#[\w_+*?-]+)', "<span class='coref'>\\1</span>", typs)
         return retyp.sub(hltyp, typs)
@@ -135,7 +134,7 @@ def showsents (c, typ, lexid, limit, biglimit):
                 sids[sid].add((kara, made))
         if limit < total and biglimit > limit:
             limtext= "({:,} out of {:,}: <a href='more.cgi?typ={}&lexid={}&limit={}'>more</a>)".format(limit, total,
-                                                                                                       urllib.quote(typ,''),
+                                                                                                       escape(typ,''),
                                                                                                        lexid,
                                                                                                        biglimit)
         elif limit < total:
@@ -146,7 +145,7 @@ def showsents (c, typ, lexid, limit, biglimit):
         c.execute("""SELECT profile, sid, wid, word, lexid FROM SENT 
                         WHERE sid in (%s) order by sid, wid""" % \
                           ','.join('?'*len(sids)), 
-                      sids.keys())
+                      list(sids.keys()))
         sents = dd(dict)
         profname=dict()
         for (prof, sid, wid, word, lexid) in c:
@@ -358,7 +357,7 @@ def showlexs (c, lextyp, lexid, limit, biglimit):
         
     if results and results[0] > 0:
         total = results[0]
-        lem = dd(unicode) # lemma
+        lem = dd(str) # lemma
 
         if lexid:
             ## You want a specific word
@@ -366,22 +365,22 @@ def showlexs (c, lextyp, lexid, limit, biglimit):
             LEFT JOIN lexfreq ON lex.lexid = lexfreq.lexid
             WHERE lex.lexid=?""", (lexid,))
             for (lexid, orth, freq) in c:
-                lem[lexid] = cgi.escape(orth, quote=True)
+                lem[lexid] = escape(orth)
         else:
             ## You want a lexical type
             c.execute("""SELECT lex.lexid, orth, freq FROM lex 
             LEFT JOIN lexfreq ON lex.lexid = lexfreq.lexid
             WHERE typ=? ORDER BY freq DESC LIMIT ?""", (lextyp, 5 * limit))
             for (lxid, orth, freq) in c:
-                lem[lxid] = cgi.escape(orth, quote=True)
+                lem[lxid] = escape(orth)
 
                 
         c.execute("""SELECT lexid,  word, freq
 FROM lexfreq WHERE lexid in (%s) ORDER BY lexid, freq DESC""" % \
                       ','.join('?'*len(lem)), 
-                  lem.keys())
+                  list(lem.keys()))
         lf = dd(int) # frequency
-        sf = dd(unicode) # surface forms
+        sf = dd(str) # surface forms
         for (lxid, word,freq) in c:
         ### if the word was not in the corpus
             if not word:
@@ -389,13 +388,13 @@ FROM lexfreq WHERE lexid in (%s) ORDER BY lexid, freq DESC""" % \
             if not freq:
                 freq=0
             sf[lxid] += "<span title='freq=%s'>%s</span>  " % (freq, 
-                                                                cgi.escape(word, quote=True))
+                                                                escape(word))
             lf[lxid] +=freq
         #lf=lf[:50]
         #sf=sf[:50]
         if limit < total and biglimit > limit:
             limtext= "({:,} out of {:,}: <a href='more.cgi?lextyp={}&lexid={}&limit={}'>more</a>)".format(limit, total,
-                                                                                                         urllib.quote(lextyp, ''),
+                                                                                                         escape(lextyp, ''),
                                                                                                          lexid,
                                                                                                          biglimit)
         elif limit < total:
@@ -403,11 +402,11 @@ FROM lexfreq WHERE lexid in (%s) ORDER BY lexid, freq DESC""" % \
         else:
             limtext ='({:,})'.format(total)
             
-        print ("""<h2>Lexical Examples: {:,} {}</h2>""".format(min(len(lf),limit),
+        print ("""<h2>Lexical Examples: {:,}  {}</h2>""".format(min(len(lf),limit),
                                                                limtext))
         print("""<table><th>lexid</th><th>Lemma</th><th>Surface</th>
 <th>Frequency</th></tr>""")  ### FIXME <th>Sentences
-        for lxid in sorted(lf.keys()[:min(len(lf),limit)], key = lambda x: lf[x], reverse=True):
+        for lxid in sorted(list(lf.keys())[:min(len(lf),limit)], key = lambda x: lf[x], reverse=True):
             print(u"""<td><a href='showtype.cgi?lexid={}'>{}</a></td>
 <td>{}</td>
 <td>{}</td>

@@ -1,11 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-from __future__ import print_function, unicode_literals
+ 
 import cgi
 import cgitb; cgitb.enable()  # for troubleshooting
 import sqlite3, collections
-import sys,codecs 
-sys.stdout = codecs.getwriter('utf8')(sys.stdout)
+import sys
 from collections import defaultdict as dd
 import ltdb
 form = cgi.FieldStorage()
