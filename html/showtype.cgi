@@ -71,7 +71,7 @@ def showtype (typinfo, tdlinfo):
         print("""<h3>TDL from LKB comment</h3>""")
         print("""<pre class='code'>%s</pre>""" % ltdb.hlall(definition))    ### TDL and type info
 
-def show_description(description, tdlinfo):
+def show_description(typ, description, tdlinfo):
     """print out the linguistic description in the doscstring
        use the value from the LKB if possible, if not then from pydelphin"""
     if description:
@@ -83,8 +83,9 @@ def show_description(description, tdlinfo):
     else:
         for  src, line, tdl, docstring in  tdlinfo:
             if docstring:
+                description, examples, names=  ltdb.munge_desc(typ,docstring)
                 print("""<h2>Linguistic Documentation (TDL)</h2>
-                {}""".format(docutils.core.publish_parts("\n"+ docstring +"\n",
+                {}""".format(docutils.core.publish_parts("\n"+ description +"\n",
                                                          writer_name='html',
                                                          settings_overrides= {'table_style':'colwidths-auto',
                                                                               'initial_header_level':'3'})['body']))
@@ -109,7 +110,7 @@ if (lexid):
         <h1>{0} (<a href='showtype.cgi?typ={1}'>{1}</a>)</h1>""".format(lexid, typ))
        
         ### Show docstring 
-        show_description(description, tdlinfo)
+        show_description(typ, description, tdlinfo)
         ### Corpus examples of lextype, type
         ltdb.showlexs(c, typ, lexid, maxexe, 50) 
         ltdb.showsents(c, typ, lexid, maxexe, 50)
@@ -136,7 +137,7 @@ elif (typ):
         <h1>%s (%s)</h1>""" % (typ, status)) ## FIXME show headedness
 
         ### Show docstring 
-        show_description(description, tdlinfo)
+        show_description(typ, description, tdlinfo)
         ### Corpus examples of lextype, type
         ltdb.showlexs(c, typ, lexid, maxexe, 50) 
         ltdb.showsents(c, typ, lexid, maxexe, 50)

@@ -525,15 +525,15 @@ def munge_desc(typ,description):
             if l.startswith("<ex>"):
                 ex = l[4:].strip()
                 exes.append((ex,typ,1))
-                desc.append("\n{:d}. {}\n".format(count, ex))
+                desc.append("\n{:d}. *{}*\n".format(count, ex))
             elif l.startswith("<nex>"):
                 ex = l[5:].strip()
                 exes.append((ex,typ,0))
-                desc.append("\n{:d}. ∗ {}\n".format(count, ex))
+                desc.append("\n{:d}. ∗ *{}*\n".format(count, ex))
             else: # l.startswith("<mex>")
                 ex = l[5:].strip()
                 exes.append((ex,typ,1))
-                desc.append("\n{:d}. ⊛ {}\n".format(count, ex))
+                desc.append("\n{:d}. ⊛ *{}*\n".format(count, ex))
             if ex.startswith('*'):
                 print("Warning: don't use '*' in examples, just use <nex>:", l,
                       file=sys.stderr)
