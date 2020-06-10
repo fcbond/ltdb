@@ -105,6 +105,15 @@ If the LKB complains
 it probably means you have a docstring in an instance file, or an old
 version of the LKB. Make sure you only document types for now.
 
+If you are having trouble with apache encodings, set the following in ``/etc/apache2/apache2.conf``
+
+::
+
+   SetEnv PYTHONIOENCODING utf8
+
+
+
+
 Todo
 ----
 
