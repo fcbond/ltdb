@@ -1,21 +1,20 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 import cgi
 import cgitb; cgitb.enable()  # for troubleshooting
 import sqlite3, collections
-import sys,codecs 
-sys.stdout = codecs.getwriter('utf8')(sys.stdout)
+import sys
 from collections import defaultdict as dd
 import ltdb
 
 form = cgi.FieldStorage()
 #synset = form.getfirst("synset", "")
 lemma = form.getfirst("lemma", "")
-lemma = lemma.strip().decode('utf-8')
+lemma = lemma.strip()
 typ = form.getfirst("typ", "")
-typ = typ.strip().decode('utf-8')
+typ = typ.strip()
 
 
 par=ltdb.getpar('params')
@@ -33,12 +32,12 @@ lexinfo = ltdb.get_lexinfo(typ,c)
 if (lemma):
     leminfo = ltdb.get_leminfo (lemma,c)
     if leminfo:
-        print """
+        print ("""
 <div align ='center' id="contents">
 <h1>Lexical Types matching "%s" (%s)</h1>
 %d Type(s) found.
-""" % (lemma, par['ver'], len(leminfo))
-        print "<table>"
+""".format(lemma, par['ver'], len(leminfo)))
+        print ("<table>")
         print ("""<tr>
         <th>{}</th><th>{}</th><th>{}</th><th>{}</th><th>{}</th>
         </tr>""".format("Lexical Entry",
@@ -51,10 +50,10 @@ if (lemma):
             ## FIXME ':' -> '\t'
             if not name:
                 name = '<br>'
-            wrds = "<br>"
-            if words:
-                wrds = ", ".join(["<span title='%s (%s)'>%s</a>" % tuple(r.split('\t')) for 
-                                  r in words.split('\n')])
+                wrds = "<br>"
+                if words:
+                    wrds = ", ".join(["<span title='%s (%s)'>%s</a>" % tuple(r.split('\t')) for 
+                                      r in words.split('\n')])
             print("""<tr>
             <td><a href='showtype.cgi?typ={0}'>{0}</a></td>
             <td><a href='search.cgi?lemma={1}'>{1}</a></td>
@@ -63,31 +62,39 @@ if (lemma):
             <td>{4} ({5}, {6})</td>
 </tr>""".format(lexid, orth, ltdb.hlt(typ), name,
                  wrds, typefreq, tokenfreq))
-        print "</table>"
+        print ("</table>")
     else:
-        print "<p>No matches found for lemma %s in %s."  % (lemma, par['ver'])
+        print ("<p>No matches found for lemma %s in %s.".format((lemma,
+                                                                 par['ver'])))
+###
+### deal with types
+###
 elif(typ):
     typsum = ltdb.get_typsum (typ, c)
     if typsum:
-        print """
+        print ("""
 <div id="contents">
 <h1>Types matching "%s" (%s)</h1>
 %d Type(s) found.
-""" % (typ, par['ver'], len(typsum))
-        print "<table>"
-        print "<tr><th>%s</th><th>%s</th><th>%s</th><th>%s</th></tr>" % ("Type", 
-                                                                         "Name", 
-                                                                         "Status", 
-                                                                         "Freq.")
+""" % (typ, par['ver'], len(typsum)))
+        print ("<table>")
+        print ("""<tr>
+  <th>%s</th>
+  <th>%s</th>
+  <th>%s</th>
+  <th>%s</th></tr>""".format("Type", 
+        "Name", 
+        "Status", 
+        "Freq."))
         for (typ, name, status, freq) in typsum:
             if not name:
                 name='<br>'
             if not freq:
                 freq=0
-            print """<tr class='%s'><td>%s</td><td>%s</td>
+            print ("""<tr class='%s'><td>%s</td><td>%s</td>
  <td>%s</td><td align='right'>%s</td></tr>""" % (status, ltdb.hlt(typ), name, 
-                                   status, freq)
-        print "</table>"
+                                   status, freq))
+        print ("</table>")
     elif (lexinfo):
         lexid=typ
         print ("""

@@ -56,12 +56,12 @@ fi
 # unset LKBFOS
 LKBFOS=~/delphin/lkb_fos/lkb.linux_x86_64
 
-if [ ${LKBFOS} ]; then
+if [[ -n ${LKBFOS} && -e ${LKBFOS} ]]; then
     LISPCOMMAND="${LKBFOS}"
-    echo We will use $LISPCOMMAND
-elif [ $LOGONROOT ];then
+    echo We will use ${LISPCOMMAND}
+elif [[ -n $LOGONROOT && -e "${LOGONROOT}/bin/logon" ]]; then
     LISPCOMMAND="${LOGONROOT}/bin/logon --binary -I base -locale ja_JP.UTF-8"
-    echo We will use $LISPCOMMAND
+    echo We will use ${LISPCOMMAND}
 else
     echo we found no suitable LKB
 fi
@@ -141,7 +141,7 @@ mkdir -p "${outdir}"
 
 db=${outdir}/${LTDB_FILE}
 
-if [ ${lkbscript} ]
+if [[ ${lkbscript} && ${LISPCOMMAND} ]]
 then
     ### dump  the lex-types
     echo "Dumping lex-type definitions and lexicon using the LKB (slow but steady)" 
@@ -194,7 +194,7 @@ echo
 sqlite3 ${db} < tables.sql
 
 ###
-if [ ${lkbscript} ]
+if [[ ${lkbscript} && ${LISPCOMMAND} ]]
 then
     echo "Adding in the info from the lisp"
     echo
