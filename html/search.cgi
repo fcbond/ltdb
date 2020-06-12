@@ -79,10 +79,10 @@ elif(typ):
 """ % (typ, par['ver'], len(typsum)))
         print ("<table>")
         print ("""<tr>
-  <th>%s</th>
-  <th>%s</th>
-  <th>%s</th>
-  <th>%s</th></tr>""".format("Type", 
+  <th>{}</th>
+  <th>{}</th>
+  <th>{}</th>
+  <th>{}</th></tr>""".format("Type", 
         "Name", 
         "Status", 
         "Freq."))
