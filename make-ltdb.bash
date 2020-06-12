@@ -6,12 +6,22 @@ echo
 echo  Welcome to the Linguistic Type Database
 echo
 
+usage="""You need to give a grammar directory or script file (or both)
+    --script path/to/lkb/script
+    --grmtdl path/to/grammar.tdl
+
+You can add some lisp before we load the script
+    --lisp (push :mal *features*)  
+
+You can not add information from the gold trees
+    --nogold 
+"""
 
 
 ###
 ### get the grammar directory
 ###
-
+gold='true'
 while [ $# -gt 0 -a "${1#-}" != "$1" ]; do
   case ${1} in
       --script)
@@ -22,11 +32,16 @@ while [ $# -gt 0 -a "${1#-}" != "$1" ]; do
 	  grammartdl=${2};
 	  shift 2;
 	  ;;
+      --lisp)
+	  lisp=${2};
+	  shift 2;
+	  ;;
+      --nogold)
+	  gold='false'
+	  shift 1;
+	  ;;
       *)
-	  echo """You need to give a grammar directory or script file (or both)
-    --script path/to/lkb/script
-    --grmtdl path/to/grammar.tdl
-"""
+	  echo "${usage}"
 	  exit 0	
   esac
 done
@@ -44,10 +59,7 @@ then
     grammardir=`dirname ${grammartdl}`
     echo "Grammar directory is " ${grammardir}
 else
-    echo """You need to give a grammar directory or script file
-    --script path/to/lkb/script
-    --grmtdl path/to/grammar.tdl
-"""
+    echo "${usage}"
     exit 0
 fi
 
@@ -72,7 +84,6 @@ fi
 ### set things up
 ###
 
-treebanks=`ls -d ${grammardir}/tsdb/gold/*`
 now=`date --rfc-3339=date`
 
 
@@ -210,8 +221,10 @@ fi
 
 #echo "Adding in the info from the gold trees"
 #echo
-python3 gold2db.py ${grammardir} ${db}
-
+if [ ${gold} == 'true' ]
+then
+    python3 gold2db.py ${grammardir} ${db}
+fi
 
 echo
 echo Install to ${CGI_DIR}
