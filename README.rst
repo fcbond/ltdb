@@ -23,6 +23,13 @@ or (somewhat experimental but gets more docstrings)
 
 2. Run ``./make-ltdb.bash --grmtdl /path/to/grammar/grammar.tdl``
    
+3. Add extra lisp to call before the script
+   ``./make-ltdb.bash   --lisp '(push :mal *features*)' --script /path/to/grammar/lkb/script``
+
+4. You can tell it to just read the grammar, not gold (mainly useful for debugging)
+   ``./make-ltdb.bash --grmtdl /path/to/grammar/grammar.tdl --nogold``
+
+You can load from lisp and ace versions of the grammar, it will try to merge information from both.
 
 .. code:: bash
 
@@ -39,15 +46,15 @@ Requirements
 
 ::
 
-      * python 2.7, python 3, pydelphin, docutils, lxml
+      * python 3, pydelphin, docutils, lxml
       * Perl
       * SQLite3
       * Apache
       * LKB/Lisp        for db dump
       * xmlstarlet      for validating lisp
 
-We prefer that Sentence IDs are unique, if we see two sentences in the
-gold treebank with the same ID, we only store the first one.
+We store items as (profile, item-id) pairs, so Sentence IDs do not
+need to be unique.
 
 Only the new LKB-FOS (http://moin.delph-in.net/LkbFos) supports the new docstring comments.  We assume it is installed in
 ``LKBFOS=~/delphin/lkb_fos/lkb.linux_x86_64``.
@@ -57,7 +64,7 @@ Install dependencies (in ubuntu):
 .. code:: bash
 
     sudo apt-get install apache2 xmlstarlet
-    sudo apt-get install python-docutils python3-docutils python3-lxml
+    sudo apt-get install python3-docutils python3-lxml
 
     sudo pip install pydelphin --upgrade
     sudo pip3 install pydelphin --upgrade
