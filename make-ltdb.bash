@@ -254,7 +254,7 @@ echo "ver=$version" >> ${CGI_DIR}/params
 cp doc/lt-diagram.png html/*.js html/*.css html/ltdb.png ${HTML_DIR}/.
 cp ${outdir}/*.log ${HTML_DIR}
 
-python3 makehome.py ${version}  ${grammardir} > ${HTML_DIR}/index.html
+python3 makehome.py ${version}  ${grammardir} ${lkbscript} ${extralisp} ${grammartdl} > ${HTML_DIR}/index.html
 
 
 ### All done

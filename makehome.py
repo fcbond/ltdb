@@ -12,24 +12,38 @@ from collections import OrderedDict
 ### get some local utilities
 sys.path.append(os.getcwd() + '/html')
 from ltdb import statuses, footer
+from html import escape
 
-(script, version, grmdir) = sys.argv
+(script, version, grmdir, extralisp, lkbscript, grammartdl) = sys.argv
 
-print("""
+
+madewith =''
+if lkbscript or grammartdl:
+    madewith += " made from:\n  <ul>\n"
+    if lkbscript:
+        if extralisp:
+            madewith += f"    <li> LKB loading <code>{lkbscript}</code> after executing <code>{extralisp}</code>\n"
+        else:
+            madewith += f"    <li> LKB loading <code>{lkbscript}</code>\n"
+    if grammartdl:
+        madewith += f"<li> PyDelphin, parsing <code>{grammartdl}</code>\n"
+    madewith += "  </ul>" 
+
+print(f"""
 <html>
 <head>
-  <title>{0} ltdb</title>
+  <title>{version} ltdb</title>
   <link rel='stylesheet' type='text/css' href='lextypedb.css'/>
   <link rel="icon"  type="image/png"  href="%s/ltdb.png"/>
 </head>
 <body>
-<h1>Welcome to {0}</h1>
+<h1>Welcome to {version}</h1>
 <ul>  
-  <li>  <a href='../../cgi-bin/{0}/search.cgi'>Lexical Type Database for {0}</a> ( <a href='../../cgi-bin/{0}/search.cgi'>Search</a>)
+  <li>  <a href='../../cgi-bin/{0}/search.cgi'>Lexical Type Database for {version}</a>{madewith}
   <li>  <a href='http://wiki.delph-in.net/moin/LkbLtdb'>Lexical Type Database Wiki</a>
   <li>  <a href='http://wiki.delph-in.net/moin/FrontPage'>DELPH-IN Wiki</a>
 </ul>
-""".format(version))
+""")
 
 # if [ -n "$grammarurl" ]; then
 # echo "  <li>  <a href='$grammarurl'>Grammar Home Page</a>"  >> ${HTML_DIR}/index.html
