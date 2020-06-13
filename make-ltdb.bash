@@ -11,7 +11,7 @@ usage="""You need to give a grammar directory or script file (or both)
     --grmtdl path/to/grammar.tdl
 
 You can add some lisp before we load the script
-    --lisp (push :mal *features*)  
+    --lisp '(push :mal *features*)'
 
 You can not add information from the gold trees
     --nogold 
@@ -33,7 +33,7 @@ while [ $# -gt 0 -a "${1#-}" != "$1" ]; do
 	  shift 2;
 	  ;;
       --lisp)
-	  lisp=${2};
+	  extralisp=${2};
 	  shift 2;
 	  ;;
       --nogold)
@@ -117,8 +117,8 @@ fi
 ### write the temporary files to here
 outdir=${LOGONTMP}/${version}
 
-log=${outdir}/lkb.log
-echo Log file at ${log}
+lkblog=${outdir}/lkb.log
+echo Log file at ${lkblog}
 
 ### write the html here
 HTML_DIR=${HOME}/public_html/ltdb/${version}
@@ -160,25 +160,27 @@ then
     
     unset DISPLAY;
     unset LUI;
-    
-{ 
- cat 2>&1 <<- LISP
-  (format t "~%Read Grammar~%")
-  (lkb::read-script-file-aux  "${lkbscript}")
-  (lkb::lkb-load-lisp "." "patch-lextypedb.lsp")
-  (format t "~%Output types~%")
-  (lkb::output-types :xml "${outdir}/${TYPES_FILE}")
-  (format t "~%Output lrules, rules and roots ~%")
-  (lkb::lrules-to-xml :file "${outdir}/${LRULES_FILE}")
-  (lkb::rules-to-xml :file "${outdir}/${RULES_FILE}")
-  (lkb::roots-to-xml :file "${outdir}/${ROOTS_FILE}")
-  (lkb::output-lex-summary lkb::*lexicon* "${outdir}/${LEXICON_FILE}")
-  (format t "~%All Done!~%")
+
+LISP="
+  ${extralisp}
+  (format t \"~%LTDB Read Grammar~%\")
+  (lkb::read-script-file-aux  \"${lkbscript}\")
+  (lkb::lkb-load-lisp \".\" \"patch-lextypedb.lsp\")
+  (format t \"~%LTDB Output types~%\")
+  (lkb::output-types :xml \"${outdir}/${TYPES_FILE}\")
+  (format t \"~%LTDB Output lrules, rules and roots ~%\")
+  (lkb::lrules-to-xml :file \"${outdir}/${LRULES_FILE}\")
+  (lkb::rules-to-xml :file \"${outdir}/${RULES_FILE}\")
+  (lkb::roots-to-xml :file \"${outdir}/${ROOTS_FILE}\")
+  (format t \"~%LTDB Output lexical summary ~%\")
+  (lkb::output-lex-summary lkb::*lexicon* \"${outdir}/${LEXICON_FILE}\")
+  (format t \"~%LTDB All Done!~%\")
   #+allegro        (excl:exit)
-  #+sbcl           (sb-ext:quit)
-LISP
-} | ${LISPCOMMAND}   2>${log} >${log}
-# } | cat   
+" 
+echo "$LISP" > ${lkblog}
+echo LISP "${LISP}"
+echo "$LISP"  | ${LISPCOMMAND}  2>>${lkblog} >>${lkblog}
+# } | cat     ### DEBUG LISP
     
     ###
     ### Try to validate the types.xml
