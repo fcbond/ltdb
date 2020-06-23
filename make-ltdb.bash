@@ -253,7 +253,20 @@ echo "ver=$version" >> ${CGI_DIR}/params
 ### HTML and logs
 cp doc/lt-diagram.png html/*.js html/*.css html/ltdb.png ${HTML_DIR}/.
 cp ${outdir}/*.log ${HTML_DIR}
+if [ -n ${lkbscript} ]
+then
+    lkbscript='none'
+fi
+if [ -n ${extralisp} ]
+then
+    extralisp='none'
+fi
+if [ -n ${grammartdl} ]
+then
+    grammartdl='none'
+fi
 
+   
 python3 makehome.py ${version}  ${grammardir} ${lkbscript} ${extralisp} ${grammartdl} > ${HTML_DIR}/index.html
 
 

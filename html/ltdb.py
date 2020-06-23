@@ -27,6 +27,7 @@ statuses = od()
 
 ##things used when parsing
 statuses["lex-rule"] = "Lexical Rules"
+statuses["inf-rule"] = "Inflectional Rules"
 statuses["rule"] = "Syntactic Rules"
 statuses["token-mapping-rule"] = "Rules for token mapping"
 statuses["root"] = "Root Conditions for well formed utterances"
@@ -40,8 +41,8 @@ statuses["lex-type"] = "Types for lexical entries (immediate supertypes of lex-e
 statuses["type"] = "Other Internal Types"
 
 ## pre and post processing
-statuses["lexical-filtering-rule"] = "lexical filtering rule"
-statuses["post-generation-mapping-rule"] = "post generation mapping rule"
+statuses["lexical-filtering-rule"] = "Lexical filtering rule"
+statuses["post-generation-mapping-rule"] = "Post generation mapping rule"
 
 ## interface 
 statuses["labels"] = "Labels for trees in the (parse-nodes)"
@@ -101,7 +102,7 @@ def hlall (typs):
     if typs:
         typs = escape(typs)
         ### Definition from http://moin.delph-in.net/TdlRfc
-        typs=re.sub(r'(#[\w_+*?-]+)', "<span class='coref'>\\1</span>", typs)
+        typs=re.sub(r'( )(#[\w_+*?-]+)([ ,])', "\\1<span class='coref'>\\2</span>\\3", typs)
         return retyp.sub(hltyp, typs)
     else:
         return '<br>'

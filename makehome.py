@@ -18,14 +18,14 @@ from html import escape
 
 
 madewith =''
-if lkbscript or grammartdl:
+if  lkbscript != 'none' or grammartdl != 'none':
     madewith += " made from:\n  <ul>\n"
-    if lkbscript:
-        if extralisp:
+    if lkbscript != 'none':
+        if extralisp != 'none':
             madewith += f"    <li> LKB loading <code>{lkbscript}</code> after executing <code>{extralisp}</code>\n"
         else:
             madewith += f"    <li> LKB loading <code>{lkbscript}</code>\n"
-    if grammartdl:
+    if grammartdl != 'none':
         madewith += f"<li> PyDelphin, parsing <code>{grammartdl}</code>\n"
     madewith += "  </ul>" 
 
@@ -33,13 +33,16 @@ print(f"""
 <html>
 <head>
   <title>{version} ltdb</title>
-  <link rel='stylesheet' type='text/css' href='lextypedb.css'/>
-  <link rel="icon"  type="image/png"  href="%s/ltdb.png"/>
+  <link rel='stylesheet' type='text/css' href='ltdb.css'/>
+  <link rel="icon"  type="image/png"  href="ltdb.png"/>
 </head>
 <body>
 <h1>Welcome to {version}</h1>
+<div  id="contents">
+<p> This is online documentation for the {version} grammar, made from the grammar itself and its accompanying metadata.
+
 <ul>  
-  <li>  <a href='../../cgi-bin/{0}/search.cgi'>Lexical Type Database for {version}</a>{madewith}
+  <li>  <a href='../../cgi-bin/{version}/search.cgi'>Lexical Type Database for {version}</a>{madewith}
   <li>  <a href='http://wiki.delph-in.net/moin/LkbLtdb'>Lexical Type Database Wiki</a>
   <li>  <a href='http://wiki.delph-in.net/moin/FrontPage'>DELPH-IN Wiki</a>
 </ul>
@@ -101,7 +104,7 @@ print("""<h3>Types and Instances in the Database</h3>
 """)
 print("<table>")
 for (typ, desc) in statuses.items():
-    print(f"<tr><td>{typ}</td><td>{desc}</td></tr>")
+    print(f"<tr class='{typ}'><td>{typ}</td><td>{desc}</td></tr>")
 print("</table>")
 ###
 ### Links to Logs
@@ -129,6 +132,7 @@ print("""
 """)
 
     
-print("""  <p>Created on {}</p>""".format(datetime.datetime.now()))
+print("""  <p>Created on {}</p>
+</div>""".format(datetime.datetime.now()))
 
 print(footer(version))

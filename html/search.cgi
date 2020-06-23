@@ -64,8 +64,9 @@ if (lemma):
                  wrds, typefreq, tokenfreq))
         print ("</table>")
     else:
-        print ("<p>No matches found for lemma %s in %s.".format((lemma,
-                                                                 par['ver'])))
+        print ("""<div align ='center' id="contents">
+<p>No matches found for lemma <b><i>{}</i></b> in {}.""".format(lemma,
+                                                  par['ver']))
 ###
 ### deal with types
 ###
