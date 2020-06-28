@@ -33,7 +33,7 @@ while [ $# -gt 0 -a "${1#-}" != "$1" ]; do
 	  shift 2;
 	  ;;
       --lisp)
-	  extralisp=${2};
+	  extralisp="${2}";
 	  shift 2;
 	  ;;
       --nogold)
@@ -161,11 +161,12 @@ then
     unset DISPLAY;
     unset LUI;
 
-LISP="
-  ${extralisp}
-  (format t \"~%LTDB Read Grammar~%\")
+LISP="""
+  "${extralisp}"
+  (format t \"~%LTDB Read Grammar~% \")
   (lkb::read-script-file-aux  \"${lkbscript}\")
   (lkb::lkb-load-lisp \".\" \"patch-lextypedb.lsp\")
+  (format t \"~%LTDB Grammar Version  ~A~%\" cl-user::*grammar-version*)
   (format t \"~%LTDB Output types~%\")
   (lkb::output-types :xml \"${outdir}/${TYPES_FILE}\")
   (format t \"~%LTDB Output lrules, rules and roots ~%\")
@@ -176,7 +177,7 @@ LISP="
   (lkb::output-lex-summary lkb::*lexicon* \"${outdir}/${LEXICON_FILE}\")
   (format t \"~%LTDB All Done!~%\")
   #+allegro        (excl:exit)
-" 
+"""
 echo "$LISP" > ${lkblog}
 echo LISP "${LISP}"
 echo "$LISP"  | ${LISPCOMMAND}  2>>${lkblog} >>${lkblog}
@@ -253,21 +254,25 @@ echo "ver=$version" >> ${CGI_DIR}/params
 ### HTML and logs
 cp doc/lt-diagram.png html/*.js html/*.css html/ltdb.png ${HTML_DIR}/.
 cp ${outdir}/*.log ${HTML_DIR}
-if [ -n ${lkbscript} ]
+
+if [ -n "${lkbscript}" ]
 then
     lkbscript='none'
 fi
-if [ -n ${extralisp} ]
+
+if [ -n "${extralisp}" ]
 then
     extralisp='none'
 fi
-if [ -n ${grammartdl} ]
+
+if [ -n "${grammartdl}" ]
 then
     grammartdl='none'
 fi
 
-   
-python3 makehome.py ${version}  ${grammardir} ${lkbscript} ${extralisp} ${grammartdl} > ${HTML_DIR}/index.html
+echo python3 makehome.py "${version}"  "${grammardir}" "${lkbscript}" "${extralisp}" "${grammartdl}" to "${HTML_DIR}"/index.html
+
+python3 makehome.py "${version}"  "${grammardir}" "${lkbscript}" "${extralisp}" "${grammartdl}" > "${HTML_DIR}"/index.html
 
 
 ### All done
