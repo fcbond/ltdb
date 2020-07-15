@@ -118,7 +118,15 @@ If you are having trouble with apache encodings, set the following in ``/etc/apa
 
    SetEnv PYTHONIOENCODING utf8
 
+To make debugging 
 
+On Ubuntu 18.04, to get python3 modwsgi working if you have updated from an earlier version (so your python defaults to 2.7) do this
+
+.. code:: bash
+
+    sudo apt-get install libapache2-mod-wsgi-py3 
+    sudo update-alternatives --install /usr/bin/python python /usr/bin/python2.7 1 
+    sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.6 2 
 
 
 Todo
