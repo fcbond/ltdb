@@ -79,7 +79,7 @@ This may be different on different operating systems
     sudo a2enmod userdir
     sudo a2enmod cgi
 
-Put this in ``/etc/apache2/sites-available/000-default.conf``
+Put this at the end of ``/etc/apache2/sites-available/000-default.conf``
 
 .. code:: xml
 
