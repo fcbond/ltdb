@@ -124,15 +124,15 @@ def showsents (c, typ, lexid, limit, biglimit):
         total = results[0]
         sids = dd(set)
         if lexid:
-            c.execute("""SELECT sid, wid FROM sent 
+            c.execute("""SELECT profile, sid, wid FROM sent 
                          WHERE lexid=? ORDER BY sid LIMIT ?""", (lexid, limit))
-            for (sid, wid) in c:
-                sids[sid].add((wid, wid+1))
+            for (profile, sid, wid) in c:
+                sids[profile, sid].add((wid, wid+1))
         else:
-            c.execute("""SELECT sid, kara, made FROM typind 
+            c.execute("""SELECT profile, sid, kara, made FROM typind 
                          WHERE typ=? ORDER BY sid LIMIT ?""", (typ, limit))
-            for (sid, kara, made) in c:
-                sids[sid].add((kara, made))
+            for (profile, sid, kara, made) in c:
+                sids[profile, sid].add((kara, made))
         if limit < total and biglimit > limit:
             limtext= "({:,} out of {:,}: <a href='more.cgi?typ={}&lexid={}&limit={}'>more</a>)".format(limit, total,
                                                                                                        escape(typ,''),
@@ -143,24 +143,22 @@ def showsents (c, typ, lexid, limit, biglimit):
         else:
             limtext ='({:,})'.format(total)
         print("""<h2>Corpus Examples %s</h2>""" % limtext)
-        c.execute("""SELECT profile, sid, wid, word, lexid FROM SENT 
-                        WHERE sid in (%s) order by sid, wid""" % \
-                          ','.join('?'*len(sids)), 
-                      list(sids.keys()))
         sents = dd(dict)
-        profname=dict()
-        for (prof, sid, wid, word, lexid) in c:
-            sents[sid][wid] = (word, lexid)
-            profname[sid]=prof
+        for profile, sid in sids:
+            c.execute("""SELECT profile, sid, wid, word, lexid FROM SENT 
+            WHERE profile = ? AND sid = ? order by profile, sid, wid""",
+                      (profile, sid))
+            for (prof, sid, wid, word, lexid) in c:
+                sents[prof, sid][wid] = (word, lexid)
 
             
         print("""<ul style="list-style:none;">""")
-        for sid in sorted(sids):
+        for profile, sid in sorted(sids):
 
 
             # fetch json for deriv_tree, mrs and dmrs
             c.execute("""SELECT mrs, mrs_json, dmrs_json, deriv_json, sent, comment FROM gold 
-                        WHERE sid =  ? """, [sid])
+                        WHERE profile=? AND sid =  ? """, (profile, sid))
             for (mrs, mrs_json, dmrs_json, deriv_json, sent, comment) in c:
                 mrs = mrs
                 mrs_json = mrs_json
@@ -169,15 +167,15 @@ def showsents (c, typ, lexid, limit, biglimit):
                 sent=sent
                 #comment unused
 
-            for (kara, made) in sorted(sids[sid]):
+            for (kara, made) in sorted(sids[profile, sid]):
                 print('<li>{}<sub>{}-{}</sub> &nbsp;&nbsp; '.format(sid,kara,made))
-                for wid in sents[sid]:
+                for wid in sents[profile, sid]:
                     if wid >= kara and wid < made:
                         print ("<span class='match'>%s</span>" % \
-                                   sents[sid][wid][0])
+                                   sents[profile, sid][wid][0])
                     else:
-                            print (sents[sid][wid][0])
-                print(" (%s)" % (profname[sid]))
+                            print (sents[profile, sid][wid][0])
+                print(f" ({profile})")
 
             ##############################################################
             # PRINT THE VISUALIZATIONS (only once per sentence)

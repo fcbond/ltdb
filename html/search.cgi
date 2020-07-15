@@ -32,11 +32,10 @@ lexinfo = ltdb.get_lexinfo(typ,c)
 if (lemma):
     leminfo = ltdb.get_leminfo (lemma,c)
     if leminfo:
-        print ("""
+        print (f"""
 <div align ='center' id="contents">
-<h1>Lexical Types matching "%s" (%s)</h1>
-%d Type(s) found.
-""".format(lemma, par['ver'], len(leminfo)))
+<h1>Lexical Entries for <i>{lemma}</i></h1>
+{len(leminfo)} Type(s) found.""")  #.format(lemma, par['ver'], len(leminfo)))
         print ("<table>")
         print ("""<tr>
         <th>{}</th><th>{}</th><th>{}</th><th>{}</th><th>{}</th>
@@ -55,7 +54,7 @@ if (lemma):
                     wrds = ", ".join(["<span title='%s (%s)'>%s</a>" % tuple(r.split('\t')) for 
                                       r in words.split('\n')])
             print("""<tr>
-            <td><a href='showtype.cgi?typ={0}'>{0}</a></td>
+            <td><a href='showtype.cgi?lexid={0}'>{0}</a></td>
             <td><a href='search.cgi?lemma={1}'>{1}</a></td>
             <td>{2}</td>
             <td>{3}</td>
@@ -64,9 +63,9 @@ if (lemma):
                  wrds, typefreq, tokenfreq))
         print ("</table>")
     else:
-        print ("""<div align ='center' id="contents">
-<p>No matches found for lemma <b><i>{}</i></b> in {}.""".format(lemma,
-                                                  par['ver']))
+        print (f"""<div align ='center' id="contents">
+<p>No matches found for lemma <b><i>{lemma}</i></b> in {par['ver']}.""")
+#        .format(lemma, par['ver'],par))
 ###
 ### deal with types
 ###
