@@ -63,7 +63,7 @@ Install dependencies (in ubuntu):
 
 .. code:: bash
 
-    sudo apt-get install apache2 xmlstarlet
+    sudo apt-get install apache2 xmlstarlet p7zip 
     sudo apt-get install python3-docutils python3-lxml
 
     sudo pip install pydelphin --upgrade
