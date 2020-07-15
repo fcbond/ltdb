@@ -21,10 +21,10 @@ madewith =''
 if  lkbscript != 'none' or grammartdl != 'none':
     madewith += " made from:\n  <ul>\n"
     if lkbscript != 'none':
-        if extralisp != 'none':
-            madewith += f"    <li> LKB loading <code>{lkbscript}</code> after executing <code>{extralisp}</code>\n"
-        else:
+        if extralisp == 'none':
             madewith += f"    <li> LKB loading <code>{lkbscript}</code>\n"
+        else:
+            madewith += f"    <li> LKB loading <code>{lkbscript}</code> after executing <code>{extralisp}</code>\n"
     if grammartdl != 'none':
         madewith += f"<li> PyDelphin, parsing <code>{grammartdl}</code>\n"
     madewith += "  </ul>" 
@@ -42,7 +42,7 @@ print(f"""
 <p> This is online documentation for the {version} grammar, made from the grammar itself and its accompanying metadata.
 
 <ul>  
-  <li>  <a href='../../cgi-bin/{version}/search.cgi'>Lexical Type Database for {version}</a>{madewith}
+  <li>  Click Here: <a href='../../cgi-bin/{version}/search.cgi'>Lexical Type Database for {version}</a>{madewith}
   <li>  <a href='http://wiki.delph-in.net/moin/LkbLtdb'>Lexical Type Database Wiki</a>
   <li>  <a href='http://wiki.delph-in.net/moin/FrontPage'>DELPH-IN Wiki</a>
 </ul>

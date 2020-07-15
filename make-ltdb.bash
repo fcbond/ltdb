@@ -8,7 +8,7 @@ echo
 
 usage="""You need to give a grammar directory or script file (or both)
     --script path/to/lkb/script
-    --grmtdl path/to/grammar.tdl
+    --acecfg path/to/ace/config.tdl
 
 You can add some lisp before we load the script
     --lisp '(push :mal *features*)'
@@ -19,17 +19,17 @@ You can not add information from the gold trees
 
 
 ###
-### get the grammar directory
+### get the config files
 ###
 gold='true'
 while [ $# -gt 0 -a "${1#-}" != "$1" ]; do
   case ${1} in
       --script)
-	  lkbscript=${2};
+	  lkb_script=${2};
 	  shift 2;
 	  ;;
-      --grmtdl)
-	  grammartdl=${2};
+      --acecfg)
+	  ace_cfg=${2};
 	  shift 2;
 	  ;;
       --lisp)
@@ -47,16 +47,17 @@ while [ $# -gt 0 -a "${1#-}" != "$1" ]; do
 done
 
 
-if [ ${lkbscript} ]
+if [ ${lkb_script} ]
 then
-    echo "LKB script file is" ${lkbscript}
-    grammardir=`dirname ${lkbscript}`
+    echo "LKB script file is" ${lkb_script}
+    grammardir=`dirname ${lkb_script}`
     grammardir=`dirname ${grammardir}`
     echo "Grammar directory is " ${grammardir}
-elif [ ${grammartdl} ]
+elif [ ${ace_cfg} ]
 then
-    echo "Grammar file is " ${grammartdl}
-    grammardir=`dirname ${grammartdl}`
+    echo "ACE Config file is " ${ace_cfg}
+    grammardir=`dirname ${ace_cfg}`
+    grammardir=`dirname ${grammardir}`
     echo "Grammar directory is " ${grammardir}
 else
     echo "${usage}"
@@ -96,47 +97,22 @@ ROOTS_FILE="roots.xml"                # roots
 LRULES_FILE="lrules.xml"              # lexical tules
 LEXICON_FILE="lex.tab"                # lexicon
 
-### I really don't want to do this!
-if [ -f  ${grammardir}/Version.lsp ]; then
-    versionfile=${grammardir}/Version.lsp
-else
-    versionfile=${grammardir}/Version.lisp
-fi
-
-version=`perl -ne 'if (/^\(defparameter\s+\*grammar-version\*\s+\"(.*)\s+\((.*)\)\"/) {print "$1_$2"}' $versionfile`
-if [ -z "$version" ]; then
-    echo "Don't know the version, will use 'something'"
-    version=something
-fi
-
-version=${version// /_}
-
-if [ -z "${LOGONTMP}" ]; then
-  export LOGONTMP=/tmp
-fi
 ### write the temporary files to here
-outdir=${LOGONTMP}/${version}
+outdir=$(mktemp -d -t ltdb_XXXX)
 
 lkblog=${outdir}/lkb.log
 echo Log file at ${lkblog}
 
-### write the html here
-HTML_DIR=${HOME}/public_html/ltdb/${version}
-CGI_DIR=${HOME}/public_html/cgi-bin/${version}
 
 #outdir=/tmp/new
 
 echo 
-echo "Creating a lextypedb for the grammar stored at: $grammardir"
+echo "Creating a Linguistic Type DataBase"
 echo 
 echo "Temporary files will be stored in $outdir"
 echo
 
 echo
-echo "It will be installed into:"
-echo "   $HTML_DIR"
-echo "   $CGI_DIR"
-echo 
 echo "Would you like to continue (Y/n)?"
 read
 case ${REPLY} in
@@ -152,7 +128,7 @@ mkdir -p "${outdir}"
 
 db=${outdir}/${LTDB_FILE}
 
-if [[ ${lkbscript} && ${LISPCOMMAND} ]]
+if [[ ${lkb_script} && ${LISPCOMMAND} ]]
 then
     ### dump  the lex-types
     echo "Dumping lex-type definitions and lexicon using the LKB (slow but steady)" 
@@ -161,12 +137,17 @@ then
     unset DISPLAY;
     unset LUI;
 
-LISP="""
+LISP="
   "${extralisp}"
   (format t \"~%LTDB Read Grammar~% \")
-  (lkb::read-script-file-aux  \"${lkbscript}\")
+  (lkb::read-script-file-aux  \"${lkb_script}\")
   (lkb::lkb-load-lisp \".\" \"patch-lextypedb.lsp\")
   (format t \"~%LTDB Grammar Version  ~A~%\" cl-user::*grammar-version*)
+  (with-open-file (str 	\"${outdir}/lkb_ver\"
+                     :direction :output
+                     :if-exists :supersede
+                     :if-does-not-exist :create)
+  		     (format str \"~A\" cl-user::*grammar-version*))
   (format t \"~%LTDB Output types~%\")
   (lkb::output-types :xml \"${outdir}/${TYPES_FILE}\")
   (format t \"~%LTDB Output lrules, rules and roots ~%\")
@@ -177,7 +158,7 @@ LISP="""
   (lkb::output-lex-summary lkb::*lexicon* \"${outdir}/${LEXICON_FILE}\")
   (format t \"~%LTDB All Done!~%\")
   #+allegro        (excl:exit)
-"""
+"
 echo "$LISP" > ${lkblog}
 echo LISP "${LISP}"
 echo "$LISP"  | ${LISPCOMMAND}  2>>${lkblog} >>${lkblog}
@@ -208,18 +189,18 @@ echo
 sqlite3 ${db} < tables.sql
 
 ###
-if [[ ${lkbscript} && ${LISPCOMMAND} ]]
+if [[ ${lkb_script} && ${LISPCOMMAND} ]]
 then
     echo "Adding in the info from the lisp"
     echo
     python3 xml2db.py ${outdir} ${db}
 fi
 
-if [ ${grammartdl} ]
+if [ ${ace_cfg} ]
 then
     echo "Adding in the info from the tdl with pydelphin"
     echo
-    python3 tdl2db.py ${grammartdl} ${db}   ### add tdl and comments
+    python3 tdl2db.py ${ace_cfg} ${db}   ### add tdl and comments
 fi
 
 #echo "Adding in the info from the gold trees"
@@ -229,9 +210,30 @@ then
     python3 gold2db.py ${grammardir} ${db}
 fi
 
+
+### I really don't want to do this!
+if [ -f  ${outdir}/tdl_ver ]; then
+    versionfile=`cat ${outdir}/tdl_ver`
+    version=`perl -ne 'if (/^\(defparameter\s+\*grammar-version\*\s+\"(.*)\s+\((.*)\)\"/) {print "$1_$2"}' $versionfile`
+else
+    version=`cat ${outdir}/lkb_ver`
+fi
+
+if [ -z "$version" ]; then
+    echo "Don't know the version, will use 'something'"
+    version=something
+fi
+
+version=${version// /_}
+
+### write the html here
+HTML_DIR=${HOME}/public_html/ltdb/${version}
+CGI_DIR=${HOME}/public_html/cgi-bin/${version}
+
 echo
-echo Install to ${CGI_DIR}
+echo Install to ${HTML_DIR}, ${CGI_DIR}
 echo
+
 mkdir -p ${CGI_DIR}
 mkdir -p ${HTML_DIR}
 
@@ -255,24 +257,24 @@ echo "ver=$version" >> ${CGI_DIR}/params
 cp doc/lt-diagram.png html/*.js html/*.css html/ltdb.png ${HTML_DIR}/.
 cp ${outdir}/*.log ${HTML_DIR}
 
-if [ -n "${lkbscript}" ]
+if [ -z "$lkb_script" ]
 then
-    lkbscript='none'
+    lkb_script='none'
 fi
 
-if [ -n "${extralisp}" ]
+if [ -z "${extralisp}" ]
 then
     extralisp='none'
 fi
 
-if [ -n "${grammartdl}" ]
+if [ -z "${ace_cfg}" ]
 then
-    grammartdl='none'
+    ace_cfg='none'
 fi
 
-echo python3 makehome.py "${version}"  "${grammardir}" "${lkbscript}" "${extralisp}" "${grammartdl}" to "${HTML_DIR}"/index.html
+echo python3 makehome.py "${version}"  "${grammardir}" "${lkb_script}" "${extralisp}" "${ace_cfg}" to "${HTML_DIR}"/index.html
 
-python3 makehome.py "${version}"  "${grammardir}" "${lkbscript}" "${extralisp}" "${grammartdl}" > "${HTML_DIR}"/index.html
+python3 makehome.py "${version}"  "${grammardir}" "${lkb_script}" "${extralisp}" "${ace_cfg}" > "${HTML_DIR}"/index.html
 
 
 ### All done

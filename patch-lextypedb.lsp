@@ -172,7 +172,7 @@
 
 ;;;#+:tsdb
 (defun output-type-as-xml (name type-struct stream)
- (let* ((def (ltype-local-constraint type-struct))
+ (let* (;(def (ltype-local-constraint type-struct))
         (parents (ltype-parents type-struct))
 	(children (ltype-daughters type-struct))
 	(comment (ltype-comment type-struct))
@@ -259,33 +259,33 @@
   (when file-name 
     (with-open-file 
         (ostream file-name :direction :output :if-exists :supersede)
-      (lex-summary  (collect-psort-ids *lexicon*) ostream))))
+      (lex-summary  (collect-psort-ids lexicon) ostream))))
 
 ;;; how do I define TAB in format?
 (defun lex-summary (lex-entries stream)
   (loop for word-entry in lex-entries
 	for lex-entry =  (get-lex-entry-from-id word-entry :cache nil)
 	for lex-tdfs = (tdfs-indef (psort-full-fs lex-entry))
-	do
-	(format stream "~A	~A	~{~A~^ ~}	~A	~A~%"
-		;; lex-id
-		(string-downcase word-entry)
-		;; Lexical Type
-		(string-downcase (lkb::dag-type lex-tdfs))
-		;; ORTH
-		(lex-entry-orth lex-entry)
-		;; Predicate
-		(string-downcase (if (mrs::path-value 
-				      lex-tdfs '(SYNSEM LKEYS KEYREL PRED))
-				     (lkb::dag-type 
-				      (mrs::path-value 
-				       lex-tdfs '(SYNSEM LKEYS KEYREL PRED)))))
-	       ;; ALTKEY
-		(string-downcase (if (mrs::path-value 
-				      lex-tdfs '(SYNSEM LKEYS ALTKEYREL PRED))
-				     (lkb::dag-type 
-				      (mrs::path-value 
-				       lex-tdfs '(SYNSEM LKEYS ALTKEYREL PRED))))))))
+	    do
+	    (format stream "~A	~A	~{~A~^ ~}	~A	~A~%"
+		    ;; lex-id
+		    (string-downcase word-entry)
+		    ;; Lexical Type
+		    (string-downcase (lkb::dag-type lex-tdfs))
+		    ;; ORTH
+		    (lex-entry-orth lex-entry)
+		    ;; Predicate
+		    (string-downcase (if (mrs::path-value 
+					  lex-tdfs '(SYNSEM LKEYS KEYREL PRED))
+					 (lkb::dag-type 
+					  (mrs::path-value 
+					   lex-tdfs '(SYNSEM LKEYS KEYREL PRED)))))
+		    ;; ALTKEY
+		    (string-downcase (if (mrs::path-value 
+					  lex-tdfs '(SYNSEM LKEYS ALTKEYREL PRED))
+					 (lkb::dag-type 
+					  (mrs::path-value 
+					   lex-tdfs '(SYNSEM LKEYS ALTKEYREL PRED))))))))
 ;               ;; KEYTAG
 ;            (lkb::dag-type (mrs::path-value lex-tdfs
 ;                                              '(SYNSEM LKEYS KEYREL CARG)))

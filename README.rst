@@ -21,20 +21,20 @@ Usage
 
 or (somewhat experimental but gets more docstrings)
 
-2. Run ``./make-ltdb.bash --grmtdl /path/to/grammar/grammar.tdl``
+2. Run ``./make-ltdb.bash --acecfg /path/to/ace/config.tdl``
    
 3. Add extra lisp to call before the script
    ``./make-ltdb.bash   --lisp '(push :mal *features*)' --script /path/to/grammar/lkb/script``
 
 4. You can tell it to just read the grammar, not gold (mainly useful for debugging)
-   ``./make-ltdb.bash --grmtdl /path/to/grammar/grammar.tdl --nogold``
+   ``./make-ltdb.bash --acecfg /path/to/ace/config.tdl --nogold``
 
 You can load from lisp and ace versions of the grammar, it will try to merge information from both.
 
 .. code:: bash
 
     ./make-ltdb.bash --script ~/logon/dfki/jacy/lkb/script
-    ./make-ltdb.bash --grmtdl ~/logon/dfki/jacy/japanese.tdl
+    ./make-ltdb.bash --acecfg ~/logon/dfki/jacy/ace/config.tdl
 
 Everything is installed to ``~/public_html/``
 

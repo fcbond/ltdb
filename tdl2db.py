@@ -7,6 +7,7 @@ from pathlib import Path
 from delphin import tdl
 
 import sqlite3, sys, os
+import re
 
 ###  ToDo
 # identify lextypes
@@ -15,25 +16,42 @@ import sqlite3, sys, os
 if (len(sys.argv) < 3):
     # prints standard error msg (stderr)
     print('''You need to give two arguments, 
- tdl grammar file and LTDB''', file=sys.stderr)
+ ace config file and LTDB''', file=sys.stderr)
     sys.exit(1)
 else:
-    (script, grammar, dbfile) = sys.argv
-    print("Adding files from %s to %s" % (grammar, dbfile), file=sys.stderr)
+    (script, config, dbfile) = sys.argv
+    print("Adding files from %s to %s" % (config, dbfile), file=sys.stderr)
 
 
 ## make a log in the same directory as the database
 log = open(os.path.join(os.path.dirname(dbfile),"tdl.log"), 'w')
-
+ver = open(os.path.join(os.path.dirname(dbfile),"tdl_ver"), 'w')
     
-#grammar = '/home/bond/svn/erg-mo/educ.tdl'
+#grammar = '/home/bond/svn/mo/ace/config-mal.tdl'
 tdls = []
 hierarchy = []  #(child, parent)
 types = dd(list)
 les = {}
 
 
-def readgrm (grammarfile, tdls, types, hierarchy, les):
+def read_cfg (config, ver):
+    """
+    read the config file, find the grammar and version
+    """
+    for l in open(config):
+        grmmatch =  re.findall(r'grammar-top\s+:=\s+"([^"]+)".', l.strip())
+        if grmmatch:
+            grammar = grmmatch[0]
+        vermatch =  re.findall(r'version\s+:=\s+"([^"]+)".', l.strip())
+        if vermatch:
+            version = vermatch[0]
+    version_file = os.path.join(os.path.dirname(config), version)
+    grammar_file = os.path.join(os.path.dirname(config), grammar)
+    print(version_file, file=ver)
+    return grammar_file, version_file
+
+
+def read_grm (grammarfile, tdls, types, hierarchy, les):
     print("FILE", grammarfile)
     path = Path(grammarfile)
     base = path.parent
@@ -171,8 +189,10 @@ def intodb(dbfile, tdls, hierarchy, types,les):
     WHERE typ IN (SELECT typ FROM lex)""")
     
     conn.commit()
-    
-readgrm(grammar,tdls,hierarchy, types, les)
+
+grammar, version = read_cfg(config,ver)
+print(grammar, version)
+read_grm(grammar,tdls,hierarchy, types, les)
 intodb(dbfile, tdls, hierarchy, types, les)
 
 # for thing in tdls:
