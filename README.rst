@@ -66,8 +66,7 @@ Install dependencies (in ubuntu):
     sudo apt-get install apache2 xmlstarlet p7zip sqlite3
     sudo apt-get install python3-docutils python3-lxml
 
-    sudo pip install pydelphin --upgrade
-    sudo pip3 install pydelphin --upgrade
+    pip install pydelphin --upgrade
 
 Enable local directories in Apache2
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -128,11 +127,27 @@ On Ubuntu 18.04, to get python3 modwsgi working if you have updated from an earl
     sudo update-alternatives --install /usr/bin/python python /usr/bin/python2.7 1 
     sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.6 2 
 
+Links go to the wrong place
+---------------------------
 
+ltdb assumes that the code is being served from a machine whose name
+is  ``hostname -f`` using ``http`` in your ``public_html``.  If that is not true, e.g. you
+want to change the host, or port or use https, then please change the
+appropriate parts of ``params``. 
+
+.. code:: bash
+
+    charset=utf-8
+    dbroot=/home/bond/public_html/cgi-bin/ERG_mal_mo
+    db=/home/bond/public_html/cgi-bin/ERG_mal_mo/lt.db
+    cssdir=http://mori/~bond/ltdb/ERG_mal_mo
+    cgidir=http://mori/~bond/cgi-bin/ERG_mal_mo
+    ver=ERG_mal_mo
+
+
+    
 Todo
 ----
-
--  check I am getting lrule/irule right
 
 --------------
 
@@ -183,5 +198,3 @@ Types, instances in the same table, distinguished by status.
 +--------+--------------------------------------+
 |  ◬    | Binary, Non-Headed                   |
 +--------+--------------------------------------+
-
-FIXME: add IDIOMS as a different table

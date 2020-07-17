@@ -1,6 +1,3 @@
-#p7zip-full
-#xmlstarlet
-#sqlite3
-pydelphin
+ pydelphin
 docutils
 lxml
