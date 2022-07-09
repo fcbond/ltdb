@@ -7,7 +7,6 @@ import sqlite3, collections
 import cgi, re,  sys
 from html import escape
 from collections import defaultdict as dd
-from collections import OrderedDict as od
 import json
 
 
@@ -23,7 +22,7 @@ headedness = {(1,0):('▲', 'unary: headed'),
               (None,None):(' ', ' ')}
 
 ### the different kinds of things we deal with
-statuses = od()
+statuses = dict()
 
 ##things used when parsing
 statuses["lex-rule"] = "Lexical Rules"
@@ -514,7 +513,7 @@ def munge_desc(typ,description):
     """
     exes = []
     nams = []
-    namere=re.compile(r"""<name\s+lang=["'](.*)['"]>(.*)</name>""")
+    namere=re.compile(r"""<name\s+lang=["'](.*)['"]>(.*)(</name>)?""")
     desc = []
     count = 1
     for l in description.splitlines():
