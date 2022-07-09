@@ -22,14 +22,14 @@ You can not add information from the gold trees
 ### get the config files
 ###
 gold='true'
-while [ $# -gt 0 -a "${1#-}" != "$1" ]; do
-  case ${1} in
+while [ $# -gt 0 ]; do
+  case "${1}" in
       --script)
-	  lkb_script=${2};
+	  lkb_script="${2}";
 	  shift 2;
 	  ;;
       --acecfg)
-	  ace_cfg=${2};
+	  ace_cfg="${2}";
 	  shift 2;
 	  ;;
       --lisp)
@@ -40,20 +40,24 @@ while [ $# -gt 0 -a "${1#-}" != "$1" ]; do
 	  gold='false'
 	  shift 1;
 	  ;;
+      -h|--help)
+	  echo "${usage}"
+	  exit 0
+	  ;;
       *)
 	  echo "${usage}"
-	  exit 0	
+	  exit 1	
   esac
 done
 
 
-if [ ${lkb_script} ]
+if [ -f "${lkb_script}" ]
 then
     echo "LKB script file is" ${lkb_script}
     grammardir=`dirname ${lkb_script}`
     grammardir=`dirname ${grammardir}`
     echo "Grammar directory is " ${grammardir}
-elif [ ${ace_cfg} ]
+elif [ -f ${ace_cfg} ]
 then
     echo "ACE Config file is " ${ace_cfg}
     grammardir=`dirname ${ace_cfg}`
@@ -100,8 +104,8 @@ LEXICON_FILE="lex.tab"                # lexicon
 ### write the temporary files to here
 outdir=$(mktemp -d -t ltdb_XXXX)
 
-lkblog=${outdir}/lkb.log
-echo Log file at ${lkblog}
+lkblog="${outdir}"/lkb.log
+echo Log file at "${lkblog}"
 
 
 #outdir=/tmp/new
@@ -159,19 +163,19 @@ LISP="
   (format t \"~%LTDB All Done!~%\")
   #+allegro        (excl:exit)
 "
-echo "$LISP" > ${lkblog}
+echo "$LISP" > "${lkblog}"
 echo LISP "${LISP}"
-echo "$LISP"  | ${LISPCOMMAND}  2>>${lkblog} >>${lkblog}
+echo "$LISP"  | ${LISPCOMMAND}  2>>"${lkblog}" >>"${lkblog}"
 # } | cat     ### DEBUG LISP
     
     ###
     ### Try to validate the types.xml
     ###
     if which xmlstarlet  &> /dev/null; then
-        xmlstarlet val  -e ${outdir}/${TYPES_FILE}
-        xmlstarlet val  -e ${outdir}/${RULES_FILE}
-        xmlstarlet val  -e ${outdir}/${LRULES_FILE}
-        xmlstarlet val  -e ${outdir}/${ROOTS_FILE}
+        xmlstarlet val  -e "${outdir}"/${TYPES_FILE}
+        xmlstarlet val  -e "${outdir}"/${RULES_FILE}
+        xmlstarlet val  -e "${outdir}"/${LRULES_FILE}
+        xmlstarlet val  -e "${outdir}"/${ROOTS_FILE}
     else 
         echo
         echo "   types files not validated, please install xmlstarlet."
@@ -189,7 +193,7 @@ echo
 sqlite3 ${db} < tables.sql
 
 ###
-if [[ ${lkb_script} && ${LISPCOMMAND} ]]
+if [[ -f" ${lkb_script}" && -n "${LISPCOMMAND}" ]]
 then
     echo "Adding in the info from the lisp"
     echo
@@ -207,7 +211,7 @@ fi
 #echo
 if [ ${gold} == 'true' ]
 then
-    python3 gold2db.py ${grammardir} ${db}
+    python3 gold2db.py "${grammardir}" "${db}"
 fi
 
 
@@ -227,31 +231,31 @@ fi
 version=${version// /_}
 
 ### write the html here
-HTML_DIR=${HOME}/public_html/ltdb/${version}
-CGI_DIR=${HOME}/public_html/cgi-bin/${version}
+HTML_DIR="${HOME}"/public_html/ltdb/"${version}"
+CGI_DIR="${HOME}"/public_html/cgi-bin/"${version}"
 
 echo
-echo Install to ${HTML_DIR}, ${CGI_DIR}
+echo Install to "${HTML_DIR}", "${CGI_DIR}"
 echo
 
-mkdir -p ${CGI_DIR}
-mkdir -p ${HTML_DIR}
+mkdir -p "${CGI_DIR}"
+mkdir -p "${HTML_DIR}"
 
 ###  copy cgi, javascript and css to cgi-bin
 cp html/*.cgi html/*.py html/*.js html/*.css  ${CGI_DIR}/.   
 
 ### copy database to cgi-bin
-cp ${outdir}/${LTDB_FILE} ${CGI_DIR}/.
+cp "${outdir}"/"${LTDB_FILE}" $"{CGI_DIR}"/.
 
 
 ### params
 dbhost=`hostname -f`
-echo "charset=utf-8" > ${CGI_DIR}/params
-echo "dbroot=$CGI_DIR" >> ${CGI_DIR}/params
-echo "db=$CGI_DIR/lt.db" >> ${CGI_DIR}/params
-echo "cssdir=http://$dbhost/~$USER/ltdb/$version" >> ${CGI_DIR}/params
-echo "cgidir=http://$dbhost/~$USER/cgi-bin/$version" >> ${CGI_DIR}/params
-echo "ver=$version" >> ${CGI_DIR}/params
+echo "charset=utf-8" > $"{CGI_DIR}"/params
+echo "dbroot=$CGI_DIR" >> $"{CGI_DIR}"/params
+echo "db=$CGI_DIR/lt.db" >> $"{CGI_DIR}"/params
+echo "cssdir=http://$dbhost/~$USER/ltdb/$version" >> $"{CGI_DIR}"/params
+echo "cgidir=http://$dbhost/~$USER/cgi-bin/$version" >> $"{CGI_DIR}"/params
+echo "ver=$version" >> $"{CGI_DIR}"/params
 
 ### HTML and logs
 cp doc/lt-diagram.png html/*.js html/*.css html/ltdb.png ${HTML_DIR}/.
@@ -278,14 +282,14 @@ python3 makehome.py "${version}"  "${grammardir}" "${lkb_script}" "${extralisp}"
 
 
 ### All done
-URL=http://localhost/~${USER}/ltdb/${version}/
+URL=http://localhost/~${USER}/ltdb/"${version}"/
 echo
 echo
 echo
-echo "Almost done!  Take a look at " ${URL}
+echo "Almost done!  Take a look at " "${URL}"
 echo
 echo
 echo
 echo "Still compressing the db for download" 
-7z a ${HTML_DIR}/${LTDB_FILE}.7z ${CGI_DIR}/${LTDB_FILE}
+7z a "${HTML_DIR}"/"${LTDB_FILE}".7z $"{CGI_DIR}"/"${LTDB_FILE}"
 echo "Really Done"
