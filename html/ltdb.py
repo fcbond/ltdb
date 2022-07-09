@@ -353,7 +353,7 @@ def showlexs (c, lextyp, lexid, limit, biglimit):
         
     if results and results[0] > 0:
         total = results[0]
-        lem = dd(str) # lemma
+        lem = dict() # lemma
 
         if lexid:
             ## You want a specific word
