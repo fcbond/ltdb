@@ -64,13 +64,11 @@ par=getpar('params')
 
 def hlt (typs):
     "hyperlink a list of space seperated types"
-    l = str()
+    linked = []
     if typs:
         for t in typs.split():
-            l += "<a href='%s/showtype.cgi?typ=%s'>%s</a> " % (par['cgidir'], 
-                                                           escape(t, ''),
-                                                           t)
-        return l
+            linked.append(f"<a href='{par['cgidir']}/showtype.cgi?typ={escape(t, '')}'>{t}</a>")
+        return ' '.join(linked)
     else:
         return '<br>'
 
