@@ -12,10 +12,28 @@ documentation in the grammar, a kind of literate programming.
 There is `more documentation <http://moin.delph-in.net/LkbLtdb>`__ at
 the DELPH-IN Wiki.
 
+
+LTDB assumes that the grammar follows the usual DELPH-IN conventions,
+in particular that there is a grammar directory with sub directories
+for ace and lkb config files.  
+
+``
+grammar/ace/config.tdl
+grammar/lkb/script
+``
+
 --------------
 
 Usage
 -----
+
+0. Prepare the local environment
+   ``
+   python3 -m venv .venv
+   source .venv/bin/activate
+   python3 -m pip install --upgrade pip
+   pip install -r requirements.txt
+   ``
 
 1. Run ``./make-ltdb.bash --script /path/to/grammar/lkb/script``
 
