@@ -8,7 +8,7 @@ import cgi, re,  sys
 from html import escape
 from collections import defaultdict as dd
 import json
-
+import urllib.parse as up
 
 ### labels for branching: arity, head
 headedness = {(1,0):('▲', 'unary: headed'),
@@ -67,7 +67,7 @@ def hlt (typs):
     linked = []
     if typs:
         for t in typs.split():
-            linked.append(f"<a href='{par['cgidir']}/showtype.cgi?typ={escape(t, '')}'>{t}</a>")
+            linked.append(f"<a href='{par['cgidir']}/showtype.cgi?typ={up.quote(t)}'>{t}</a>")
         return ' '.join(linked)
     else:
         return '<br>'
@@ -88,7 +88,7 @@ def hltyp(match):
     #print "<br>%s %s\n" % (t, t in types)
     if t in types and not t.startswith('#'):
         return "<a href='{}/showtype.cgi?typ={}'>{}</a>".format(par['cgidir'], 
-                                                                escape(t,''),
+                                                                up.quote(t),
                                                                 t)
     else:
         return t
@@ -132,7 +132,7 @@ def showsents (c, typ, lexid, limit, biglimit):
                 sids[profile, sid].add((kara, made))
         if limit < total and biglimit > limit:
             limtext= "({:,} out of {:,}: <a href='more.cgi?typ={}&lexid={}&limit={}'>more</a>)".format(limit, total,
-                                                                                                       escape(typ,''),
+                                                                                                       up.quote(typ),
                                                                                                        lexid,
                                                                                                        biglimit)
         elif limit < total:
@@ -390,7 +390,7 @@ FROM lexfreq WHERE lexid in (%s) ORDER BY lexid, freq DESC""" % \
         #sf=sf[:50]
         if limit < total and biglimit > limit:
             limtext= "({:,} out of {:,}: <a href='more.cgi?lextyp={}&lexid={}&limit={}'>more</a>)".format(limit, total,
-                                                                                                         escape(lextyp, ''),
+                                                                                                         up.quote(lextyp),
                                                                                                          lexid,
                                                                                                          biglimit)
         elif limit < total:
