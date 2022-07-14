@@ -1,6 +1,6 @@
 /* An SVG renderer for DELPH-IN derivation trees. Targets the ERG API that is
  * currently under development and is documented here:
- * http://moin.delph-in.net/ErgApi
+ * https://github.com/delph-in/docs/wiki/ErgApi
  * 
  * This code is adapted from code found in Woodley Packard's full forest treebanker,
  * which can be found here: http://sweaglesw.org/svn/treebank/trunk/

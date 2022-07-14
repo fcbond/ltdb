@@ -98,7 +98,7 @@ def hlall (typs):
     "hyperlink all types in a description or documentation"
     if typs:
         typs = escape(typs)
-        ### Definition from http://moin.delph-in.net/TdlRfc
+        ### Definition from https://github.com/delph-in/docs/wiki/TdlRFC
         typs=re.sub(r'( )(#[\w_+*?-]+)([ ,])', "\\1<span class='coref'>\\2</span>\\3", typs)
         return retyp.sub(hltyp, typs)
     else:
@@ -488,7 +488,7 @@ def footer(version):
     return """</div> <!-- end of outline -->
   <br>
   <address>
-  <a href='http://moin.delph-in.net/LkbLtdb'>Linguistic Type Database</a> 
+  <a href='https://github.com/delph-in/docs/wiki/LkbLtdb'>Linguistic Type Database</a> 
     for the grammar {}; 
   <br>By Chikara Hashimoto, Luis Morgado da Costa, Michael Goodman and Francis Bond; 
   Maintained by Francis Bond &lt;<a href='mailto:bond@ieee.org'>bond@ieee.org</a>&gt;;
