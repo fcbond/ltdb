@@ -13,6 +13,8 @@ form = cgi.FieldStorage()
 #synset = form.getfirst("synset", "")
 lemma = form.getfirst("lemma", "")
 lemma = lemma.strip()
+pred = form.getfirst("pred", "")
+pred = pred.strip()
 typ = form.getfirst("typ", "")
 typ = typ.strip()
 
@@ -113,6 +115,19 @@ elif(typ):
   <div align ='center' id="contents">
     <p>No matches found for type {} in {}.
   </div>""".format(typ, par['ver']))
+elif(pred):
+    sents = ltdb.get_predsents (pred,c)
+    print (f"""
+<div align ='center' id="contents">
+<h1>Sentences with  <i>{pred}</i></h1>
+</div>
 
+  <ul>
+""")
+    for (sid, profile, sent, deriv_json, mrs_json, dmrs_json) in sents[:10]:
+        print(f"""<li>{sent} ({profile}, {sid})""")
+        
+    print("""  </ul>\n""")
+        
 
 print (ltdb.footer(par['ver']))

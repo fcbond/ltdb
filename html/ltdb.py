@@ -443,36 +443,45 @@ def header():
 """ % (par['ver'], par['cssdir'], par['cssdir'])
 
 def searchbar():
-    return """
+    """
+    Return the Searchbar
+    """
+    return f"""
 <div id="outline">
 <div id="header">
 <div id="menu">
-<a href='%s/index.html'>Home</a>&nbsp;&nbsp;
-<a href='%s/ltypes.cgi'>Lex Types</a>&nbsp;&nbsp;
-<a href='%s/rules.cgi'>Rules</a>
+<a href='{par['cssdir']}/index.html'>Home</a>&nbsp;&nbsp;
+<a href='{par['cgidir']}/ltypes.cgi'>Lex Types</a>&nbsp;&nbsp;
+<a href='{par['cgidir']}/rules.cgi'>Rules</a>
 </div> <!-- end of menu -->
-<div id="confusing">  <!-- search for word -->
-<div class='form'>
-<form name="frm1" action="%s/search.cgi" method="GET">
-Lemma:&nbsp;<input type="text" name="lemma" size=15
- placeholder="lemma">
-<input type="submit" value="Go" name="submitbtn">
-</form>
-</div>
+<div id="confusing">
 <div class='form'>
 
-<form name="frm2" action="%s/search.cgi" method="GET">
+<form name="frm2" action="{par['cgidir']}/search.cgi" method="GET">
 Type:&nbsp;<input type="text" name="typ" size=20
  placeholder="lextype, lexid, rule or type">
 <input type="submit" value="Go" name="submitbtn">
 </form>
 </div>
+  <!-- search for word -->
+<div class='form'>
+<form name="frm1" action="{par['cgidir']}/search.cgi" method="GET">
+Lemma:&nbsp;<input type="text" name="lemma" size=15
+ placeholder="lemma">
+<input type="submit" value="Go" name="submitbtn">
+</form>
+</div>
+  <!-- search for predicate in mrs -->
+<div class='form'>
+<form name="frm3" action="{par['cgidir']}/search.cgi" method="GET">
+Predicate:&nbsp;<input type="text" name="pred" size=15
+ placeholder="pred_x">
+<input type="submit" value="Go" name="submitbtn">
+</form>
+</div>
 </div> <!-- end of confusing -->
 </div> <!-- end of header -->
-"""  %  (par['cssdir'], 
-                                      par['cgidir'], par['cgidir'], 
-                                      par['cgidir'], par['cgidir'])
-
+"""
 
     
 def footer(version):
@@ -572,4 +581,14 @@ def get_leminfo (lemma,c):
                  LEFT JOIN types ON lex.typ = types.typ
                  WHERE orth GLOB ?
     ORDER BY orth = ? DESC""", ('*{0}*'.format(lemma), lemma))
+    return c.fetchall()
+
+def get_predsents (pred,c):
+    """
+    get predicates from mrs_json
+    put quotes around to match the entire predicate
+    """
+    c.execute("""SELECT sid, profile, sent, deriv_json, mrs_json, dmrs_json
+    FROM gold
+    WHERE instr(mrs_json, ?) > 0""",  (f'"{pred}"',))
     return c.fetchall()
