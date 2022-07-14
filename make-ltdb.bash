@@ -242,24 +242,24 @@ mkdir -p "${CGI_DIR}"
 mkdir -p "${HTML_DIR}"
 
 ###  copy cgi, javascript and css to cgi-bin
-cp html/*.cgi html/*.py html/*.js html/*.css  ${CGI_DIR}/.   
+cp html/*.cgi html/*.py html/*.js html/*.css  "${CGI_DIR}/".   
 
 ### copy database to cgi-bin
-cp "${outdir}"/"${LTDB_FILE}" $"{CGI_DIR}"/.
+cp "${outdir}"/"${LTDB_FILE}" "${CGI_DIR}"/.
 
 
 ### params
 dbhost=`hostname -f`
-echo "charset=utf-8" > $"{CGI_DIR}"/params
-echo "dbroot=$CGI_DIR" >> $"{CGI_DIR}"/params
-echo "db=$CGI_DIR/lt.db" >> $"{CGI_DIR}"/params
-echo "cssdir=http://$dbhost/~$USER/ltdb/$version" >> $"{CGI_DIR}"/params
-echo "cgidir=http://$dbhost/~$USER/cgi-bin/$version" >> $"{CGI_DIR}"/params
-echo "ver=$version" >> $"{CGI_DIR}"/params
+echo "charset=utf-8" > "${CGI_DIR}"/params
+echo "dbroot=$CGI_DIR" >> "${CGI_DIR}"/params
+echo "db=$CGI_DIR/lt.db" >> "${CGI_DIR}"/params
+echo "cssdir=http://$dbhost/~$USER/ltdb/$version" >> "${CGI_DIR}"/params
+echo "cgidir=http://$dbhost/~$USER/cgi-bin/$version" >> "${CGI_DIR}"/params
+echo "ver=$version" >> "${CGI_DIR}"/params
 
 ### HTML and logs
-cp doc/lt-diagram.png html/*.js html/*.css html/ltdb.png ${HTML_DIR}/.
-cp ${outdir}/*.log ${HTML_DIR}
+cp doc/lt-diagram.png html/*.js html/*.css html/ltdb.png "${HTML_DIR}/."
+cp "${outdir}"/*.log "${HTML_DIR}"
 
 if [ -z "$lkb_script" ]
 then
