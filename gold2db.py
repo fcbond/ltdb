@@ -75,15 +75,18 @@ for root, dirs, files in os.walk(golddir):
                     log.write(f"{root}: {profile} {sid} {e}\n")
                     deriv_json = '{}'
                 try:
-                    mrs_str=first_result.mrs()
+                    mrs_obj = first_result.mrs()
+                    mrs_str = simplemrs.encode(mrs_obj,indent=True)
+                    mrs_json = mrsjson.encode(mrs_obj)
                 except Exception as e:
                     log.write("\n\nMRS couldn't be retrieved in pydelphin:\n")
                     log.write(f"{root}: {profile} {sid} {e}\n")
-                    mrs_str = None 
+                    mrs_obj = None
+                    mrs_str = ''
+                    mrs_json = '{}'
                 try:
-                    dmrs_str=dmrs.from_mrs(mrs_str)
-                    mrs_json = mrsjson.encode(mrs_str)
-                    dmrs_json = dmrsjson.encode(dmrs_str)
+                    dmrs_obj=dmrs.from_mrs(mrs_obj)
+                    dmrs_json = dmrsjson.encode(dmrs_obj)
                 except Exception as e:
                     log.write("\n\nMRS failed to convert in pydelphin:\n")
                     log.write(f"{root}: {profile} {sid} {e}\n")
@@ -93,9 +96,9 @@ for root, dirs, files in os.walk(golddir):
                     if hasattr(e, 'message'):
                         log.write(e.message)
                         log.write("\n\n")
-                    if mrs_obj:
-                        log.write(simplemrs.encode(mrs_obj,indent=True))
-                    mrs_json = '{}'
+                    if mrs_str:
+                        log.write(mrs_str))
+                    dmrs_str = '{}'  
                     dmrs_json = '{}'
                 # STORE gold info IN DB
                 try:
