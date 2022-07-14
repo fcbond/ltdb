@@ -33,25 +33,30 @@ hierarchy = []  #(child, parent)
 types = dd(list)
 les = {}
 
+cfg = dict()
+
+
 
 def read_cfg (config, ver):
     """
-    read the config file, find the grammar and version
+    read the config file, find the grammar, version and path to orthography
     """
+    cfg = dict()
     for l in open(config):
-        grmmatch =  re.findall(r'grammar-top\s+:=\s+"([^"]+)".', l.strip())
-        if grmmatch:
-            grammar = grmmatch[0]
-        vermatch =  re.findall(r'version\s+:=\s+"([^"]+)".', l.strip())
-        if vermatch:
-            version = vermatch[0]
-    version_file = os.path.join(os.path.dirname(config), version)
-    grammar_file = os.path.join(os.path.dirname(config), grammar)
-    print(version_file, file=ver)
-    return grammar_file, version_file
+        for attr in ["version",
+                     "grammar-top",
+                     "orth-path"]:
+            match =  re.findall(rf'{attr}\s+:=\s+"?([^"]+)"?.', l.strip())
+            if match:
+                cfg[attr] = match[0]
+    cfg['version_file'] = os.path.join(os.path.dirname(config), cfg['version'])
+    cfg['grammar_file'] = os.path.join(os.path.dirname(config), cfg['grammar-top'])
+    print(cfg['version_file'], file=ver)
+    return cfg
 
 
-def read_grm (grammarfile, tdls, types, hierarchy, les):
+def read_grm (cfg, tdls, types, hierarchy, les):
+    grammarfile=cfg['grammar_file']
     print("FILE", grammarfile)
     path = Path(grammarfile)
     base = path.parent
@@ -69,13 +74,13 @@ def read_grm (grammarfile, tdls, types, hierarchy, les):
                 if isinstance(entry,tdl.FileInclude):
                     path = Path(base, entry.path).with_suffix('.tdl')
                     if path.is_file():
-                        process_type(str(base), str(path), status, tdls, hierarchy, les)
+                        process_type(cfg, str(base), str(path), status, tdls, hierarchy, les)
                     else:
                         print('INCLUDED FILE NOT FOUND: {!s}'.format(path))
                 else:
-                    print('what to do with', entry.status, file=log)
+                    print('WARNING unknown type:', entry.status, file=log)
 
-def  process_type(base, path, status, tdls, hierachy, les):
+def  process_type(cfg, base, path, status, tdls, hierachy, les):
     if 'root' in path:
         status = 'root'
     elif 'parse-nodes' in path:
@@ -83,7 +88,7 @@ def  process_type(base, path, status, tdls, hierachy, les):
 
     print(f"Processing types in {path} as {status}")
     for event, obj, lineno in tdl.iterparse(path): # assume utf-8
-        #print(lineno, event, sep = '\t')
+        ##print(lineno, event, sep = '\t')
         if event in ['TypeDefinition',  'TypeAddendum',
                      'LexicalRuleDefinition']:
             # if obj.documentation(): ### The tdl has a docstring
@@ -98,7 +103,8 @@ def  process_type(base, path, status, tdls, hierachy, les):
                 else:
                     ### (lex-type, docstring)
                     ### fixme get orth, pred, altpred
-                    orths = obj.conjunction.get('ORTH', default=None)
+                    ORTH= cfg['orth-path']
+                    orths = obj.conjunction.get(ORTH, default=None)
                     try:
                         orth=' '.join([str(s) for s in orths.values()])
                     except:
@@ -139,6 +145,7 @@ def  process_type(base, path, status, tdls, hierachy, les):
 
 
 def intodb(dbfile, tdls, hierarchy, types,les):
+    print(f"Adding types to database {dbfile}")
     conn = sqlite3.connect(dbfile)    # loads dbfile as con
     c = conn.cursor()    # creates a cursor object that can perform SQL commands with c.execute("...")
     c.executemany("""INSERT INTO tdl (typ, src, line, kind, tdl, docstring)
@@ -189,10 +196,12 @@ def intodb(dbfile, tdls, hierarchy, types,les):
     WHERE typ IN (SELECT typ FROM lex)""")
     
     conn.commit()
+    print(f"Added types to database {dbfile}")
+     
 
-grammar, version = read_cfg(config,ver)
-print(grammar, version)
-read_grm(grammar,tdls,hierarchy, types, les)
+cfg = read_cfg(config,ver)
+print(cfg['grammar_file'], cfg['version_file'])
+read_grm(cfg,tdls,hierarchy, types, les)
 intodb(dbfile, tdls, hierarchy, types, les)
 
 # for thing in tdls:
