@@ -29,14 +29,18 @@ CREATE TABLE ltypes (typ TEXT primary key,
 		     words TEXT,
 		     lfreq INTEGER default 0,
 		     cfreq INTEGER DEFAULT 0);
--- sentences in the database (assumes unique profile+sid)
+-- words in the database (assumes unique profile+sid+wid)
+-- each sentence has words and their lexical ids, ordered by wid
 CREATE TABLE sent (sid INTEGER,
                    profile TEXT,
 		   wid INTEGER,
 		   word TEXT,
-		   lexid TEXT);
+		   lexid TEXT,
+		   UNIQUE(profile, sid, wid) );
 -- Information from the gold profiles
-CREATE TABLE gold (sid INTEGER primary key,
+-- The json could be built on the fly,
+-- but it is useful to have a log of when conversion fails
+CREATE TABLE gold (sid INTEGER,
        	     	   profile TEXT,				
        	     	   sent TEXT,
 		   comment TEXT,
@@ -46,7 +50,8 @@ CREATE TABLE gold (sid INTEGER primary key,
 		   mrs TEXT,
 		   mrs_json TEXT,
 		   dmrs_json TEXT,
-		   flags TEXT);
+		   flags TEXT,
+		   UNIQUE(profile, sid) );
 CREATE TABLE typind (typ TEXT,
        	     	     profile TEXT,	    
                      sid INTEGER,
