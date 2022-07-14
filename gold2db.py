@@ -63,68 +63,61 @@ for root, dirs, files in os.walk(golddir):
         for response in ts.processed_items():
             sid=response['i-id']
             profile = ts.path.name 
-            if response['readings'] > 0:
+            if response['results']:
+                first_result=response.result(0)
+                deriv = first_result.derivation()
+                tree = first_result.get('tree', '')
+                deriv_str = deriv.to_udf(indent=None)
                 try:
-                    first_result=response.result(0)
-                    deriv = first_result.derivation()
-                    mrs_obj=first_result.mrs()
-                    mrs_str = first_result['mrs']
-                    tree = first_result.get('tree', '')
-                    deriv_str = deriv.to_udf(indent=None)
                     deriv_json = json.dumps(deriv.to_dict(fields=['id','entity','score','form','tokens']))
                 except Exception as e:
-                    log.write("\n\nSomething went wrong getting the result:\n")
-                    log.write("{}: {} {}\n".format(root, profile, sid))
-                    deriv = ''
-                    mrs_obj = None
-                    mrs_str =''
-                    tree=''
-                    deriv_str = ''
-                    derv_json = ''
+                    log.write("\n\ncouldn't convert deriv to json:\n")
+                    log.write(f"{root}: {profile} {sid} {e}\n")
+                    deriv_json = '{}'
                 try:
-                    mrs_obj=first_result.mrs()
+                    mrs_str=first_result.mrs()
                 except Exception as e:
                     log.write("\n\nMRS couldn't be retrieved in pydelphin:\n")
-                    log.write("{}: {} {}\n".format(root, profile, sid))
-                    mrs_obj = None 
+                    log.write(f"{root}: {profile} {sid} {e}\n")
+                    mrs_str = None 
                 try:
-                    dmrs_obj=dmrs.from_mrs(mrs_obj)
-                    mrs_json = mrsjson.encode(mrs_obj)
-                    dmrs_json = dmrsjson.encode(dmrs_obj)
+                    dmrs_str=dmrs.from_mrs(mrs_str)
+                    mrs_json = mrsjson.encode(mrs_str)
+                    dmrs_json = dmrsjson.encode(dmrs_str)
                 except Exception as e:
                     log.write("\n\nMRS failed to convert in pydelphin:\n")
-                    log.write("{}: {} {}\n".format(root, profile, sid))
+                    log.write(f"{root}: {profile} {sid} {e}\n")
                     log.write(response['i-input']) ### FIXME
-                    log.write("\n\n")
-                    if mrs_obj:
-                        log.write(simplemrs.encode(mrs_obj,indent=True))
                     log.write("\n\n")
                     log.write(repr(e))
                     if hasattr(e, 'message'):
                         log.write(e.message)
-                    # else:
-                    #     log.write(str(e))
-                    log.write("\n\n")
+                        log.write("\n\n")
+                    if mrs_obj:
+                        log.write(simplemrs.encode(mrs_obj,indent=True))
                     mrs_json = '{}'
                     dmrs_json = '{}'
-            
-            # STORE gold info IN DB
-            try:
-                c.execute("""INSERT INTO gold (profile, sid, sent, comment, 
-                                         deriv, deriv_json, pst, 
-                                         mrs, mrs_json, dmrs_json, flags) 
-                                         VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-                        (profile,
-                         sid,
-                         response['i-input'],
-                         response['i-comment'],
-                         deriv_str,
-                         deriv_json,
-                         tree,
-                         mrs_str,
-                         mrs_json,
-                         dmrs_json,
-                         None))
+                # STORE gold info IN DB
+                try:
+                    c.execute("""INSERT INTO gold (profile, sid, sent, comment, 
+                    deriv, deriv_json, pst, 
+                    mrs, mrs_json, dmrs_json, flags) 
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                              (profile,
+                               sid,
+                               response['i-input'],
+                               response['i-comment'],
+                               deriv_str,
+                               deriv_json,
+                               tree,
+                               mrs_str,
+                               mrs_json,
+                               dmrs_json,
+                               None))
+                except sqlite3.Error as e:
+                    log.write('ERROR:   ({}) of type ({}), {}: {} {}\n'.format(e, type(e).__name__,
+                                                                               root, profile, sid))
+
                 ##leaves
                 if deriv:
                     for (preterminal, terminal) in zip(deriv.preterminals(),deriv.terminals()):
@@ -138,18 +131,13 @@ for root, dirs, files in os.walk(golddir):
                             typefreq[ltypes[lexid]]  += 1
                             lxidfreq[ltypes[lexid]][lexid]   += 1
                             typind[ltypes[lexid]][(profile, sid)].add((start, end))
-                ### internal node (store as type)
+                    ### internal node (store as type)
                     for node in deriv.internals():
                         typ =  node.entity
                         start= node.start
                         end=   node.end
                         typefreq[typ]  += 1
                         typind[typ][(profile, sid)].add((start, end))
-
-            ##print('\n\n\n')
-            except sqlite3.Error as e:
-                log.write('ERROR:   ({}) of type ({}), {}: {}\n'.format(e, type(e).__name__,
-                                                                      root, sid))
 
 # ### each sentence should have a root
 # for s in sent:
@@ -185,7 +173,9 @@ for typ in lxidfreq:
   VALUES (?,?,?,?)""", (typ, wrds, 
                         lfreq[typ],
                         typefreq[typ]))
+        
 
+    
 ### Wack these into a database
 for typ in typefreq:
     #print("%d\t%s" % (typefreq[typ], typ))
@@ -199,11 +189,13 @@ for l in lexfreq:
 
 for p,s in sent:
     ##print(s, " ".join([surf for (surf, lexid) in sent[s]]))
-    for i, (w, l) in enumerate(sent[(p,s)]):
-        c.execute("""INSERT INTO sent (profile, sid, wid, word, lexid) 
-                 VALUES (?,?,?,?,?)""", (p, s, i, w, l))
-
- 
+    try:
+        for i, (w, l) in enumerate(sent[(p,s)]):
+            c.execute("""INSERT INTO sent (profile, sid, wid, word, lexid) 
+            VALUES (?,?,?,?,?)""", (p, s, i, w, l))
+    except sqlite3.Error as e:
+        log.write('ERROR:   ({}) of type ({}), {}: {} {}\n'.format(e, type(e).__name__,
+                                                                   root, profile, sid))
 
 for t in typind:
     for p,s in typind[t]:
