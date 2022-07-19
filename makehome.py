@@ -43,8 +43,8 @@ print(f"""
 
 <ul>  
   <li>  Click Here: <a href='../../cgi-bin/{version}/search.cgi'>Lexical Type Database for {version}</a>{madewith}
-  <li>  <a href='http://wiki.delph-in.net/moin/LkbLtdb'>Lexical Type Database Wiki</a>
-  <li>  <a href='http://wiki.delph-in.net/moin/FrontPage'>DELPH-IN Wiki</a>
+  <li>  <a href='https://github.com/delph-in/docs/wiki/LkbLtdb</a>
+  <li>  <a href='https://github.com/delph-in/docs/wiki/'>DELPH-IN Wiki</a>
 </ul>
 """)
 
