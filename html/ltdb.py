@@ -167,7 +167,7 @@ def showsents (c, typ, lexid, limit, biglimit):
             for (kara, made) in sorted(sids[profile, sid]):
                 print('<li>{}<sub>{}-{}</sub> &nbsp;&nbsp; '.format(sid,kara,made))
                 for wid in sents[profile, sid]:
-                    if wid >= kara and wid < made:
+                    if kara and made and wid >= kara and wid < made:
                         print ("<span class='match'>%s</span>" % \
                                    sents[profile, sid][wid][0])
                     else:
