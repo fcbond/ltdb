@@ -193,7 +193,7 @@ echo
 sqlite3 ${db} < tables.sql
 
 ###
-if [[ -f" ${lkb_script}" && -n "${LISPCOMMAND}" ]]
+if [[ -f "${lkb_script}" && -n "${LISPCOMMAND}" ]]
 then
     echo "Adding in the info from the lisp"
     echo
