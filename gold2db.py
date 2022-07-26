@@ -97,7 +97,7 @@ for root, dirs, files in os.walk(golddir):
                         log.write(e.message)
                         log.write("\n\n")
                     if mrs_str:
-                        log.write(mrs_str))
+                        log.write(mrs_str)
                     dmrs_str = '{}'  
                     dmrs_json = '{}'
                 # STORE gold info IN DB
