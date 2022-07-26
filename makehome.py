@@ -14,7 +14,7 @@ sys.path.append(os.getcwd() + '/html')
 from ltdb import statuses, footer
 from html import escape
 
-(script, version, grmdir, extralisp, lkbscript, grammartdl) = sys.argv
+(script, version, grmdir, lkbscript, extralisp, grammartdl) = sys.argv
 
 
 madewith =''
