@@ -103,7 +103,7 @@ def  process_type(cfg, base, path, status, tdls, hierachy, les):
                 else:
                     ### (lex-type, docstring)
                     ### fixme get orth, pred, altpred
-                    ORTH= cfg['orth-path']
+                    ORTH= cfg.get('orth-path', 'STEM')
                     orths = obj.conjunction.get(ORTH, default=None)
                     try:
                         orth=' '.join([str(s) for s in orths.values()])

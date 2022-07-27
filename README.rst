@@ -22,6 +22,9 @@ grammar/ace/config.tdl
 grammar/lkb/script
 ``
 
+If your `orth-path` is not `STEM` then you must have it defined in the
+**top** ace config file, we do not follow includes for config files (yet). 
+
 --------------
 
 Usage
