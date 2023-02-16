@@ -1,0 +1,25 @@
+<header>
+  <nav class="navbar fixed-top navbar-expand-sm navbar-light bg-light">
+      <div class="container-fluid">
+        <a href="/" class="navbar-brand"><img width=50
+					   src="{{ url_for('static',
+					   filename='img/omw-logo.svg')
+					   }}"/> Linguistic Type Database</a>
+        <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarCollapse">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarCollapse">
+          <div class="navbar-nav">
+	    <!-- Add overview of all grammars -->
+	    <a href="{{ url_for('grammar') }}"
+	       class="nav-item nav-link">Grammar</a>
+		      <!-- {% if page == pg %} active{% endif %}" -->
+	       <a href="{{ url_for('rules') }}"
+		  class="nav-item nav-link">Rules</a>
+	       <a href="{{ url_for('ltypes') }}"
+		  class="nav-item nav-link">Lexical Types</a>
+	    </div>
+	</div>
+      </div>
+  </nav>
+</header>

@@ -1,0 +1,36 @@
+{% extends 'layout.html' %}
+
+{% block css %}
+<link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1>{{meta['GRAMMAR_NAME']}} ({{meta['SHORT_GRAMMAR_NAME']}})</h1>
+
+ <table class="table table-hover table-borderless table-sm">
+    <caption>Grammar Medadata</caption>
+    <thead class="thead-light">
+    <tr>
+      <th>Metadata</th> <th>Value</th>
+    </tr>
+    </thead>
+    <tbody>
+      {%- for key in meta %}
+      <tr>
+	<td>{{key.title().replace('_', ' ')}}</td>
+	{% if 'EMAIL' in key %}
+	<td><a href='mailto:{{meta[key]}}'>{{meta[key]}}</a></td>
+	{% elif 'URL' in key or 'WEBSITE' in key %}
+	<td><a href='{{meta[key]}}'>{{meta[key]}}</a></td>
+	{% else %}
+	<td>{{meta[key]}}</td>
+	{% endif %}
+      </tr>
+      {% endfor %}
+        </tbody>
+    </table>
+
+  
+</div>
+{% endblock %}

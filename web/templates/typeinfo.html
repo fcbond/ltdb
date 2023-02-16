@@ -1,0 +1,37 @@
+{% extends 'layout.html' %}
+
+{% block css %}
+<link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+
+<!-- Color and sort according to type   -->
+
+<div class="container">
+  <h1>{{typ}}</h1>
+
+  {{ info }}
+  
+
+  <h2>Type Information</h2>
+  <pre class='code'>{{info['tdl']}}</pre>
+  <p>{{ info['src'] }}, {{ info['line'] }}
+
+    <ul>
+	{% if info['parents'] %}
+      <li>Parents:
+	{% for p in info['parents'].split() %}
+	<a href="{{url_for('type', typ=p)}}">{{p}}</a>{{ ", " if not loop.last else "" }}
+	{% endfor %}
+	{% endif %}
+	{% if info['children'] %}
+      <li>Children:
+	{% for p in info['children'].split() %}
+	<a href="{{url_for('type', typ=p)}}">{{p}}</a> {{ ", " if not loop.last else "" }}
+	{% endfor %}
+	{% endif %}
+	<ul>
+    
+</div>
+{% endblock %}

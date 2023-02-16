@@ -1,0 +1,38 @@
+{% extends 'layout.html' %}
+
+{% block css %}
+<link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+
+<!-- Color and sort according to type   -->
+
+<div class="container">
+  <h1>Lexical Types</h1>
+
+
+  <table class="table table-hover table-borderless table-sm">
+    <caption>Lexical Types</caption>
+    <thead class="thead-light">
+    <tr>
+      <th>Lexical Type</th> <th>Name</th>
+      <th>Lex Freq</th>
+      <th>Corpus Freq</th>
+      <th>Words</th>
+    </tr>
+    </thead>
+    <tbody>
+      {%- for (typ, lname, words, lfreq, cfreq) in data %}
+      <tr>
+	<td><a href="{{url_for('type', typ=rule)}}">{{rule}}</a></td>
+	<td>{{lname}}</td>
+	<td>{{lfreq}}</td>
+	<td>{{cfreq}}</td>
+	<td>{{words}}</td>
+      </tr>
+      {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
