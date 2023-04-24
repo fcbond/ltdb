@@ -89,6 +89,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    ###
+    ### Read Metadata
+    ###
+
     md = read_metadata(args.metadata)
     #print(md)
 
@@ -100,23 +104,30 @@ if __name__ == '__main__':
     
     cfg = read_cfg(os.path.join(os.path.dirname(args.metadata),
                                 md['ACE_CONFIG_FILE']))
-    
-   
-    ## read the info from the tdl
+
+    md['Version'] = cfg['ver'] 
+    ###
+    ### read the info from the tdl
+    ###
     tdls, types, hierarchy, les = read_grm(cfg, log)
 
-    print(tdls, types, hierarchy, les)
-
-    ## make the db
+    #print(tdls, types, hierarchy, les)
+    ###
+    ### make the db
+    ###
     dbname=f"{cfg['ver'].replace(' ', '_')}.db"
     conn = make_db(temp_dir, dbname)
 
-    ## add in the information
+    ## add the information to the database
+    
+    meta_to_db(conn, md)
+   
     intodb(conn, tdls, types, hierarchy, les)
 
-    meta_to_db(conn, md)
+    ###
+    ### add the info from gold
+    ###
     
-    ## add the info from gold
     golddir =  os.path.normpath(os.path.join(os.path.dirname(cfg['grammar_file']),
                                              'tsdb/gold/'))
     if os.path.isdir(golddir):

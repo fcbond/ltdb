@@ -5,7 +5,7 @@ from flask import current_app, g
 def get_db(root, db):
     if 'db' not in g:
         g.db = sqlite3.connect(
-            os.path.join(root, db)
+            os.path.join(root, f'db/{db}')
             #detect_types=sqlite3.PARSE_DECLTYPES
         )
 #        g.db.row_factory = sqlite3.Row
@@ -24,6 +24,7 @@ def close_db(e=None):
 def get_md(conn):
     c = conn.cursor()
     c.execute("SELECT att, val FROM meta")
+    print(c)
     md = dict()
     for (att, val) in c:
         md[att]=val
@@ -41,10 +42,15 @@ def get_rules(conn):
 
 def get_ltypes(conn):
     c = conn.cursor()
-    c.execute("""SELECT types.typ, lname, words, lfreq, cfreq 
-             FROM types LEFT JOIN ltypes ON types.typ=ltypes.typ  
-             WHERE status ='lex-type' ORDER BY types.typ""" )
+    c.execute("""SELECT lex.typ, lname, count(lex.typ), freq, '' 
+             FROM types LEFT JOIN lex ON types.typ = lex.typ
+    LEFT JOIN typfreq ON lex.typ = typfreq.typ
+    WHERE status ='lex-type' 
+    GROUP BY lex.typ ORDER BY lex.typ""" )
     results = c.fetchall()
+
+
+    
     return results
 
 
@@ -54,7 +60,7 @@ def get_type(conn, typ):
     c = conn.cursor()
     c.execute("""SELECT  parents,  children,  cat,  val,
     cont, definition,  status, arity, head, 
-    lname, description,
+    lname, tdl.docstring,
     criteria, reference, todo,
     src, line, kind, tdl 
     FROM types LEFT JOIN tdl 

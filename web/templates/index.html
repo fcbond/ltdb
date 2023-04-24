@@ -8,33 +8,27 @@
 <div class="container">
   <h1>Overview</h1>
 
-  <p>Welcome to the Open Multilingual Wordnet (OMW) project.  The goal
-    of this project is to make it easy to use wordnets in multiple
-    languages.  We have been working for many years to make a shared
-    format and link the wordnets together.  OMW and its components are
-      <a href='http://opendefinition.org/'>open</a>: they can be freely used, 
-      modified, and shared by anyone for any purpose.  
-      There is a fuller list of wordnets at the Global Wordnet Association's
-      <a href='http://globalwordnet.org/wordnets-in-the-world/'>Wordnets
-	in the World page</a>.
 
-    <p>If you use these wordnets, please cite the original projects
-    who created them, if you got value from this
-    aggregation/normalization, please cite <a href="#Bond:Paik:2012">Bond and Paik (2012)</a>.
+  {{grammars, grm}}
+  
+  <p>Welcome to the Linguistic Type Database.
+    
+    {%if grm == None %}
+    <p class="text-danger font-weight-bold">Please Select a Grammar</p>
+    {% else %}
+    <p>You can select your grammar here:
+    {% endif %}
+    
+    <form action="/" method="POST">
+      {% for grammar in grammars %} 
+      <input type="radio" id="{{grammar}}" name="grm" value="{{grammar}}"
+	     {%if grammar == grm %}checked='checked'{% endif %}>
+      <label for="{{grammar}}">{{grammar}}</label><br>
+      {% endfor %}
+      <input type="submit">
+    </form>
 
-    <p>There are currently two versions of the OMW.  
-      <ul>
-	<li><a href="{{ url_for('show',  page='omw1') }}">OMW Version 1</a> links hand created wordnets and
-	  automatically created wordnets for over a 150 languages
-	  through the Princeton Wordnet of English.
-	   
-	<li><a href="{{ url_for('show', page='omw2') }}"> OMW Version
-	    2</a>, the current (experimental) version, uses the
-	    Collaborative Interlingual Index to link the wordnets
-	  together <a href='#Bond:Vossen:McCrae:Fellbaum:2016'>(Bond etal., 2016)
-	    </a>.
-	  </ul>
-      </ul>
+    
       <h3>References</h3>
       <dl>
 	<dt><a name="Bond:Paik:2012">Francis Bond and Kyonghee Paik</a> (2012) 

@@ -22,3 +22,13 @@ nav a {
 h1 {
     margin-top: 0;
 }
+
+/* check colors */
+tr.inf-rule {background:#FFEEEE}
+tr.token-mapping-rule {background:#FFEEEE}
+tr.rule {background:#FFAAAA}
+tr.lex-rule {background:#FFDDDD}
+tr.lex-type {background:#AAFFAA}
+tr.lex-entry {background:#DDFFDD}
+tr.generic-lex-entry {background:#DDFFDD}
+tr.root {background:#FFAAFF}

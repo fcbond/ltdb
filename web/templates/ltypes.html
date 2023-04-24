@@ -23,9 +23,9 @@
     </tr>
     </thead>
     <tbody>
-      {%- for (typ, lname, words, lfreq, cfreq) in data %}
+      {%- for (typ, lname,  lfreq, cfreq, words) in data %}
       <tr>
-	<td><a href="{{url_for('type', typ=rule)}}">{{rule}}</a></td>
+	<td><a href="{{url_for('type', typ=typ)}}">{{typ}}</a></td>
 	<td>{{lname}}</td>
 	<td>{{lfreq}}</td>
 	<td>{{cfreq}}</td>

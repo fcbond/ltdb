@@ -11,13 +11,18 @@
 <div class="container">
   <h1>{{typ}}</h1>
 
-  {{ info }}
+ <!--  {{ info }} -->
+
+
+ <!--  <h2>Description</h2> -->
+
+ <!-- <p>{{ info['docstring']}} -->
+
+
+   
+   <p>{{desc|safe}}
+
   
-
-  <h2>Type Information</h2>
-  <pre class='code'>{{info['tdl']}}</pre>
-  <p>{{ info['src'] }}, {{ info['line'] }}
-
     <ul>
 	{% if info['parents'] %}
       <li>Parents:
@@ -31,7 +36,13 @@
 	<a href="{{url_for('type', typ=p)}}">{{p}}</a> {{ ", " if not loop.last else "" }}
 	{% endfor %}
 	{% endif %}
-	<ul>
+	</ul>
+
+  
+  <h3>TDL</h3>
+  <pre class='code'>{{info['tdl']}}</pre>
+  <p>{{ info['src'] }}, {{ info['line'] }}
+
     
 </div>
 {% endblock %}
