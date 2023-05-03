@@ -33,7 +33,7 @@ def get_md(conn):
 
 def get_rules(conn):
     c = conn.cursor()
-    c.execute("""SELECT types.typ, parents, lname, status, freq, arity, head 
+    c.execute("""SELECT types.typ, parents, lname, status, COALESCE(freq,0), arity, head 
     FROM types left join typfreq on types.typ=typfreq.typ
     WHERE status in ('rule', 'lex-rule', 'inf-rule', 'root') order by
     status, types.typ""" )
@@ -42,7 +42,7 @@ def get_rules(conn):
 
 def get_ltypes(conn):
     c = conn.cursor()
-    c.execute("""SELECT lex.typ, lname, count(lex.typ), freq, '' 
+    c.execute("""SELECT lex.typ, lname, count(lex.typ), COALESCE(freq,0), '' 
              FROM types LEFT JOIN lex ON types.typ = lex.typ
     LEFT JOIN typfreq ON lex.typ = typfreq.typ
     WHERE status ='lex-type' 
@@ -55,7 +55,9 @@ def get_ltypes(conn):
 
 
 def get_type(conn, typ):
-    
+    """
+    ToDo: also get the status of the children so we can link them better.
+    """
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("""SELECT  parents,  children,  cat,  val,

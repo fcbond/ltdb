@@ -1,0 +1,79 @@
+{% extends 'layout.html' %}
+
+{% block css %}
+<link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+
+<!-- Color and sort according to type   -->
+
+<div class="container">
+  <h1>{{typ}} ({{info['status']}})</h1>
+
+ <!--  {{ info }} -->
+
+
+ <!--  <h2>Description</h2> -->
+
+ <!-- <p>{{ info['docstring']}} -->
+  
+    <p>{{desc|safe}}</p>
+    
+    <ul>
+	{% if info['parents'] %}
+      <li>Parents:
+	{% for p in info['parents'].split() %}
+	<a href="{{url_for('type', typ=p)}}">{{p}}</a>{{ ", " if not loop.last else "" }}
+	{% endfor %}
+	{% endif %}
+      {# 	{% if info['children'] %} #}
+      {# <li>Children: #}
+      {# 	{% for p in info['children'].split() %} #}
+      {# 	<a href="{{url_for('type', typ=p)}}">{{p}}</a> {{ ", " if not loop.last else "" }} #}
+      {# 	{% endfor %} #}
+      {# 	{% endif %} #}
+    </ul>
+
+    <h3>Words</h3>
+
+    <table id='data'
+	 data-search="false"
+	 data-searchable="false"
+	 data-pagination="true"
+	   class="table table-hover table-borderless table-sm">
+    <thead class="thead-light">
+      <tr><th>Lexeme</th><th>Freq</th></tr>
+    </thead>
+    <tbody>
+      {% for lxid in words %}
+	<tr>
+	  <td>{{words[lxid][0]}}</td><td>{{words[lxid][1]}}</td>
+	</tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <h3>Sentences</h3>
+    
+  
+  {# <h3>TDL</h3> #}
+  {# <pre class='code'>{{info['tdl']}}</pre> #}
+  {# <p>{{ info['src'] }}, {{ info['line'] }} #}
+
+    
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    $(document).ready(function () {
+    {% if words|length <= 5 %}
+      $('#data').DataTable({searching: false,
+      paging: false,
+       "lengthMenu":  [5, 10, 50, 100]});
+    {% else %}
+      $('#data').DataTable({ "lengthMenu":  [5, 10, 50, 100]});
+    {% endif %}
+    });
+  </script>
+{% endblock %}

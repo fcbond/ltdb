@@ -108,7 +108,7 @@ def type(typ):
 
    
     return render_template(
-        f"typeinfo.html",
+        f"type.html",
         typ=typ,
         info=typeinfo,
         grm=grm,
@@ -128,7 +128,7 @@ def ltype(typ):
     words = get_lxids(conn, typ)
     
     return render_template(
-        f"ltype.html",
+        f"lextype.html",
         typ=typ,
         info=typeinfo,
         grm=grm,
