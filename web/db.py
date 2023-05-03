@@ -72,3 +72,17 @@ def get_type(conn, typ):
     else:
         return dict()
 
+def get_lxids(conn, typ):
+    """
+    return lexical items that have this lexical type
+    or {} if the type is not a lexical type
+    """
+    c = conn.cursor()
+    c.execute("""SELECT lex.lexid, orth, COALESCE(freq,0) FROM lex 
+             LEFT JOIN lexfreq ON lex.lexid = lexfreq.lexid
+             WHERE typ=? ORDER BY freq DESC""", (typ,))
+    lem = dict()
+    for (lxid, orth, freq) in c:
+        lem[lxid] = (orth, freq)
+        
+    return lem

@@ -12,8 +12,8 @@
   <h1>Lexical Types</h1>
 
 
-  <table class="table table-hover table-borderless table-sm">
-    <caption>Lexical Types</caption>
+  <table id='data'
+	 class="table table-hover table-borderless table-sm">
     <thead class="thead-light">
     <tr>
       <th>Lexical Type</th> <th>Name</th>
@@ -25,7 +25,7 @@
     <tbody>
       {%- for (typ, lname,  lfreq, cfreq, words) in data %}
       <tr>
-	<td><a href="{{url_for('type', typ=typ)}}">{{typ}}</a></td>
+	<td><a href="{{url_for('ltype', typ=typ)}}">{{typ}}</a></td>
 	<td>{{lname}}</td>
 	<td>{{lfreq}}</td>
 	<td>{{cfreq}}</td>
@@ -35,4 +35,13 @@
         </tbody>
     </table>
 </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    $(document).ready(function () {
+	$('#data').DataTable({"pageLength": 25},
+			     "lengthMenu": [ [25, 50, 100, -1], [25, 50, 100, "All"] ]);
+    });
+  </script>
 {% endblock %}

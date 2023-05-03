@@ -7,7 +7,7 @@ import pathlib
 import sqlite3, os
 
 from .db import get_db, get_md, get_rules, get_ltypes, \
-    get_type
+    get_type, get_lxids
 
 from .ltdb import rst2html
 
@@ -40,15 +40,13 @@ def home():
 
     if 'grm' in request.form:
         session['grm'] = request.form['grm']
-    else:
-        session.get('grm')
     page='index'
     return render_template(
         f"index.html",
         page=page,
         title='LTDB',
         grammars=grammars,
-        grm =  session['grm']
+        grm =  session.get('grm', None)
     )
 
 
@@ -107,11 +105,33 @@ def type(typ):
     typeinfo=get_type(conn, typ)
 
     desc = rst2html(typ, typeinfo['docstring'])
-    
+
+   
     return render_template(
         f"typeinfo.html",
         typ=typ,
         info=typeinfo,
         grm=grm,
         desc=desc,
+    )
+
+@app.route("/lextype/<typ>")
+def ltype(typ):
+    """show the lexical type"""
+    grm = session['grm']
+    conn = get_db(current_directory, grm)
+
+    typeinfo=get_type(conn, typ)
+
+    desc = rst2html(typ, typeinfo['docstring'])
+
+    words = get_lxids(conn, typ)
+    
+    return render_template(
+        f"ltype.html",
+        typ=typ,
+        info=typeinfo,
+        grm=grm,
+        desc=desc,
+        words=words,
     )
