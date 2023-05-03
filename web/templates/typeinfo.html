@@ -9,7 +9,7 @@
 <!-- Color and sort according to type   -->
 
 <div class="container">
-  <h1>{{typ}}</h1>
+  <h1>{{typ}} ({{info['status']}})</h1>
 
  <!--  {{ info }} -->
 
@@ -17,12 +17,9 @@
  <!--  <h2>Description</h2> -->
 
  <!-- <p>{{ info['docstring']}} -->
-
-
-   
-   <p>{{desc|safe}}
-
   
+    <p>{{desc|safe}}</p>
+    
     <ul>
 	{% if info['parents'] %}
       <li>Parents:
@@ -36,8 +33,11 @@
 	<a href="{{url_for('type', typ=p)}}">{{p}}</a> {{ ", " if not loop.last else "" }}
 	{% endfor %}
 	{% endif %}
-	</ul>
+    </ul>
 
+   
+    <h3>Sentences</h3>
+    
   
   <h3>TDL</h3>
   <pre class='code'>{{info['tdl']}}</pre>
