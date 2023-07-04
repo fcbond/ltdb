@@ -1,7 +1,21 @@
 {% extends 'layout.html' %}
 
 {% block css %}
-<link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/home.css') }}"
+	rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/delphin-viz.css') }}"
+	      rel="stylesheet">
+
+<script src="{{ url_for('static', filename='js/tree.js') }}"        
+	language='javascript'></script>
+<script src="{{ url_for('static', filename='js/dmrs.js') }}"        
+	language='javascript'></script>	
+<script src="{{ url_for('static', filename='js/mrs.js') }}"        
+	language='javascript'></script>
+<script src="{{ url_for('static', filename='js/svg.js') }}"        
+	language='javascript'></script>
+<script src="https://d3js.org/d3.v3.js"></script>
+
 {% endblock %}
 
 {% block content %}
@@ -35,45 +49,162 @@
       {# 	{% endif %} #}
     </ul>
 
+    {% if words %}
     <h3>Words</h3>
-
     <table id='data'
 	 data-search="false"
 	 data-searchable="false"
 	 data-pagination="true"
 	   class="table table-hover table-borderless table-sm">
     <thead class="thead-light">
-      <tr><th>Lexeme</th><th>Freq</th></tr>
+      <tr><th>Lexeme</th><th>Freq</th><th>Words</th></tr>
     </thead>
     <tbody>
-      {% for lxid in words %}
+      {% for lexid in lexids %}
 	<tr>
-	  <td>{{words[lxid][0]}}</td><td>{{words[lxid][1]}}</td>
+	  <td>{{lexids[lexid][0]}}</td><td>{{lexids[lexid][1]}}</td>
+	  <td>{% for word in words[lexid] %}
+	    <i>{{word}}</i> ({{words[lexid][word]}})
+	  {% endfor %}
+	  </td>
 	</tr>
       {% endfor %}
       </tbody>
     </table>
+    {% endif %}
+    {%if sents %}
     <h3>Sentences</h3>
+
     
-  
-  {# <h3>TDL</h3> #}
-  {# <pre class='code'>{{info['tdl']}}</pre> #}
-  {# <p>{{ info['src'] }}, {{ info['line'] }} #}
+    <ul> 
+      {% for p, s in phenomena %}
+	{% for (kara, made) in phenomena[p,s] %}
+	  <li><div><a title='{{p}}, {{s}}'>🗩</a>
+	    {% for wid in sents[(p,s)] %}
+	      {% if wid >= kara and wid < made %}
+		<span class = 'text-success'>{{sents[(p,s)][wid]}}</span>
+	      {% else %}
+		{{sents[(p,s)][wid]}}
+	      {% endif %}
+	    {% endfor %}
+	    <div class="float-end">
+	      {% for result in results %}
+		<button id="toggle{{result}}{{p}}{{s}}"
+			class="btn btn-outline-primary
+			btn-sm">{{results[result]}}</button>
+	      {% endfor %}
+	    </div>
+              {# <button id="toggleTree{{p}}{{s}}" #}
+	      {# 	      class="btn btn-outline-primary btn-sm">Tree</button> #}
+              {# <button id="toggleDMRS{{p}}{{s}}" #}
+	      {# 	      class="btn btn-outline-primary btn-sm">DMRS</button> #}
+              {# <button id="toggleTextMRS{{p}}{{s}}" #}
+	      {# 	      class="btn btn-outline-primary btn-sm">MRS</button> #}
+
+
+	    <div id='derivj{{p}}{{s}}'><br></div>
+	    <div id="tooltip" class="tooltip"></div>
+            <div id='dmrsj{{p}}{{s}}'></div>
+	    <div id='mrs{{p}}{{s}}' class = 'card card-body'>
+<pre>
+{{gold[(p,s)]['mrs']}}
+</pre></div>
+	    </div>
+	    <div id='mrsj{{p}}{{s}}'><br>
+              <div id="text-input" style="font-size: 150%%;">{{gold[(p,s)]['item']}}</div><br>
+	    </div>  
+
+	  </li><br>
+	  {% endfor %}
+      {% endfor %}
+    </ul>
+  </a>
+{% endif %}
+<h3>TDL</h3> 
+  <pre class='code'>{{info['tdl']}}</pre> 
+  <p>{{ info['src'] }}, {{ info['line'] }}
 
     
 </div>
 {% endblock %}
 
 {% block scripts %}
+
+
+
   <script>
     $(document).ready(function () {
-    {% if words|length <= 5 %}
+    {% if lexids|length <= 5 %}
       $('#data').DataTable({searching: false,
       paging: false,
-       "lengthMenu":  [5, 10, 50, 100]});
+      "lengthMenu":  [5, 10, 50, 100],
+      order: [[1, 'desc']]});
     {% else %}
-      $('#data').DataTable({ "lengthMenu":  [5, 10, 50, 100]});
+      $('#data').DataTable({
+      "lengthMenu":  [5, 10, 50, 100],
+      order: [[1, 'desc']]
+      });
     {% endif %}
     });
+
+
+    {% for p, s in phenomena %} 
+    {# PRINT DERIVATION TREE FROM JSON #}
+    $( document ).ready(function() {
+       elem = document.getElementById('derivj{{p}}{{s}}');
+      deriv_json_string = '{{gold[(p,s)]['derivj'] | safe}}';
+      deriv_json = JSON.parse(deriv_json_string);
+      drawTree(elem, deriv_json);
+    
+      elemChild = document.createElement('span');
+      elemChild.innerHTML = '<br><br>';
+      elem.appendChild(elemChild);
+      });
+
+      {# PRINT DMRS FROM JSON #}
+      $( document ).ready(function() {
+      elem = document.getElementById('dmrsj{{p}}{{s}}');
+      dmrs_json_string = '{{gold[(p,s)]['dmrsj'] | safe}}';
+      dmrs_json = JSON.parse(dmrs_json_string);
+      DMRS(elem, dmrs_json);
+      });
+
+  {# PRINT MRS FROM JSON #}
+      $( document ).ready(function() {
+      elem = document.getElementById('mrsj{{p}}{{s}}');
+      mrs_json_string = '{{gold[(p,s)]['mrsj'] | safe}}';
+      mrs_json = JSON.parse(mrs_json_string);
+      MRS(elem, mrs_json);
+      });
+
+      
+
+{% endfor %}
+    
+    {# Toggle Things #}
+    $(document).ready(function(){
+    {% for result in results %}
+      {% for p, s in phenomena %} 
+	$("#toggle{{result}}{{p}}{{s}}").click(function(){
+          $("#{{result}}{{p}}{{s}}").toggle(); 
+        });  
+	{# TOGGLE OFF ALL VISUALS  #}
+	$("#{{result}}{{p}}{{s}}").toggle(); 
+      {% endfor %}
+    {% endfor %}
+    }); 
+
+    {# Make tree nodes clickable #}
+    $(document).ready(function(){
+          $(".ltdb").click(function(event){
+  	    var elem = event.target;
+	    var title = elem.getAttribute("title");
+            window.open("../type/" + title);
+        });
+        });
+
   </script>
+
+
+
 {% endblock %}

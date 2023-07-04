@@ -6,8 +6,11 @@ import toml
 import pathlib
 import sqlite3, os
 
+
 from .db import get_db, get_md, get_rules, get_ltypes, \
-    get_type, get_lxids
+    get_type, get_lxids, get_wrds_by_lexids, \
+    get_phenomena_by_lexids, get_sents, get_gold, \
+    get_phenomena_by_cx, get_lxid
 
 from .ltdb import rst2html
 
@@ -98,21 +101,89 @@ def ltypes():
 
 @app.route("/type/<typ>")
 def type(typ):
-    """show the type"""
+    """show the type
+
+    May do different things for different types
+     * token-mapping-rule
+     * post-generation-mapping-rule
+     * lexical-filtering-rule
+     * type
+     * lex-type: show lexemes, words and sentences
+     * lex-entry
+     * generic-lex-entry
+     * rule
+     * lex-rule
+     * labels
+     * root
+     """
     grm = session['grm']
     conn = get_db(current_directory, grm)
 
     typeinfo=get_type(conn, typ)
-
+   
     desc = rst2html(typ, typeinfo['docstring'])
 
-   
+
+    status = typeinfo['status']
+    
+    if status == 'lex-type':
+        lexids = get_lxids(conn, typ)
+
+        words = get_wrds_by_lexids(conn, list(lexids.keys()))
+
+        phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
+
+        sents = get_sents(conn, list(phenomena.keys()))
+
+        gold = get_gold(conn, list(phenomena.keys()))
+    elif  status == 'lex-entry':
+        lexids = get_lxid(conn,typ)
+
+        words = get_wrds_by_lexids(conn, list(lexids.keys()))
+
+        phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
+
+        sents = get_sents(conn, list(phenomena.keys()))
+
+        gold = get_gold(conn, list(phenomena.keys()))
+
+        lexids = []
+        words = []
+
+    elif  status in ('root', 'rule', 'lex-rule'):
+        phenomena = get_phenomena_by_cx(conn, typ)
+
+        sents = get_sents(conn, list(phenomena.keys()))
+
+        gold = get_gold(conn, list(phenomena.keys()))
+
+        lexids = []
+        words = []
+    else:
+        lexids = []
+        words = []
+        phenomena = []
+        sents= []
+        gold = []
+
+    results = {'derivj':'Tree', 
+               'mrs':'MRS',
+               'dmrsj':'DMRS',
+               'mrsj':'[MRS]',
+               }
+    
     return render_template(
-        f"type.html",
+        f"lextype.html",
         typ=typ,
         info=typeinfo,
         grm=grm,
         desc=desc,
+        lexids=lexids,
+        words=words,
+        phenomena=phenomena,
+        sents=sents,
+        gold=gold,
+        results=results
     )
 
 @app.route("/lextype/<typ>")
@@ -125,13 +196,32 @@ def ltype(typ):
 
     desc = rst2html(typ, typeinfo['docstring'])
 
-    words = get_lxids(conn, typ)
+    lexids = get_lxids(conn, typ)
+
+    words = get_wrds_by_lexids(conn, list(lexids.keys()))
+
+    phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
+
+    sents = get_sents(conn, list(phenomena.keys()))
+
+    gold = get_gold(conn, list(phenomena.keys()))
+
+    results = {'derivj':'Tree', 
+               'mrs':'MRS',
+               'dmrsj':'DMRS',
+               'mrsj':'[MRS]',
+    }
+
     
-    return render_template(
-        f"lextype.html",
-        typ=typ,
-        info=typeinfo,
-        grm=grm,
-        desc=desc,
-        words=words,
+    return render_template("lextype.html",
+               typ=typ,
+               info=typeinfo,
+               grm=grm,
+               desc=desc,
+               lexids=lexids,
+               words=words,
+               phenomena=phenomena,
+               sents=sents,
+               gold=gold,
+               results=results
     )
