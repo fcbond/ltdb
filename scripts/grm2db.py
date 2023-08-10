@@ -137,3 +137,5 @@ if __name__ == '__main__':
     post_process_corpus(conn)
 
     log.close()
+
+    print(f"Made {temp_dir}/{dbname} for {md['SHORT_GRAMMAR_NAME']}")
