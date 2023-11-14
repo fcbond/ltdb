@@ -6,7 +6,24 @@ import json
 
 import warnings
 
+def extract_span(terminal):
+    str_tok = terminal.tokens[0][1]
+    from_match = re.search(r'\+FROM\s+\\"(\d+)\\"', str_tok)
+    to_match = re.search(r'\+TO\s+\\"(\d+)\\"', str_tok)
 
+    if from_match and to_match:
+        from_value = int(from_match.group(1))
+        to_value = int(to_match.group(1))
+        return from_value, to_value
+    else:
+        return None
+
+def get_surface_form(terminal, item):
+    span = extract_span(terminal)
+    if span:
+        return item['i-input'][span[0]:span[1]]
+    else:
+        return terminal.form
 
 def ver_match(ver, profile, log):
     """ 
@@ -41,6 +58,7 @@ def process_results(root,log):
         profile = ts.path.name 
         if response['results']:
             first_result=response.result(0)
+            # replace instances of numbers with commas "0,0000" with "0.0000":
             deriv = first_result.derivation()
             tree = first_result.get('tree', '')
             deriv_str = deriv.to_udf(indent=None)
@@ -112,7 +130,10 @@ def process_results(root,log):
                 for  (preterminal, terminal) in zip(deriv.preterminals(),
                                                     deriv.terminals()):
                     lexid=preterminal.entity
-                    surf=terminal.form
+                    if response['p-tokens']:
+                        surf = get_surface_form(terminal, response)
+                    else:
+                        surf=terminal.form
                     start=preterminal.start
                     end=preterminal.end
                     ### get cfrom cto
