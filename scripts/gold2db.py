@@ -129,10 +129,7 @@ def process_results(root,log):
                 for  (preterminal, terminal) in zip(deriv.preterminals(),
                                                     deriv.terminals()):
                     lexid=preterminal.entity
-                    if response['p-tokens']:
-                        surf = get_surface_form(terminal, response)
-                    else:
-                        surf=terminal.form
+                    surf = get_surface_form(terminal, response)
                     start=preterminal.start
                     end=preterminal.end
                     ### get cfrom cto
