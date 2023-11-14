@@ -58,7 +58,6 @@ def process_results(root,log):
         profile = ts.path.name 
         if response['results']:
             first_result=response.result(0)
-            # replace instances of numbers with commas "0,0000" with "0.0000":
             deriv = first_result.derivation()
             tree = first_result.get('tree', '')
             deriv_str = deriv.to_udf(indent=None)
