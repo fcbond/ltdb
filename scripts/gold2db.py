@@ -18,10 +18,10 @@ def extract_span(terminal):
     else:
         return None
 
-def get_surface_form(terminal, item):
+def get_surface_form(terminal, surf_str):
     span = extract_span(terminal)
     if span:
-        return item['i-input'][span[0]:span[1]]
+        return surf_str[span[0]:span[1]]
     else:
         return terminal.form
 
@@ -128,18 +128,18 @@ def process_results(root,log):
             if deriv:
                 for  (preterminal, terminal) in zip(deriv.preterminals(),
                                                     deriv.terminals()):
-                    lexid=preterminal.entity
-                    surf = get_surface_form(terminal, response)
-                    start=preterminal.start
-                    end=preterminal.end
+                    lexid = preterminal.entity
+                    surf = get_surface_form(terminal, response['i-input'])
+                    start = preterminal.start
+                    end = preterminal.end
                     ### get cfrom cto
                     sent[(profile, sid)].append((surf, lexid))
                     lexind[lexid][(profile, sid)].add((start, end))
                 ### internal node (store as type)
                 for node in deriv.internals():
-                    typ =  node.entity
-                    start= node.start
-                    end=   node.end
+                    typ = node.entity
+                    start = node.start
+                    end = node.end
                     typind[typ][(profile, sid)].add((start, end))       
     return gold, sent, lexind, typind
 
