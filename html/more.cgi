@@ -3,8 +3,7 @@
 import cgi
 import cgitb; cgitb.enable()  # for troubleshooting
 import sqlite3, collections
-import sys,codecs 
-sys.stdout = codecs.getwriter('utf8')(sys.stdout)
+import sys
 from collections import defaultdict as dd
 import ltdb
 
@@ -13,19 +12,20 @@ form = cgi.FieldStorage()
 # lemma = form.getfirst("lemma", "")
 # lemma = lemma.strip().decode('utf-8')
 typ = form.getfirst("typ", "")
-typ = typ.strip().decode('utf-8')
+typ = typ.strip()
 lextyp = form.getfirst("lextyp", "")
-lextyp = lextyp.strip().decode('utf-8')
+lextyp = lextyp.strip()
 lexid = form.getfirst("lexid", "")
-lexid = lexid.strip().decode('utf-8')
+lexid = lexid.strip()
 limit = int(form.getfirst("limit", 50))
 
 
 par=ltdb.getpar('params')
 
-print ltdb.header()
+print(ltdb.header())
 
-print ltdb.searchbar()
+
+print (ltdb.searchbar())
 ###
 ### Print out the type
 ###
@@ -43,4 +43,4 @@ elif(lextyp):
 else:
     print("<p>More examples of what?")
 print("</div>")
-print ltdb.footer()
+print (ltdb.footer(par['ver']))

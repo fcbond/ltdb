@@ -94,8 +94,9 @@ color: green;
 }
 
 .coref{
-#    border: 1px solid black;
+    border: 1px solid black;
     background: #F3FFFF;
+    font-size: smaller;
 }
 pre{
     white-space: pre-wrap;
@@ -117,10 +118,13 @@ tr {background:#F3FFF3} /* FCB likes green */
 td {padding:4pt}
 caption { font-weight:bold; font-size: 18pt;}
 /* check colors */
-tr.irule {background:#EEEEEE}
+tr.inf-rule {background:#FFEEEE}
+tr.token-mapping-rule {background:#FFEEEE}
 tr.rule {background:#FFAAAA}
-tr.lrule {background:#AAAAFF}
-tr.ltype {background:#AAFFAA}
+tr.lex-rule {background:#FFDDDD}
+tr.lex-type {background:#AAFFAA}
+tr.lex-entry {background:#DDFFDD}
+tr.generic-lex-entry {background:#DDFFDD}
 tr.root {background:#FFAAFF}
 
 pre.code {
