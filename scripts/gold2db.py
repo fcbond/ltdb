@@ -6,7 +6,24 @@ import json
 
 import warnings
 
+def extract_span(terminal):
+    str_tok = terminal.tokens[0][1]
+    from_match = re.search(r'\+FROM\s+\\"(\d+)\\"', str_tok)
+    to_match = re.search(r'\+TO\s+\\"(\d+)\\"', str_tok)
 
+    if from_match and to_match:
+        from_value = int(from_match.group(1))
+        to_value = int(to_match.group(1))
+        return from_value, to_value
+    else:
+        return None
+
+def get_surface_form(terminal, surf_str):
+    span = extract_span(terminal)
+    if span:
+        return surf_str[span[0]:span[1]]
+    else:
+        return terminal.form
 
 def ver_match(ver, profile, log):
     """ 
@@ -111,18 +128,18 @@ def process_results(root,log):
             if deriv:
                 for  (preterminal, terminal) in zip(deriv.preterminals(),
                                                     deriv.terminals()):
-                    lexid=preterminal.entity
-                    surf=terminal.form
-                    start=preterminal.start
-                    end=preterminal.end
+                    lexid = preterminal.entity
+                    surf = get_surface_form(terminal, response['i-input'])
+                    start = preterminal.start
+                    end = preterminal.end
                     ### get cfrom cto
                     sent[(profile, sid)].append((surf, lexid))
                     lexind[lexid][(profile, sid)].add((start, end))
                 ### internal node (store as type)
                 for node in deriv.internals():
-                    typ =  node.entity
-                    start= node.start
-                    end=   node.end
+                    typ = node.entity
+                    start = node.start
+                    end = node.end
                     typind[typ][(profile, sid)].add((start, end))       
     return gold, sent, lexind, typind
 
