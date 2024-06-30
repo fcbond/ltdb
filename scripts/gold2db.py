@@ -14,10 +14,13 @@ def ver_match(ver, profile, log):
     """
     grms = set(tsdb.split(l)[7] for l in tsdb.open(profile, 'run'))
     if len(grms) == 1:
-        if grms.pop() == ver:
+        rungrm = grms.pop() 
+        if rungrm == ver:
             return True
         else:
-            return False            
+            print(f"Grammar in treebank '{rungrm}' != '{ver}'", file=log)
+            return False
+        
     elif len(grms) > 1:
         print(f"Warning: "
               "two different grammars used in this profile {profile}",
@@ -174,14 +177,15 @@ def nodes2db(conn, lexind, typind, log):
     conn.commit()
 
     
-def process_tsdb(conn, ver, golddir, log):
+def process_tsdb(conn, ver, checkgrm, golddir, log):
     """
     look at all the trees in the golddir
     process those with the same version cfg['ver']
     """
     for root, dirs, files in os.walk(golddir):
         if ('result' in files or 'result.gz' in files):
-            if ver_match(ver, root, log):
+            ##print (root, dirs, files)
+            if (not checkgrm) or ver_match(ver, root, log):
                 print(f"Processing {root}", file=sys.stderr)
                 gold, sent, lexind, typind = process_results(root, log)
                 #print(gold[0], gold[-1])
@@ -192,3 +196,4 @@ def process_tsdb(conn, ver, golddir, log):
 #process_tsdb('ERG-dict (2020)', '/home/bond/tmp/2020-for-ltdb/tsdb/gold/omw', log)
 #process_tsdb('ERG-dict (2020)', '/home/bond/tmp/2020-for-ltdb/tsdb/gold/ntucle', log)
 #process_tsdb('ERG-dict (2020)', '/home/bond/tmp/2020-for-ltdb/tsdb/gold/sh-spec', log)
+

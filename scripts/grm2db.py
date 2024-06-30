@@ -84,11 +84,14 @@ if __name__ == '__main__':
                     prog = 'grm2db',
                     description = 'Take a delphin grammar and make a db from it and its corpora',
                     epilog = 'Text at the bottom of help')
+    parser.add_argument('--checkgrm',  action='store_true',
+                        help='Check the grammar version in the treebank')
     parser.add_argument('metadata', type=Path,
                         help="METADATA file for the grammar")
 
     args = parser.parse_args()
 
+    
     ###
     ### Read Metadata
     ###
@@ -130,8 +133,10 @@ if __name__ == '__main__':
     
     golddir =  os.path.normpath(os.path.join(os.path.dirname(cfg['grammar_file']),
                                              'tsdb/gold/'))
+    print(golddir)
     if os.path.isdir(golddir):
-        process_tsdb(conn, cfg['ver'], golddir, log)
+        process_tsdb(conn, cfg['ver'], args.checkgrm,
+                     golddir, log)
 
 
     post_process_corpus(conn)
