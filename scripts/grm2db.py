@@ -5,7 +5,7 @@ import sys, os
 import argparse
 import tempfile
 import sqlite3
-
+import toml
 from pathlib import Path
 
 from tdl2db import read_cfg, read_grm, intodb
@@ -19,14 +19,8 @@ if not sys.version_info > (3, 8):
 def read_metadata(metadata_path):
     md = dict()
     try:
-        fh = open(metadata_path, 'r')
-    # Store configuration file values
-        for l in fh:  
-            if l.strip() and l[0].isupper():
-                (att,val) = l.strip().split('=')
-                val=val.strip('"')
-                if val:
-                    md[att]=val
+        with open(metadata_path, "r", encoding="utf-8") as f:
+            md = toml.load(f)
     except FileNotFoundError:
         print(f"METADATA not found at {metadata_path}", file=sys.stderr)
     return md
