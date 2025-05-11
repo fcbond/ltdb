@@ -1,0 +1,33 @@
+{% extends 'layout.html' %}
+
+{% block css %}
+<link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+
+<!-- Color and sort according to type   -->
+
+<div class="container">
+  <h1>Query {{searched}}</h1>
+
+  {%- for t in results %}
+  <h2>{{t}}</h2>
+    <ul>
+  {%- for r in results[t] %}
+
+  <li><a href="{{url_for(path[t], query=r[0])}}">{{r[0]}}</a> <!-- {{r[1:]}} -->
+    {% endfor %}
+    </ul>
+  {% endfor %}  
+
+  {% endblock %}
+
+{% block scripts %}
+  <script>
+    $(document).ready(function () {
+	$('#data').DataTable({"pageLength": 25,
+			      "lengthMenu": [ [25, 50, 100, -1], [25, 50, 100, "All"] ]});
+    });
+  </script>
+{% endblock %}
