@@ -1,7 +1,4 @@
-ltdb
-====
-
-Linguistic Type Data-Base
+# Linguistic Type Data-Base (ltdb)
 
 The Linguistic Type Database (LTDB, née Lextype DB), describes types and
 rules of a DELPH-IN grammar with frequency information from the
@@ -9,9 +6,34 @@ treebank. Lexical types can be seen as detailed parts-of-speech.
 Information about the types are constructed from the linguists
 documentation in the grammar, a kind of literate programming.
 
+## Quick Start
+
+A separate database is made for each grammar.  The description for the grammar is read from the METADATA, a single project may have multiple grammars.
+
+Compile a database with:
+
+```
+$ python scripts/grm2db.py path/to/METADATA
+```
+
+--checkgrm only includes treebanks made by the same version
+--outdir specifies the output directory 
+         a temporary directory will be made otherwise
+
+If all goes well, copy the database to web/db/.
+
+The grammars are read by a web application, written using flask.
+
+$ deploy.sh
+
+You can also install it as a normal flask application.
+
+
 There is `more documentation <http://moin.delph-in.net/LkbLtdb>`__ at
 the DELPH-IN Wiki.
 
+
+## IGNORE BELOW HERE
 
 LTDB assumes that the grammar follows the usual DELPH-IN conventions,
 in particular that there is a grammar directory with sub directories

@@ -20,9 +20,16 @@
 		  class="nav-item nav-link">Rules</a>
 	       <a href="{{ url_for('ltypes') }}"
 		  class="nav-item nav-link">Lexical Types</a>
-	</div>
+	  </div>
 	  {% endif %}
-
+	    <form action="/search" method="post" class="form-inline my-2 my-lg-0">
+              <input type="text" id="search" name="search" required placeholder="lemma/type/predicate">
+	      <button type="submit" class="btn btn-outline-secondary">
+		🔍
+              </button>
+	    </form>
+	    
+	  
 	</div>
       </div>
   </nav>

@@ -99,8 +99,8 @@ def ltypes():
 
 
 
-@app.route("/type/<typ>")
-def type(typ):
+@app.route("/type/<query>")
+def type(query):
     """show the type
 
     May do different things for different types
@@ -119,15 +119,15 @@ def type(typ):
     grm = session['grm']
     conn = get_db(current_directory, grm)
 
-    typeinfo=get_type(conn, typ)
+    typeinfo=get_type(conn, query)
    
-    desc = rst2html(typ, typeinfo['docstring'])
+    desc = rst2html(query, typeinfo['docstring'])
 
 
     status = typeinfo['status']
     
     if status == 'lex-type':
-        lexids = get_lxids(conn, typ)
+        lexids = get_lxids(conn, query)
 
         words = get_wrds_by_lexids(conn, list(lexids.keys()))
 
@@ -137,7 +137,7 @@ def type(typ):
 
         gold = get_gold(conn, list(phenomena.keys()))
     elif  status == 'lex-entry':
-        lexids = get_lxid(conn,typ)
+        lexids = get_lxid(conn, query)
 
         words = get_wrds_by_lexids(conn, list(lexids.keys()))
 
@@ -151,7 +151,7 @@ def type(typ):
         words = []
 
     elif  status in ('root', 'rule', 'lex-rule'):
-        phenomena = get_phenomena_by_cx(conn, typ)
+        phenomena = get_phenomena_by_cx(conn, query)
 
         sents = get_sents(conn, list(phenomena.keys()))
 
@@ -174,7 +174,7 @@ def type(typ):
     
     return render_template(
         f"lextype.html",
-        typ=typ,
+        query=query,
         info=typeinfo,
         grm=grm,
         desc=desc,
@@ -186,17 +186,17 @@ def type(typ):
         results=results
     )
 
-@app.route("/lextype/<typ>")
-def ltype(typ):
+@app.route("/lextype/<query>")
+def ltype(query):
     """show the lexical type"""
     grm = session['grm']
     conn = get_db(current_directory, grm)
 
-    typeinfo=get_type(conn, typ)
+    typeinfo=get_type(conn, query)
 
-    desc = rst2html(typ, typeinfo['docstring'])
+    desc = rst2html(query, typeinfo['docstring'])
 
-    lexids = get_lxids(conn, typ)
+    lexids = get_lxids(conn, query)
 
     words = get_wrds_by_lexids(conn, list(lexids.keys()))
 
@@ -214,7 +214,7 @@ def ltype(typ):
 
     
     return render_template("lextype.html",
-               typ=typ,
+               query=query,
                info=typeinfo,
                grm=grm,
                desc=desc,
@@ -225,3 +225,31 @@ def ltype(typ):
                gold=gold,
                results=results
     )
+
+
+
+@app.route('/search', methods=['POST'])
+def submit_fsearch():
+    grm = session['grm']
+    conn = get_db(current_directory, grm)
+
+    
+    searched = request.form['search']
+
+    results= dict()
+    
+    results['rules']  = get_rules(conn, query=searched)
+    results['ltypes'] = get_ltypes(conn, query=searched)
+
+    path = dict()
+    
+    path['rules'] = 'type'
+    path['ltypes'] = 'ltype'
+    path['lemmas'] = 'lemma'
+    path['predicates'] = 'pred'
+    
+    return render_template('searched.html',
+                           grm=grm,
+                           searched=searched,
+                           results=results,
+                           path=path)

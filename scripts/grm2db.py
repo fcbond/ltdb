@@ -28,13 +28,18 @@ def read_metadata(metadata_path):
                 if val:
                     md[att]=val
     except FileNotFoundError:
-        print("METADATA not found at {}".format(MF),file=sys.stderr)
+        print(f"METADATA not found at {metadata_path}", file=sys.stderr)
     return md
 
 def make_db (dbdir, db):
     conn = sqlite3.connect(os.path.join(dbdir, db))    # loads dbfile as con
     c = conn.cursor()
-    with open('tables.sql', 'r') as sql_file:
+    
+    # Get the script directory to find tables.sql
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    sql_path = os.path.join(script_dir, 'tables.sql')
+    
+    with open(sql_path, 'r') as sql_file:
         sql_script = sql_file.read()
     c.executescript(sql_script)
     conn.commit()
@@ -86,6 +91,8 @@ if __name__ == '__main__':
                     epilog = 'Text at the bottom of help')
     parser.add_argument('--checkgrm',  action='store_true',
                         help='Check the grammar version in the treebank')
+    parser.add_argument('--outdir', type=Path,
+                        help="Output directory for the database")
     parser.add_argument('metadata', type=Path,
                         help="METADATA file for the grammar")
 
@@ -95,20 +102,25 @@ if __name__ == '__main__':
     ###
     ### Read Metadata
     ###
-
+    print('hi')
     md = read_metadata(args.metadata)
-    #print(md)
+    print(md)
+    if not md:
+        sys.exit("No usable metadata, giving up"),
 
-    temp_dir = tempfile.mkdtemp()
+    out_dir = args.outdir or tempfile.mkdtemp()
+    os.makedirs(out_dir, exist_ok=True)
+
+    nam = md['SHORT_GRAMMAR_NAME'] or 'unknown'
     
-    print(f"Making the db for {md['SHORT_GRAMMAR_NAME']} in {temp_dir}")
-
-    log = open(os.path.join(temp_dir, "tdl.log"), 'w')
+    print(f"Making the db for {nam} in {out_dir}")
     
     cfg = read_cfg(os.path.join(os.path.dirname(args.metadata),
                                 md['ACE_CONFIG_FILE']))
 
     md['Version'] = cfg['ver'] 
+
+    log = open(os.path.join(out_dir, f"{md['Version']}-tdl.log"), 'w')
     ###
     ### read the info from the tdl
     ###
@@ -119,7 +131,7 @@ if __name__ == '__main__':
     ### make the db
     ###
     dbname=f"{cfg['ver'].replace(' ', '_')}.db"
-    conn = make_db(temp_dir, dbname)
+    conn = make_db(out_dir, dbname)
 
     ## add the information to the database
     
@@ -143,4 +155,4 @@ if __name__ == '__main__':
 
     log.close()
 
-    print(f"Made {temp_dir}/{dbname} for {md['SHORT_GRAMMAR_NAME']}")
+    print(f"Made {out_dir}/{dbname} for {md['SHORT_GRAMMAR_NAME']}")

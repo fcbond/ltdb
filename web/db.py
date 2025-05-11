@@ -42,25 +42,39 @@ def get_md(conn):
     return md
 
 
-def get_rules(conn):
+def get_rules(conn, query=''):
     c = conn.cursor()
-    c.execute("""SELECT types.typ, parents, lname, status, COALESCE(freq,0), arity, head 
+    if query:
+        constraint = 'AND  types.typ glob ?' 
+        params = [query]
+    else:
+        constraint = ''
+        params = []
+        
+    c.execute(f"""SELECT types.typ, parents, lname, status, COALESCE(freq,0), arity, head 
     FROM types left join typfreq on types.typ=typfreq.typ
-    WHERE status in ('rule', 'lex-rule', 'inf-rule', 'root') order by
-    status, types.typ""" )
+    WHERE status in ('rule', 'lex-rule', 'inf-rule', 'root') 
+    {constraint}
+    ORDER BY status, types.typ""", params)
+        
     results = c.fetchall()
     return results
 
-def get_ltypes(conn):
+def get_ltypes(conn, query=''):
     c = conn.cursor()
-    c.execute("""SELECT lex.typ, lname, count(lex.typ), COALESCE(freq,0), '' 
-             FROM types LEFT JOIN lex ON types.typ = lex.typ
+    if query:
+        constraint = 'AND lex.typ glob ?' 
+        params = [query]
+    else:
+        constraint = ''
+        params = []
+    c.execute(f"""SELECT lex.typ, lname, count(lex.typ), COALESCE(freq,0), '' 
+    FROM types LEFT JOIN lex ON types.typ = lex.typ
     LEFT JOIN typfreq ON lex.typ = typfreq.typ
     WHERE status ='lex-type' 
-    GROUP BY lex.typ ORDER BY lex.typ""" )
+    {constraint}
+    GROUP BY lex.typ ORDER BY lex.typ""", params )
     results = c.fetchall()
-
-
     
     return results
 

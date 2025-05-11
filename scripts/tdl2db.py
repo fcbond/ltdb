@@ -51,9 +51,9 @@ def read_grm (cfg, log):
     les = {}
     hierarchy = []
     grammarfile=cfg['grammar_file']
-    print("FILE", grammarfile)
     path = Path(grammarfile)
     base = path.parent
+    print("FILE", grammarfile, "BASE:", base)
     for event, obj, lineno in tdl.iterparse(grammarfile):
         if  event == "LineComment":
             continue
@@ -66,7 +66,7 @@ def read_grm (cfg, log):
             for entry in obj.entries:
                 #print('ENTRY', entry, status)
                 if isinstance(entry,tdl.FileInclude):
-                    path = Path(base, entry.path).with_suffix('.tdl')
+                    path = entry.path.with_suffix('.tdl')
                     if path.is_file():
                         tdls, types, \
                         hierarchy, les = process_type(cfg, str(base), str(path),
