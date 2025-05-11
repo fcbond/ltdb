@@ -36,8 +36,7 @@ def read_cfg (ace_config):
             match =  re.findall(rf'{attr}\s+:=\s+"?([^"]+)"?.', l.strip())
             if match:
                 cfg[attr] = match[0]
-                cfg['grammar_file'] = os.path.normpath(os.path.join(os.path.dirname(ace_config), cfg['grammar-top']))
-                
+    cfg['grammar_file'] = os.path.normpath(os.path.join(os.path.dirname(ace_config), cfg['grammar-top']))
     for l in open(os.path.join(os.path.dirname(ace_config), cfg['version'])):
         match = re.findall(rf'\*grammar-version\*\s+"([^"]+)"', l.strip())
         if match:
