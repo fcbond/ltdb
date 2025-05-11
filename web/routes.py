@@ -7,7 +7,8 @@ import pathlib
 import sqlite3, os
 
 
-from .db import get_db, get_md, get_rules, get_ltypes, \
+from .db import get_db, get_md, get_summary, \
+    get_rules, get_ltypes, \
     get_type, get_lxids, get_wrds_by_lexids, \
     get_phenomena_by_lexids, get_sents, get_gold, \
     get_phenomena_by_cx, get_lxid
@@ -59,11 +60,13 @@ def grammar():
     grm = session['grm']
     conn = get_db(current_directory, grm)
     md = get_md(conn)
+    summ = get_summary(conn)
     return render_template(
         f"grammar.html",
         title=md['GRAMMAR_NAME'],
         meta=md,
         grm=grm,
+        summ=summ,
     )
 
 @app.route("/rules.html")

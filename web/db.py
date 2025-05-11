@@ -232,3 +232,16 @@ def get_gold(conn, psids):
             data[prof, sid]['item'] = sent
     return data
 
+def get_summary(conn):
+    """
+    Return a summary of the grammar"
+    """
+    c = conn.cursor()
+    summary = dict()
+    c.execute("""
+    SELECT status, count(status) as freq
+    FROM types GROUP BY status""")
+    for status, freq in c:
+        summary[status] = freq
+
+    return summary

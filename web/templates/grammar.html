@@ -8,8 +8,8 @@
 <div class="container">
   <h1>{{meta['GRAMMAR_NAME']}} ({{meta['SHORT_GRAMMAR_NAME']}})</h1>
 
- <table class="table table-hover table-borderless table-sm">
-    <caption>Grammar Medadata</caption>
+ <table class="table table-hover table-borderless table-sm caption-top">
+    <caption>Grammar Meta-data</caption>
     <thead class="thead-light">
     <tr>
       <th>Metadata</th> <th>Value</th>
@@ -29,8 +29,27 @@
       </tr>
       {% endfor %}
         </tbody>
+ </table>
+
+ 
+ <table class="table table-hover table-borderless table-sm caption-top">
+    <caption>Grammar Summary</caption>
+    <thead class="thead-light">
+    <tr>
+      <th>Metadata</th> <th>Value</th>
+    </tr>
+    </thead>
+    <tbody>
+      {%- for key in summ %}
+      <tr>
+	<td>{{key.title().replace('_', ' ')}}</td>
+	<td>{{summ[key]}}</td>
+      </tr>
+      {% endfor %}
+        </tbody>
     </table>
 
+ 
   
 </div>
 {% endblock %}
