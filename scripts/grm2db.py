@@ -6,6 +6,7 @@ import argparse
 import tempfile
 import sqlite3
 import toml
+import json
 from pathlib import Path
 
 from tdl2db import read_cfg, read_grm, intodb
@@ -42,6 +43,10 @@ def make_db (dbdir, db):
 def meta_to_db(conn, md):
     c = conn.cursor()
     for att, val in md.items():
+        if isinstance(val, list):
+            # Wrap the list in a dictionary with a standard key
+            # as TOML requires key-value pairs at the top level
+            val = json.dumps(val)
         if att and val:
             c.execute("""
             INSERT INTO meta (att, val)
@@ -136,13 +141,19 @@ if __name__ == '__main__':
     ###
     ### add the info from gold
     ###
-    
-    golddir =  os.path.normpath(os.path.join(os.path.dirname(cfg['grammar_file']),
-                                             'tsdb/gold/'))
-    print(golddir)
-    if os.path.isdir(golddir):
-        process_tsdb(conn, cfg['ver'], args.checkgrm,
-                     golddir, log)
+
+
+    tsdb_roots = md.get('TSDB_ROOTS',  [ 'tsdb/gold/' ])
+    profiles = md.get('PROFILES',  None)
+    for root in tsdb_roots:
+        golddir =  os.path.normpath(os.path.join(os.path.dirname(args.metadata),
+                                                 root))
+        print(f'Processing profiles under {golddir}')
+        if profiles is not None:
+            print(f'If they are in {profiles}')
+        if os.path.isdir(golddir):
+            process_tsdb(conn, cfg['ver'], args.checkgrm,
+                         golddir, log, profiles)
 
 
     post_process_corpus(conn)

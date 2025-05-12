@@ -199,13 +199,18 @@ def nodes2db(conn, lexind, typind, log):
     conn.commit()
 
     
-def process_tsdb(conn, ver, checkgrm, golddir, log):
+def process_tsdb(conn, ver, checkgrm, golddir, log, profiles):
     """
     look at all the trees in the golddir
     process those with the same version cfg['ver']
     """
     for root, dirs, files in os.walk(golddir):
         if ('result' in files or 'result.gz' in files):
+            if profiles is not None:
+                profile = root.split('/')[-1]
+                if profile not in profiles:
+                    continue
+            
             ##print (root, dirs, files)
             if (not checkgrm) or ver_match(ver, root, log):
                 print(f"Processing {root}", file=sys.stderr)
