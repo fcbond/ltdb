@@ -32,18 +32,58 @@
  </table>
 
  
- <table class="table table-hover table-borderless table-sm caption-top">
+ <table class="table table-hover table-borderless table-sm caption-top w-auto">
     <caption>Grammar Summary</caption>
     <thead class="thead-light">
     <tr>
-      <th>Metadata</th> <th>Value</th>
+      <th>Object</th>
+      <th class="text-end"># in Grammar</th>
+      <th class="text-end"># in Tree Bank</th>
     </tr>
     </thead>
     <tbody>
       {%- for key in summ %}
       <tr>
 	<td>{{key.title().replace('_', ' ')}}</td>
-	<td>{{summ[key]}}</td>
+        <td class="text-end">
+          {% if summ[key][0] is number %}
+            {{ "{:,}".format(summ[key][0]) }}
+          {% else %}
+            {{ summ[key][0] }}
+          {% endif %}
+        </td>
+	 <td class="text-end">
+          {% if summ[key][1] is number %}
+            {{ "{:,}".format(summ[key][1]) }}
+          {% else %}
+            {{ summ[key][1] }}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+        </tbody>
+    </table>
+
+ <table class="table table-hover table-borderless table-sm caption-top w-auto">
+    <caption>Tree Bank Summary</caption>
+    <thead class="thead-light">
+    <tr>
+      <th>Metadata</th>
+      <th class="text-end">Value</th>
+    </tr>
+    </thead>
+    <tbody>
+      {%- for key in tsumm %}
+      <tr>
+	<td>{{key.title().replace('_', ' ')}}</td>
+        <td class="text-end">
+          {% if tsumm[key] is number %}
+            {{ "{:,}".format(tsumm[key]) }}
+          {% else %}
+            {{ tsumm[key] }}
+          {% endif %}
+        </td>
+
       </tr>
       {% endfor %}
         </tbody>

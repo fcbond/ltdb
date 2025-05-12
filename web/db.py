@@ -238,10 +238,47 @@ def get_summary(conn):
     """
     c = conn.cursor()
     summary = dict()
-    c.execute("""
-    SELECT status, count(status) as freq
-    FROM types GROUP BY status""")
-    for status, freq in c:
-        summary[status] = freq
+    c.execute("""-- Get counts for regular types using typfreq
+    SELECT t.status, 
+           COUNT(DISTINCT t.typ) AS total_types,
+           COUNT(DISTINCT tf.typ) AS types_in_corpus
+    FROM types t
+    LEFT JOIN typfreq tf ON t.typ = tf.typ
+    WHERE t.status NOT IN ('lex-entry', 'generic-lex-entry')
+    GROUP BY t.status
+
+    UNION ALL
+
+    -- Get counts for lex-entry types using lexfreq
+    SELECT t.status,
+           COUNT(DISTINCT t.typ) AS total_types,
+           COUNT(DISTINCT lf.lexid) AS types_in_corpus
+    FROM types t
+    LEFT JOIN lexfreq lf ON t.typ = lf.lexid
+    WHERE t.status IN ('lex-entry', 'generic-lex-entry')
+    GROUP BY t.status
+
+    ORDER BY status;""")
+    for status, freq, cfreq in c:
+        summary[status] = freq, cfreq
 
     return summary
+
+def get_tb_summary(conn):
+    """
+    Return a summary of the treebank"
+    """
+    c = conn.cursor()
+    summary = dict()
+    c.execute("""
+    SELECT COUNT(DISTINCT profile) AS profiles, 
+    COUNT(DISTINCT sid || ',' || profile) AS sents, 
+    COUNT(word) AS words FROM sent""")
+    profiles, sents, words = c.fetchone()
+    summary["Profiles"] = profiles
+    summary["Sents"] = sents
+    summary["Tokens"] = words
+
+    return summary
+
+

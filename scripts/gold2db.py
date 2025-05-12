@@ -7,6 +7,11 @@ import json
 import warnings
 
 def extract_span(terminal):
+    """
+    Try to get the start and end of the construction
+    """
+    if not terminal.tokens:
+        return None
     str_tok = terminal.tokens[0][1]
     from_match = re.search(r'\+FROM\s+\\"(\d+)\\"', str_tok)
     to_match = re.search(r'\+TO\s+\\"(\d+)\\"', str_tok)
