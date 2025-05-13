@@ -42,7 +42,7 @@ def home():
     # check only text files
         if file.endswith('.db'):
             grammars.append(file)
-
+    grammars.sort()
     if 'grm' in request.form:
         session['grm'] = request.form['grm']
     page='index'
