@@ -79,69 +79,70 @@ def read_grm (cfg, log):
                     print('WARNING unknown type:', entry.status, file=log)
     return tdls, types, hierarchy, les
 
-def  process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
+
+def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
     if 'root' in path:
         status = 'root'
     elif 'parse-nodes' in path:
         status = 'labels'
 
     print(f"Processing types in {path} as {status}")
-    for event, obj, lineno in tdl.iterparse(path): # assume utf-8
-        ##print(lineno, event, sep = '\t')
-        if event in ['TypeDefinition',  'TypeAddendum',
-                     'LexicalRuleDefinition']:
-            # if obj.documentation(): ### The tdl has a docstring
-            #     descript,exes,nams= ltdb.munge_desc(obj.identifier,obj.documentation())
-            #     obj.docstring=None
-            # else:
-            # get the parents
-            parents = [c for c in obj.conjunction.types()]
-            if status == 'lex-entry':
-                if len(parents) != 1:
-                    print ("LE has non unique parent", obj.identifier, parents)
-                else:
-                    ### (lex-type, docstring)
-                    ### fixme get orth, pred, altpred
-                    ORTH= cfg.get('orth-path', 'STEM')
-                    orths = obj.conjunction.get(ORTH, default=None)
-                    try:
-                        orth=' '.join([str(s) for s in orths.values()])
-                    except:
-                        orth = ''
-                        print('No Orthography', obj.identifier,
-                              sep = '\t', file=log) 
-                    pred=obj.conjunction.get('SYNSEM.LKEYS.KEYREL.PRED', default=None)
-                    altpred=obj.conjunction.get('SYNSEM.LKEYS.ALTKEYREL.PRED', default=None)
-                    carg=obj.conjunction.get('SYNSEM.LKEYS.KEYREL.CARG', default=None)
-                    altcarg=obj.conjunction.get('SYNSEM.LKEYS.ALTKEYREL.CARG', default=None)
-                    les[obj.identifier] = (str(parents[0]), orth, pred, altpred, carg, altcarg, obj.documentation())
-            else: # not a lexical entry
-                tdls.append((obj.identifier,
-                         path[len(base):], lineno,
-                         event,
-                         tdl.format(obj),
-                         obj.documentation()))
-            for c in parents:
-                hierarchy.append((obj.identifier, str(c)))
-            if event != 'TypeAddendum':
-                types[obj.identifier].append(status)
-        elif event not in ['LineComment', 'BlockComment',
-                           'BeginEnvironment', 'EndEnvironment',
-                           'FileInclude' ]:
-            ## ToDo log properly
-            print('Unknown Event', event, obj, path, lineno,
-                  sep = '\t',
-                  file=log)
-    # except Exception as e:
-    #     print("Unable to parse tdl for {}, see log for details".format(path),
-    #           file=sys.stderr)
-    #     print("Unable to parse tdl for {}".format(path),
-    #           file=log)
-    #     if hasattr(e, 'message'):
-    #         print(e.message, file=log)
-    #     else:
-    #         print(str(e), file=log)
+    try:
+        current_token_lineno = None  # To track the current token's line number
+        for event, obj, lineno in tdl.iterparse(path):  # assume utf-8
+            current_token_lineno = lineno  # Store the current line number
+            if event in ['TypeDefinition', 'TypeAddendum', 'LexicalRuleDefinition']:
+                # if obj.documentation(): ### The tdl has a docstring
+                #     descript,exes,nams= ltdb.munge_desc(obj.identifier,obj.documentation())
+                #     obj.docstring=None
+                # else:
+                # get the parents
+                parents = [c for c in obj.conjunction.types()]
+                if status == 'lex-entry':
+                    if len(parents) != 1:
+                        print("LE has non unique parent", obj.identifier, parents)
+                    else:
+                        ### (lex-type, docstring)
+                        ### fixme get orth, pred, altpred
+                        ORTH = cfg.get('orth-path', 'STEM')
+                        orths = obj.conjunction.get(ORTH, default=None)
+                        try:
+                            orth = ' '.join([str(s) for s in orths.values()])
+                        except:
+                            orth = ''
+                            print('No Orthography', obj.identifier,
+                                  sep='\t', file=log)
+                        pred = obj.conjunction.get('SYNSEM.LKEYS.KEYREL.PRED', default=None)
+                        altpred = obj.conjunction.get('SYNSEM.LKEYS.ALTKEYREL.PRED', default=None)
+                        carg = obj.conjunction.get('SYNSEM.LKEYS.KEYREL.CARG', default=None)
+                        altcarg = obj.conjunction.get('SYNSEM.LKEYS.ALTKEYREL.CARG', default=None)
+                        les[obj.identifier] = (str(parents[0]), orth, pred, altpred, carg, altcarg, obj.documentation())
+                else:  # not a lexical entry
+                    tdls.append((obj.identifier,
+                                path[len(base):], lineno,
+                                event,
+                                tdl.format(obj),
+                                obj.documentation()))
+                for c in parents:
+                    hierarchy.append((obj.identifier, str(c)))
+                if event != 'TypeAddendum':
+                    types[obj.identifier].append(status)
+            elif event not in ['LineComment', 'BlockComment',
+                              'BeginEnvironment', 'EndEnvironment',
+                              'FileInclude']:
+                ## ToDo log properly
+                print('Unknown Event', event, obj, path, lineno,
+                      sep='\t',
+                      file=log)
+    except Exception as e:
+        error_msg = f"Error at line {current_token_lineno} in {path}: {str(e)}"
+        print(error_msg, file=sys.stderr)
+        print(error_msg, file=log)
+        # Optionally, re-raise the exception with the enhanced error message
+        raise ValueError(error_msg) from e
+
     return tdls, types, hierarchy, les
+
 
 def intodb(conn, tdls, types, hierarchy, les):
     c = conn.cursor()
