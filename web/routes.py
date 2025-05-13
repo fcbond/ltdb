@@ -125,51 +125,51 @@ def type(query):
     conn = get_db(current_directory, grm)
 
     typeinfo=get_type(conn, query)
-   
-    desc = rst2html(query, typeinfo['docstring'])
+    lexids = []
+    words = []
+    phenomena = []
+    sents= []
+    gold = []
+    desc = ''
 
+    if typeinfo:
+        desc = rst2html(query, typeinfo['docstring'])
 
-    status = typeinfo['status']
-    
-    if status == 'lex-type':
-        lexids = get_lxids(conn, query)
+        status = typeinfo['status']
 
-        words = get_wrds_by_lexids(conn, list(lexids.keys()))
+        if status == 'lex-type':
+            lexids = get_lxids(conn, query)
 
-        phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
+            words = get_wrds_by_lexids(conn, list(lexids.keys()))
 
-        sents = get_sents(conn, list(phenomena.keys()))
+            phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
 
-        gold = get_gold(conn, list(phenomena.keys()))
-    elif  status == 'lex-entry':
-        lexids = get_lxid(conn, query)
+            sents = get_sents(conn, list(phenomena.keys()))
 
-        words = get_wrds_by_lexids(conn, list(lexids.keys()))
+            gold = get_gold(conn, list(phenomena.keys()))
+        elif  status == 'lex-entry':
+            lexids = get_lxid(conn, query)
 
-        phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
+            words = get_wrds_by_lexids(conn, list(lexids.keys()))
 
-        sents = get_sents(conn, list(phenomena.keys()))
+            phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
 
-        gold = get_gold(conn, list(phenomena.keys()))
+            sents = get_sents(conn, list(phenomena.keys()))
 
-        lexids = []
-        words = []
+            gold = get_gold(conn, list(phenomena.keys()))
 
-    elif  status in ('root', 'rule', 'lex-rule'):
-        phenomena = get_phenomena_by_cx(conn, query)
+            lexids = []
+            words = []
 
-        sents = get_sents(conn, list(phenomena.keys()))
+        elif  status in ('root', 'rule', 'lex-rule'):
+            phenomena = get_phenomena_by_cx(conn, query)
 
-        gold = get_gold(conn, list(phenomena.keys()))
+            sents = get_sents(conn, list(phenomena.keys()))
 
-        lexids = []
-        words = []
-    else:
-        lexids = []
-        words = []
-        phenomena = []
-        sents= []
-        gold = []
+            gold = get_gold(conn, list(phenomena.keys()))
+
+            lexids = []
+            words = []
 
     results = {'derivj':'Tree', 
                'mrs':'MRS',

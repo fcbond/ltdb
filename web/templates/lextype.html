@@ -23,15 +23,13 @@
 <!-- Color and sort according to type   -->
 
 <div class="container">
-  <h1>{{query}} ({{info['status']}})</h1>
 
- <!--  {{ info }} -->
-
-
+  {% if not info %}
+  <h1>"{{query}}" not found in this grammar</h1>
+  {% else %}
  <!--  <h2>Description</h2> -->
 
- <!-- <p>{{ info['docstring']}} -->
-  
+  <h1>{{query}} ({{info['status']}})</h1>  
     <p>{{desc|safe}}</p>
     
     <ul>
@@ -123,7 +121,7 @@
 <h3>TDL</h3> 
   <pre class='code'>{{info['tdl']}}</pre> 
   <p>{{ info['src'] }}, {{ info['line'] }}
-
+{% endif %}
     
 </div>
 {% endblock %}
