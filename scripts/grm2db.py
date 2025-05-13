@@ -101,7 +101,6 @@ if __name__ == '__main__':
     ###
     ### Read Metadata
     ###
-    print('hi')
     md = read_metadata(args.metadata)
     print(md)
     if not md:
