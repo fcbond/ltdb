@@ -29,7 +29,10 @@ def close_db(e=None):
 ############################################################
 
 
-def params(lst):
+def holders(lst):
+    """
+    return the parameter placeholders for a query 
+    """
     return ','.join(['?']*len(lst))
 
 def get_md(conn):
@@ -42,40 +45,57 @@ def get_md(conn):
     return md
 
 
-def get_rules(conn, query=''):
+def get_rules(conn):
     c = conn.cursor()
-    if query:
-        constraint = 'AND  types.typ glob ?' 
-        params = [query]
-    else:
-        constraint = ''
-        params = []
         
     c.execute(f"""SELECT types.typ, parents, lname, status, COALESCE(freq,0), arity, head 
     FROM types left join typfreq on types.typ=typfreq.typ
     WHERE status in ('rule', 'lex-rule', 'inf-rule', 'root') 
-    {constraint}
-    ORDER BY status, types.typ""", params)
+    ORDER BY status, types.typ""")
         
     results = c.fetchall()
     return results
 
-def get_ltypes(conn, query=''):
+def get_ltypes(conn):
     c = conn.cursor()
-    if query:
-        constraint = 'AND lex.typ glob ?' 
-        params = [query]
-    else:
-        constraint = ''
-        params = []
+
     c.execute(f"""SELECT lex.typ, lname, count(lex.typ), COALESCE(freq,0), '' 
     FROM types LEFT JOIN lex ON types.typ = lex.typ
     LEFT JOIN typfreq ON lex.typ = typfreq.typ
     WHERE status ='lex-type' 
-    {constraint}
-    GROUP BY lex.typ ORDER BY lex.typ""", params )
+    GROUP BY lex.typ ORDER BY lex.typ""")
     results = c.fetchall()
     
+    return results
+
+
+def search_for(conn, query):
+    """
+    Look up the query with glb in a variety of tables
+
+
+    return a dictionary of lists of results
+    """
+    c = conn.cursor()
+    results = dd(list)
+    
+    ## lemmas
+    c.execute(f"""SELECT orth, typ, 'freq', 'words' 
+    FROM lex
+    WHERE orth glob ?""", [query])
+    if (returned := c.fetchall()):
+        results['lemmas'] =  returned
+
+    ## types
+    c.execute(f"""SELECT types.typ, parents, status, freq,
+    lname 
+    FROM types left join typfreq on types.typ=typfreq.typ
+    WHERE types.typ glob  ?
+    ORDER BY status, types.typ""", [query])
+    
+    for (typ, parents, status, freq, lname) in c:
+        results[status].append((typ, parents, freq, lname))
+
     return results
 
 
@@ -140,32 +160,75 @@ def get_wrds_by_lexids(conn, lexids):
     words=dd(lambda: dd(int))
     c.execute(f"""
     SELECT lexid, word, count(word) FROM sent
-    WHERE (lexid IN ({params(lexids)}))
+    WHERE (lexid IN ({holders(lexids)}))
     GROUP BY lexid, word 
     ORDER BY lexid
     LIMIT {lim}""", lexids)
     for (lexid, word, freq) in c:
         words[lexid][word] = freq
     return words
+
+def calculate_offset_limit(N, L):
+    """
+    Calculate appropriate OFFSET and LIMIT values for SQL query.
     
+    Args:
+        N (int): Total number of available examples
+        L (int): Desired number of examples
+        
+    Returns:
+        tuple: (offset, limit) values to use in SQL query
+    """
+    if L >= N:
+        # If we want more examples than exist, return all 
+        offset, limit  = 0, N
+    else:
+        # Skip first 20% of examples
+        offset = round(N * 0.2)
+        
+        # Make sure we still have at least L examples 
+        remaining = N - offset
+        if remaining < L:
+            # Adjust offset down so we get at least L examples
+            offset = N - L
+        limit = L
+    return offset, limit
+   
 def get_phenomena_by_lexids(conn, lexids):
     """ 
     return a dict of profile, sid, with the lexid in question marked
     phenom[profile, sid = [(from, to), ....]
-    ToDo try to pick short sentences
+
+    Pick short sentences, starting 20% in
     """
+    ### get the total number
     c = conn.cursor()
+    c.execute(f"""SELECT COUNT(*) 
+    FROM (
+    SELECT DISTINCT profile, sid 
+    FROM sent 
+    WHERE lexid IN ({holders(lexids)})
+    )""", (lexids))
+    result = c.fetchone()
+    if result:
+        maxp = result[0]
+    else:
+        maxp = 0
+
+    offset, limit = calculate_offset_limit(maxp, sentlim)
+
+    ### get a sample
     phenomena=dd(list)
     c.execute(f"""SELECT a.profile, a.sid, a.wid , max(b.wid)
     FROM sent as a LEFT JOIN sent as b
     ON a.profile=b.profile and a.sid=b.sid
-    WHERE a.lexid IN ({params(lexids)})
+    WHERE a.lexid IN ({holders(lexids)})
     GROUP BY b.profile, b.sid
     ORDER BY max(b.wid) 
-    LIMIT ?""", (lexids + [sentlim]))
+    LIMIT ? OFFSET ?""", (lexids + [limit, offset]))
     for (profile, sid, wid, max) in c:
         phenomena[profile, sid].append((wid, wid+1))
-    return phenomena
+    return maxp, phenomena
 
 def get_phenomena_by_cx(conn, cx):
     """ 
@@ -176,6 +239,23 @@ def get_phenomena_by_cx(conn, cx):
     try to pick short sentences
     """
     c = conn.cursor()
+        ### get the total number
+    c = conn.cursor()
+    c.execute(f"""SELECT COUNT(*) 
+    FROM (
+    SELECT DISTINCT profile, sid 
+    FROM typind 
+    WHERE typ = ?
+    )""", (cx,))
+    result = c.fetchone()
+    if result:
+        maxp = result[0]
+    else:
+        maxp = 0
+
+    offset, limit = calculate_offset_limit(maxp, sentlim)
+
+    ### get a sample
     phenomena=dd(list)
     c.execute(f"""SELECT a.profile, a.sid, COALESCE(a.kara, -1),
     COALESCE(a.made, -1), max(b.wid)
@@ -190,7 +270,7 @@ def get_phenomena_by_cx(conn, cx):
     for (profile, sid, kara, made, max) in c:
         phenomena[profile, sid].append((kara, made))
         
-    return phenomena
+    return maxp, phenomena
 
 
 

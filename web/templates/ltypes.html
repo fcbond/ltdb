@@ -25,7 +25,7 @@
     <tbody>
       {%- for (query, lname,  lfreq, cfreq, words) in data %}
       <tr>
-	<td><a href="{{url_for('ltype', query=query)}}">{{query}}</a></td>
+	<td><a href="{{url_for('type', query=query)}}">{{query}}</a></td>
 	<td>{{lname}}</td>
 	<td>{{lfreq}}</td>
 	<td>{{cfreq}}</td>

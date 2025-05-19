@@ -9,7 +9,7 @@ import sqlite3, os
 
 from .db import get_db, get_md, \
     get_summary, get_tb_summary, \
-    get_rules, get_ltypes, \
+    get_rules, get_ltypes,  search_for, \
     get_type, get_lxids, get_wrds_by_lexids, \
     get_phenomena_by_lexids, get_sents, get_gold, \
     get_phenomena_by_cx, get_lxid
@@ -88,7 +88,7 @@ def rules():
 
 @app.route("/ltypes.html")
 def ltypes():
-    """show the rules"""
+    """show the lexical types"""
     grm = session['grm']
     conn = get_db(current_directory, grm)
 
@@ -101,6 +101,7 @@ def ltypes():
         data=data,
         grm=grm,
     )
+
 
 
 
@@ -127,7 +128,7 @@ def type(query):
     typeinfo=get_type(conn, query)
     lexids = []
     words = []
-    phenomena = []
+    maxp, phenomena = 0, []
     sents= []
     gold = []
     desc = ''
@@ -142,7 +143,7 @@ def type(query):
 
             words = get_wrds_by_lexids(conn, list(lexids.keys()))
 
-            phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
+            maxp, phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
 
             sents = get_sents(conn, list(phenomena.keys()))
 
@@ -152,7 +153,7 @@ def type(query):
 
             words = get_wrds_by_lexids(conn, list(lexids.keys()))
 
-            phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
+            maxp, phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
 
             sents = get_sents(conn, list(phenomena.keys()))
 
@@ -162,7 +163,7 @@ def type(query):
             words = []
 
         elif  status in ('root', 'rule', 'lex-rule'):
-            phenomena = get_phenomena_by_cx(conn, query)
+            maxp, phenomena = get_phenomena_by_cx(conn, query)
 
             sents = get_sents(conn, list(phenomena.keys()))
 
@@ -178,57 +179,18 @@ def type(query):
                }
     
     return render_template(
-        f"lextype.html",
+        f"type.html",
         query=query,
         info=typeinfo,
         grm=grm,
         desc=desc,
         lexids=lexids,
         words=words,
+        maxp=maxp,
         phenomena=phenomena,
         sents=sents,
         gold=gold,
         results=results
-    )
-
-@app.route("/lextype/<query>")
-def ltype(query):
-    """show the lexical type"""
-    grm = session['grm']
-    conn = get_db(current_directory, grm)
-
-    typeinfo=get_type(conn, query)
-
-    desc = rst2html(query, typeinfo['docstring'])
-
-    lexids = get_lxids(conn, query)
-
-    words = get_wrds_by_lexids(conn, list(lexids.keys()))
-
-    phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
-
-    sents = get_sents(conn, list(phenomena.keys()))
-
-    gold = get_gold(conn, list(phenomena.keys()))
-
-    results = {'derivj':'Tree', 
-               'mrs':'MRS',
-               'dmrsj':'DMRS',
-               'mrsj':'[MRS]',
-    }
-
-    
-    return render_template("lextype.html",
-               query=query,
-               info=typeinfo,
-               grm=grm,
-               desc=desc,
-               lexids=lexids,
-               words=words,
-               phenomena=phenomena,
-               sents=sents,
-               gold=gold,
-               results=results
     )
 
 
@@ -237,24 +199,12 @@ def ltype(query):
 def submit_fsearch():
     grm = session['grm']
     conn = get_db(current_directory, grm)
-
     
     searched = request.form['search']
 
-    results= dict()
-    
-    results['rules']  = get_rules(conn, query=searched)
-    results['ltypes'] = get_ltypes(conn, query=searched)
-
-    path = dict()
-    
-    path['rules'] = 'type'
-    path['ltypes'] = 'ltype'
-    path['lemmas'] = 'lemma'
-    path['predicates'] = 'pred'
+    results = search_for(conn, query=searched)
     
     return render_template('searched.html',
                            grm=grm,
                            searched=searched,
-                           results=results,
-                           path=path)
+                           results=results)

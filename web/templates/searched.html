@@ -9,18 +9,25 @@
 <!-- Color and sort according to type   -->
 
 <div class="container">
-  <h1>Query {{searched}}</h1>
+  {%- if results %}
+  <h1>Results for: <code>{{searched}}</code></h1>
 
   {%- for t in results %}
-  <h2>{{t}}</h2>
+  <h2>{{t|title}}</h2>
     <ul>
   {%- for r in results[t] %}
-
-  <li><a href="{{url_for(path[t], query=r[0])}}">{{r[0]}}</a> <!-- {{r[1:]}} -->
+  {%- if t == 'lemmas' %}
+  <li><a href="{{url_for('type', query=r[1])}}"><i>{{r[0]}}</i> ({{r[1]}})</a>
+  {%- else %} 
+  <li><a href="{{url_for('type', query=r[0])}}">{{r[0]}}</a> ({{r[1]}})
+     {%- endif %}
+    <!-- {{r[1:]}} -->
     {% endfor %}
     </ul>
   {% endfor %}  
-
+    {%- else %}
+ <h1>No result for:  <code>{{searched}}</code></h1>
+ {%- endif %}
   {% endblock %}
 
 {% block scripts %}
