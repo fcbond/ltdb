@@ -151,9 +151,73 @@ def get_lxid(conn, typ):
     return lem
 
 
+def get_wrds_by_ltypes(conn, wlimit=5):
+    """
+    return a dictionary with words and frequencies 
+    for all the lexical types
+    """
+    words=dd(lambda: dd(int))
+    c = conn.cursor()
+
+    c.execute(f""" 
+    WITH types_with_words AS (
+        SELECT DISTINCT lex.typ
+        FROM lex
+        JOIN lexfreq ON lex.lexid = lexfreq.lexid
+    ),
+    
+    top_words AS (
+        SELECT typ, word, freq AS word_count
+        FROM (
+            SELECT 
+                lex.typ, 
+                lexfreq.word, 
+                lexfreq.freq,
+                ROW_NUMBER() OVER (PARTITION BY lex.typ ORDER BY lexfreq.freq DESC) AS rank
+            FROM lex
+            JOIN lexfreq ON lex.lexid = lexfreq.lexid
+            GROUP BY lex.typ, lexfreq.word, lexfreq.freq
+        ) 
+        WHERE rank <= ?
+    ),
+    
+    -- Second part: Types without words
+    types_without_words AS (
+        SELECT l.typ, l.orth AS word
+        FROM lex l
+        WHERE NOT EXISTS (SELECT 1 FROM types_with_words t WHERE t.typ = l.typ)
+        GROUP BY l.typ, l.orth
+    ),
+    
+    top_orths AS (
+        SELECT typ, word
+        FROM (
+            SELECT 
+                typ, 
+                word,
+                ROW_NUMBER() OVER (PARTITION BY typ ORDER BY word) AS rank
+            FROM types_without_words
+        )
+        WHERE rank <= ?
+    )
+    
+    -- Combine and return results
+    SELECT typ, word, word_count FROM top_words
+    
+    UNION ALL
+    
+    SELECT typ, word, 0 AS word_count FROM top_orths
+    
+    ORDER BY typ, word_count DESC, word
+    """, (wlimit, wlimit))
+    for (ltype, word, freq) in c:
+        words[ltype][word] = freq
+    return words
+    
+    
 def get_wrds_by_lexids(conn, lexids):
     """
-    return a dictionary with words frequencies for each lexid
+    return a dictionary with words and frequencies for each lexid
     words[lexid][word] = freq
     """
     c = conn.cursor()

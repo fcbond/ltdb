@@ -10,7 +10,8 @@ import sqlite3, os
 from .db import get_db, get_md, \
     get_summary, get_tb_summary, \
     get_rules, get_ltypes,  search_for, \
-    get_type, get_lxids, get_wrds_by_lexids, \
+    get_type, get_lxids,  \
+    get_wrds_by_lexids, get_wrds_by_ltypes, \
     get_phenomena_by_lexids, get_sents, get_gold, \
     get_phenomena_by_cx, get_lxid
 
@@ -91,14 +92,15 @@ def ltypes():
     """show the lexical types"""
     grm = session['grm']
     conn = get_db(current_directory, grm)
-
+    
     md   = get_md(conn)
     data = get_ltypes(conn)
-
+    words = get_wrds_by_ltypes(conn)
     return render_template(
         f"ltypes.html",
         meta=md,
         data=data,
+        words=words,
         grm=grm,
     )
 

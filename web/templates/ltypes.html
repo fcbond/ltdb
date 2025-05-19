@@ -23,13 +23,15 @@
     </tr>
     </thead>
     <tbody>
-      {%- for (query, lname,  lfreq, cfreq, words) in data %}
+      {%- for (ltype, lname, lfreq, cfreq, _) in data %}
       <tr>
-	<td><a href="{{url_for('type', query=query)}}">{{query}}</a></td>
+	<td><a href="{{url_for('type', query=ltype)}}">{{ltype}}</a></td>
 	<td>{{lname}}</td>
 	<td>{{lfreq}}</td>
 	<td>{{cfreq}}</td>
-	<td>{{words}}</td>
+	<td> {%- for word, wfreq in words[ltype].items()  %}
+	  <small><i>{{word}}<i> ({{wfreq}}){{ ", " if not loop.last else "" }}</small>
+	  {%- endfor %}</td>
       </tr>
       {% endfor %}
         </tbody>
