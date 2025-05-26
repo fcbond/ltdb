@@ -81,7 +81,18 @@ INSERT INTO typfreq (typ, freq)
 
 
 
+def make_ex_profile(exdir, examples):
+    """
+    Make a profile with the examples
+    """
+    exdir.mkdir(parents=True, exist_ok=True)
+    with open(exdir / "item", 'w') as out:
+        for ex in examples:
+            print('@'.join(str(x) for x in ex), file=out)
 
+
+
+            
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
@@ -122,7 +133,7 @@ if __name__ == '__main__':
     ###
     ### read the info from the tdl
     ###
-    tdls, types, hierarchy, les = read_grm(cfg, log)
+    tdls, types, hierarchy, les, examples = read_grm(cfg, log)
 
     #print(tdls, types, hierarchy, les)
     ###
@@ -135,7 +146,7 @@ if __name__ == '__main__':
     
     meta_to_db(conn, md)
    
-    intodb(conn, tdls, types, hierarchy, les)
+    intodb(conn, tdls, types, hierarchy, les, examples)
 
     ###
     ### add the info from gold
@@ -154,6 +165,9 @@ if __name__ == '__main__':
             process_tsdb(conn, cfg['ver'], args.checkgrm,
                          golddir, log, profiles)
 
+    exdir = Path(golddir).parent  / "ltdb/examples/"
+
+    make_ex_profile(exdir, examples)
 
     post_process_corpus(conn)
 

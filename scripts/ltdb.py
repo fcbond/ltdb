@@ -58,10 +58,10 @@ def munge_desc(typ,description):
 
 
 def rst2html(typ, docstring):
-    """Convert the print out the linguistic description in the doscstring
-       use the value from the LKB if possible, if not then from pydelphin"""
-    
-
+    """
+    Convert the linguistic description in the doscstring
+    Add the examples to the database
+    """
     if docstring:
         description, examples, names=  munge_desc(typ,docstring)
         return docutils.core.publish_parts("\n"+ description +"\n",

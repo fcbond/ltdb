@@ -5,6 +5,7 @@ from collections import defaultdict as dd
 from pathlib import Path
 
 from delphin import tdl
+from ltdb import munge_desc
 
 import sqlite3, sys, os
 import re
@@ -46,6 +47,7 @@ def read_cfg (ace_config):
 
 def read_grm (cfg, log):
     tdls = []
+    examples = []
     types = dd(list)
     les = {}
     hierarchy = []
@@ -68,19 +70,20 @@ def read_grm (cfg, log):
                     path = entry.path.with_suffix('.tdl')
                     if path.is_file():
                         tdls, types, \
-                        hierarchy, les = process_type(cfg, str(base), str(path),
-                                                      status,
-                                                      tdls, types,
-                                                      hierarchy, les,
-                                                      log)
+                        hierarchy, les, \
+                        examples = process_type(cfg, str(base), str(path),
+                                                status,
+                                                tdls, types,
+                                                hierarchy, les, examples,
+                                                log)
                     else:
                         print('INCLUDED FILE NOT FOUND: {!s}'.format(path))
                 else:
                     print('WARNING unknown type:', entry.status, file=log)
-    return tdls, types, hierarchy, les
+    return tdls, types, hierarchy, les, examples
 
 
-def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
+def process_type(cfg, base, path, status, tdls, types, hierarchy, les, examples, log):
     if 'root' in path:
         status = 'root'
     elif 'parse-nodes' in path:
@@ -92,9 +95,12 @@ def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
         for event, obj, lineno in tdl.iterparse(path):  # assume utf-8
             current_token_lineno = lineno  # Store the current line number
             if event in ['TypeDefinition', 'TypeAddendum', 'LexicalRuleDefinition']:
-                # if obj.documentation(): ### The tdl has a docstring
-                #     descript,exes,nams= ltdb.munge_desc(obj.identifier,obj.documentation())
-                #     obj.docstring=None
+                if obj.documentation(): ### The tdl has a docstring
+                    description, exes, nams = munge_desc(obj.identifier,obj.documentation())
+                    examples += exes
+                else:
+                    description = ''
+                        #     obj.docstring=None
                 # else:
                 # get the parents
                 parents = [c for c in obj.conjunction.types()]
@@ -116,13 +122,13 @@ def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
                         altpred = obj.conjunction.get('SYNSEM.LKEYS.ALTKEYREL.PRED', default=None)
                         carg = obj.conjunction.get('SYNSEM.LKEYS.KEYREL.CARG', default=None)
                         altcarg = obj.conjunction.get('SYNSEM.LKEYS.ALTKEYREL.CARG', default=None)
-                        les[obj.identifier] = (str(parents[0]), orth, pred, altpred, carg, altcarg, obj.documentation())
+                        les[obj.identifier] = (str(parents[0]), orth, pred, altpred, carg, altcarg, description)
                 else:  # not a lexical entry
                     tdls.append((obj.identifier,
                                 path[len(base):], lineno,
                                 event,
                                 tdl.format(obj),
-                                obj.documentation()))
+                                description))
                 for c in parents:
                     hierarchy.append((obj.identifier, str(c)))
                 if event != 'TypeAddendum':
@@ -141,11 +147,12 @@ def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
         # Optionally, re-raise the exception with the enhanced error message
         raise ValueError(error_msg) from e
 
-    return tdls, types, hierarchy, les
+    return tdls, types, hierarchy, les, examples
 
 
-def intodb(conn, tdls, types, hierarchy, les):
+def intodb(conn, tdls, types, hierarchy, les, examples):
     c = conn.cursor()
+
     c.executemany("""INSERT INTO tdl (typ, src, line, kind, tdl, docstring)
     VALUES (?, ?, ?, ?, ?, ?)""", tdls)
 
@@ -193,6 +200,10 @@ def intodb(conn, tdls, types, hierarchy, les):
     ### make immediate hypernyms of lexical entries 'lex-type'
     c.execute("""UPDATE types SET status='lex-type' 
     WHERE typ IN (SELECT typ FROM lex)""")
+
+    ### add examples
+    #print('EXAMPLES')
+    #print(examples)
     
     conn.commit()
     print(f"Added types to database")
