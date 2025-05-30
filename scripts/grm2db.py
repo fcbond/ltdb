@@ -7,10 +7,15 @@ import tempfile
 import sqlite3
 import toml
 import json
+import shutil
+
 from pathlib import Path
 
 from tdl2db import read_cfg, read_grm, intodb
 from gold2db import process_tsdb
+
+from delphin import itsdb
+from delphin import ace
 
 ### check we have a new enough version
 if not sys.version_info > (3, 8):
@@ -81,17 +86,48 @@ INSERT INTO typfreq (typ, freq)
 
 
 
-def make_ex_profile(exdir, examples):
+def make_ex_profile(exdir, examples, md):
     """
     Make a profile with the examples
+    FIXME add Date, File it was in, ex/nex/mex
     """
     exdir.mkdir(parents=True, exist_ok=True)
+    script_dir = Path(__file__).parent.absolute()
+    shutil.copyfile(script_dir / "../etc/Relations", exdir / "relations")
+    
     with open(exdir / "item", 'w') as out:
-        for ex in examples:
-            print('@'.join(str(x) for x in ex), file=out)
+        iid = 10
+        for (text, typ, wf) in examples:
+            row = [ iid,  #i-id
+                    'ltdb', 
+                    '', 
+                    '', 
+                    '', 
+                    typ, # i-category 
+                    text, # i-input
+                    '', 
+                    '', 
+                    '', 
+                    wf, 
+                    len(text.split()), 
+                    '', 
+                    md['Version'], # author
+                    'today', #today
+            ]
+            print('@'.join(str(x) for x in row), file=out)
+            iid += 10
 
-
-
+def parse_profile(exdir, md):
+    """
+    parse the profile and return a report
+    FIXME specify the ace version
+    FIXME specify the ace version
+    """
+    ts = itsdb.TestSuite(exdir)
+    grammar =  f"~/git/codex-test/build/GRAMMARS/{md['SHORT_GRAMMAR_NAME']}.dat"               
+    cmdargs = ["--udx=all", "--rooted-derivations"]
+    with ace.ACEParser(grammar, cmdargs=cmdargs) as cpu:
+        ts.process(cpu)               
             
 if __name__ == '__main__':
 
@@ -167,8 +203,10 @@ if __name__ == '__main__':
 
     exdir = Path(golddir).parent  / "ltdb/examples/"
 
-    make_ex_profile(exdir, examples)
+    make_ex_profile(exdir, examples, md)
 
+    parse_profile(exdir, md)
+    
     post_process_corpus(conn)
 
     log.close()
