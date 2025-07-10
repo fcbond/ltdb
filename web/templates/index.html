@@ -2,73 +2,282 @@
 
 {% block css %}
 <link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
+<style>
+  .grammar-card {
+    transition: all 0.15s ease;
+    cursor: pointer;
+  }
+  
+  .grammar-card:hover {
+    border-color: var(--bs-primary) !important;
+    box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+  }
+  
+  .grammar-card.selected {
+    border-color: var(--bs-primary) !important;
+    background-color: rgba(var(--bs-primary-rgb), 0.03);
+    box-shadow: 0 0.125rem 0.25rem rgba(var(--bs-primary-rgb), 0.15);
+  }
+  
+  .grammar-radio {
+    display: none;
+  }
+  
+  .stat-number {
+    font-weight: 600;
+    color: var(--bs-primary);
+    font-size: 0.95rem;
+  }
+  
+  .grammar-meta {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+</style>
 {% endblock %}
 
 {% block content %}
 <div class="container">
   <h1>Overview</h1>
-
-
-
+  <p>Welcome to the Linguistic Type Database.</p>
   
-  <p>Welcome to the Linguistic Type Database.
-    
-    {%if grm == None %}
-    <p class="text-danger font-weight-bold">Please Select a Grammar</p>
-    {% else %}
-    <p>You can select your grammar here:
-    {% endif %}
-    
+  {% if grm == None %}
+    <div class="alert alert-danger" role="alert">
+      <strong>Please Select a Grammar</strong> - Choose from the available grammars below to get started.
+    </div>
+  {% endif %}
+  
+  <div class="row mb-3">
+    <div class="col-md-8">
+      <input type="text" id="grammarSearch" class="form-control" placeholder="Search grammars by name, language, or features...">
+    </div>
+    <div class="col-md-4">
+      <select id="sortSelect" class="form-select">
+        <option value="name">Sort by Name</option>
+        <option value="filename">Sort by Filename</option>
+        <option value="lexicon">Sort by Lexicon Size</option>
+        <option value="rules">Sort by Rules Count</option>
+        <option value="trees">Sort by Trees Count</option>
+        <option value="license">Sort by License</option>
+        <option value="lexicon-desc">Sort by Lexicon Size (Desc)</option>
+        <option value="rules-desc">Sort by Rules Count (Desc)</option>
+        <option value="trees-desc">Sort by Trees Count (Desc)</option>
+      </select>
+    </div>
+  </div>
+  
+  <div class="text-muted small mb-3">
+    <span id="grammarCount">{{ grammars|length }}</span> grammar(s) available
+  </div>
+  
   <form id="grammarForm" action="/" method="POST">
-      <div class="form-check">
-        {% for grammar in grammars %} 
-        <input class="form-check-input" type="radio" id="{{grammar}}" name="grm" value="{{grammar}}"
-	       {%if grammar == grm %}checked='checked'{% endif %}>
-        <label class="form-check-label" for="{{grammar}}">{{grammar}}</label><br>
-        {% endfor %}
-      </div>
-    </form>
+    <div class="row g-2" id="grammarGrid">
+      {% for grammar in grammars %}
+        {% set summary = summ[grammar] %}
+        <div class="col-md-6 col-xl-4">
+          <div class="card grammar-card border" 
+               data-grammar="{{ grammar }}" 
+               data-searchable="{{ grammar|lower }} {{ summary.get('GRAMMAR_NAME', '')|lower }}"
+               data-name="{{ summary.get('GRAMMAR_NAME', grammar.split('_')[0]) }}"
+               data-filename="{{ grammar }}"
+               data-lexicon="{{ summary.get('LEXICON', 0) }}"
+               data-rules="{{ summary.get('RULES', 0) }}"
+               data-trees="{{ summary.get('TREES', 0) }}"
+               data-license="{{ summary.get('LICENSE', 'No License') }}">
+            <input class="grammar-radio" type="radio" id="{{ grammar }}" name="grm" value="{{ grammar }}"
+                   {% if grammar == grm %}checked="checked"{% endif %}>
+            
+            <div class="card-body p-3">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <h6 class="card-title fw-bold text-dark mb-0 me-2">
+                  {{ summary.get('GRAMMAR_NAME', grammar.split('_')[0]) }}
+                </h6>
+                <div class="grammar-meta">
+                  {% if summary.get('LICENSE') %}
+                    <span class="badge bg-secondary" style="font-size: 0.7rem;">{{ summary.get('LICENSE') }}</span>
+                  {% endif %}
+                  {% if summary.get('WEBSITE') %}
+                    <a href="{{ summary.get('WEBSITE') }}" target="_blank" class="text-primary" onclick="event.stopPropagation()" title="Project Website">
+                      🔗
+                    </a>
+                  {% endif %}
+                </div>
+              </div>
+              
+              <p class="card-text small text-muted font-monospace mb-2">
+                {{ grammar }}
+              </p>
+              
+              <div class="d-flex justify-content-around">
+                <div class="text-center">
+                  <div class="stat-number">{{ "{:,}".format(summary.get('LEXICON', 0)) }}</div>
+                  <div class="small text-muted">Lexicon</div>
+                </div>
+                <div class="text-center">
+                  <div class="stat-number">{{ "{:,}".format(summary.get('RULES', 0)) }}</div>
+                  <div class="small text-muted">Rules</div>
+                </div>
+                {% if summary.get('TREES', 0) > 0 %}
+                <div class="text-center">
+                  <div class="stat-number">{{ "{:,}".format(summary.get('TREES', 0)) }}</div>
+                  <div class="small text-muted">Trees</div>
+                </div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </form>
 
-    <p>There is <a href='https://delph-in.github.io/docs/garage/LkbLtdb/'>more documentation</a> on the DELPH-IN wiki (somewhat out of date) 
+  <p>There is <a href='https://delph-in.github.io/docs/garage/LkbLtdb/'>more documentation</a> on the DELPH-IN wiki (somewhat out of date).</p>
+  
+  <h3>References</h3>
+  <dl>
+    <dt>Francis Bond (2022)</dt>
+    <dd><a href='https://hpsg2022.github.io/abstracts/Bond.pdf'>Documenting computational grammars with the Linguistic Type Database</a>. Invited Talk at HPSG 2022 (online)</dd>
     
-      <h3>References</h3>
-      <dl>Francis Bond (2022)
-	<dt><a href='https://hpsg2022.github.io/abstracts/Bond.pdf'>Documenting
-	computational grammars with the Linguistic Type Database”</a>.
-	Invited Talk at HPSG 2022 (online)
-      
-      <dl>
-	<dt><a name="Hashimoto:Bond:Flickinger:2007"> Chikara Hashimoto, Francis Bond, and Dan Flickinger (2007)</a></dt>
-	<dd><a href="https://dl.acm.org/doi/10.5555/1769901.1769909">The lextype DB: A web-based framework for collaborative multilingual grammar and treebank development</a>. 
- In <i>The First International Workshop on Intercultural Collaboration (IWIC-2007)</i>, pages 44&ndash;58, Kyoto. 
-</dd>
+    <dt><a name="Hashimoto:Bond:Flickinger:2007">Chikara Hashimoto, Francis Bond, and Dan Flickinger (2007)</a></dt>
+    <dd><a href="https://dl.acm.org/doi/10.5555/1769901.1769909">The lextype DB: A web-based framework for collaborative multilingual grammar and treebank development</a>. In <i>The First International Workshop on Intercultural Collaboration (IWIC-2007)</i>, pages 44–58, Kyoto.</dd>
 
-	<dt><a name="Hashimoto:Bond:Tanaka:Siegel:2007">Chikara Hashimoto, Francis Bond, Takaaki Tanaka and Melanie Siegel (2007)</a></dt>
-	<dd><a href='https://doi.org/10.1007/s10579-008-9065-9'>Semi-automatic documentation of an implemented linguistic grammar
-augmented with a treebank.</a>
-     <i>Language Resources and Evaluation.</i> (Special issue on Asian language technology) <b>42</b>(2):117&ndash;126.  DOI: <a href='https://doi.org/10.1007/s10579-008-9065-9'>10.1007/s10579-008-9065-9</a>
-	</dd>
-	<dt><a name="Hashimoto:Bond:Tanaka:Siegel:2005">Chikara Hashimoto, Francis Bond, Takaaki Tanaka, and Melanie Siegel (2005)</a></dt>
-	<dd><a href="https://aclanthology.org/I05-6004/">Integration of a Lexical Type Database with a Linguistically Interpreted Corpus</a>. 
-In <i><a href="https://aclanthology.org/volumes/I05-6/">Proceedings of the Sixth International Workshop on Linguistically Interpreted Corpora (LINK-2005)</a></i>, 31&ndash;40, Cheju, Korea.
-	</dd>
-	
-      </dl>
+    <dt><a name="Hashimoto:Bond:Tanaka:Siegel:2007">Chikara Hashimoto, Francis Bond, Takaaki Tanaka and Melanie Siegel (2007)</a></dt>
+    <dd><a href='https://doi.org/10.1007/s10579-008-9065-9'>Semi-automatic documentation of an implemented linguistic grammar augmented with a treebank.</a> <i>Language Resources and Evaluation.</i> (Special issue on Asian language technology) <b>42</b>(2):117–126. DOI: <a href='https://doi.org/10.1007/s10579-008-9065-9'>10.1007/s10579-008-9065-9</a></dd>
+    
+    <dt><a name="Hashimoto:Bond:Tanaka:Siegel:2005">Chikara Hashimoto, Francis Bond, Takaaki Tanaka, and Melanie Siegel (2005)</a></dt>
+    <dd><a href="https://aclanthology.org/I05-6004/">Integration of a Lexical Type Database with a Linguistically Interpreted Corpus</a>. In <i><a href="https://aclanthology.org/volumes/I05-6/">Proceedings of the Sixth International Workshop on Linguistically Interpreted Corpora (LINK-2005)</a></i>, 31–40, Cheju, Korea.</dd>
+  </dl>
 
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const form = document.getElementById('grammarForm');
+      const cards = document.querySelectorAll('.grammar-card');
+      const searchInput = document.getElementById('grammarSearch');
+      const sortSelect = document.getElementById('sortSelect');
+      const grammarCount = document.getElementById('grammarCount');
+      const grammarGrid = document.getElementById('grammarGrid');
       
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        const form = document.getElementById('grammarForm');
-        const radios = form.querySelectorAll('input[name="grm"]');
+      // Store original order for reference
+      const originalCards = Array.from(cards).map(card => ({
+        element: card.closest('.col-md-6'),
+        card: card
+      }));
+      
+      // Handle card selection
+      cards.forEach(card => {
+        const radio = card.querySelector('input[type="radio"]');
         
-        radios.forEach(radio => {
-          radio.addEventListener('change', function() {
-            if (this.checked) {
-              form.submit();
-            }
-          });
+        // Update visual state
+        if (radio.checked) {
+          card.classList.add('selected');
+        }
+        
+        card.addEventListener('click', function() {
+          // Remove selected class from all cards
+          cards.forEach(c => c.classList.remove('selected'));
+          
+          // Add selected class to clicked card
+          this.classList.add('selected');
+          
+          // Check the radio button
+          radio.checked = true;
+          
+          // Submit form
+          form.submit();
         });
       });
-    </script>
+      
+      // Sort function
+      function sortCards() {
+        const sortValue = sortSelect.value;
+        const cardContainers = Array.from(grammarGrid.children);
+        
+        cardContainers.sort((a, b) => {
+          const cardA = a.querySelector('.grammar-card');
+          const cardB = b.querySelector('.grammar-card');
+          
+          let valueA, valueB;
+          
+          switch(sortValue) {
+            case 'name':
+              valueA = cardA.dataset.name.toLowerCase();
+              valueB = cardB.dataset.name.toLowerCase();
+              return valueA.localeCompare(valueB);
+              
+            case 'filename':
+              valueA = cardA.dataset.filename.toLowerCase();
+              valueB = cardB.dataset.filename.toLowerCase();
+              return valueA.localeCompare(valueB);
+              
+            case 'lexicon':
+              valueA = parseInt(cardA.dataset.lexicon);
+              valueB = parseInt(cardB.dataset.lexicon);
+              return valueA - valueB;
+              
+            case 'lexicon-desc':
+              valueA = parseInt(cardA.dataset.lexicon);
+              valueB = parseInt(cardB.dataset.lexicon);
+              return valueB - valueA;
+              
+            case 'rules':
+              valueA = parseInt(cardA.dataset.rules);
+              valueB = parseInt(cardB.dataset.rules);
+              return valueA - valueB;
+              
+            case 'rules-desc':
+              valueA = parseInt(cardA.dataset.rules);
+              valueB = parseInt(cardB.dataset.rules);
+              return valueB - valueA;
+              
+            case 'trees':
+              valueA = parseInt(cardA.dataset.trees);
+              valueB = parseInt(cardB.dataset.trees);
+              return valueA - valueB;
+              
+            case 'trees-desc':
+              valueA = parseInt(cardA.dataset.trees);
+              valueB = parseInt(cardB.dataset.trees);
+              return valueB - valueA;
+              
+            case 'license':
+              valueA = cardA.dataset.license.toLowerCase();
+              valueB = cardB.dataset.license.toLowerCase();
+              return valueA.localeCompare(valueB);
+              
+            default:
+              return 0;
+          }
+        });
+        
+        // Re-append sorted elements
+        cardContainers.forEach(container => {
+          grammarGrid.appendChild(container);
+        });
+      }
+      
+      // Handle sorting
+      sortSelect.addEventListener('change', sortCards);
+      
+      // Handle search with current sort order maintained
+      searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        let visibleCount = 0;
+        
+        cards.forEach(card => {
+          const searchableText = card.dataset.searchable;
+          const isVisible = searchableText.includes(searchTerm);
+          const col = card.closest('.col-md-6');
+          
+          col.style.display = isVisible ? 'block' : 'none';
+          if (isVisible) visibleCount++;
+        });
+        
+        grammarCount.textContent = visibleCount;
+      });
+    });
+  </script>
 </div>
 {% endblock %}
