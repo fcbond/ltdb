@@ -18,7 +18,9 @@
   {%- for r in results[t] %}
   {%- if t == 'lemmas' %}
   <li><a href="{{url_for('type', query=r[1])}}"><i>{{r[0]}}</i> ({{r[1]}})</a>
-  {%- else %} 
+  {%- elif t == 'predicates' %}
+  <li><i>{{r[0]}}</i> &rarr; <a href="{{url_for('type', query=r[1])}}">{{r[1]}}</a> ({{r[2]}})
+  {%- else %}
   <li><a href="{{url_for('type', query=r[0])}}">{{r[0]}}</a> ({{r[1]}})
      {%- endif %}
     <!-- {{r[1:]}} -->

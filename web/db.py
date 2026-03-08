@@ -80,11 +80,18 @@ def search_for(conn, query):
     results = dd(list)
     
     ## lemmas
-    c.execute(f"""SELECT orth, typ, 'freq', 'words' 
+    c.execute(f"""SELECT orth, typ, 'freq', 'words'
     FROM lex
     WHERE orth glob ?""", [query])
     if (returned := c.fetchall()):
         results['lemmas'] =  returned
+
+    ## predicates
+    c.execute(f"""SELECT pred, lexid, typ FROM lex WHERE pred glob ?
+    UNION SELECT altpred, lexid, typ FROM lex WHERE altpred glob ?""",
+              [query, query])
+    if (returned := c.fetchall()):
+        results['predicates'] = returned
 
     ## types
     c.execute(f"""SELECT types.typ, parents, status, freq,
