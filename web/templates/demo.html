@@ -1,0 +1,261 @@
+{% extends 'layout.html' %}
+
+{% block css %}
+<link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/delphin-viz.css') }}" rel="stylesheet">
+<script src="{{ url_for('static', filename='js/tree.js') }}" ></script>
+<script src="{{ url_for('static', filename='js/dmrs.js') }}" ></script>
+<script src="{{ url_for('static', filename='js/mrs.js') }}" ></script>
+<script src="{{ url_for('static', filename='js/svg.js') }}" ></script>
+<script src="https://d3js.org/d3.v3.js"></script>
+<style>
+  .result-card { margin-bottom: 1.5rem; }
+  .result-viz { overflow-x: auto; padding: 0.5rem 0; max-width: 100%; }
+  #spinner { display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1>Parse Demo</h1>
+
+  {% if not grammars %}
+  <div class="alert alert-warning">
+    No compiled grammars (.dat files) found in <code>web/db/</code>.
+    Run <code>python scripts/grm2db.py --ace --outdir web/db path/to/METADATA</code> to build one.
+  </div>
+  {% else %}
+
+  <form id="parseForm" class="mb-4">
+    <div class="row g-2 align-items-end mb-3">
+      <div class="col-md-6">
+        <label for="inputText" class="form-label">Input sentence</label>
+        <input type="text" id="inputText" name="input" class="form-control"
+               placeholder="e.g. The dog chases the cat." required>
+      </div>
+      <div class="col-md-3">
+        <label for="grammarSelect" class="form-label">Grammar</label>
+        <select id="grammarSelect" name="grm" class="form-select">
+          {% for g in grammars %}
+          <option value="{{ g }}" {% if g == grm %}selected{% endif %}>{{ g[:-3] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-1">
+        <label for="numResults" class="form-label">Results</label>
+        <select id="numResults" name="results" class="form-select">
+          {% for n in [1, 2, 5, 10] %}
+          <option value="{{ n }}" {% if n == 5 %}selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-1">
+        <label for="vizZoom" class="form-label">Zoom</label>
+        <select id="vizZoom" class="form-select">
+          <option value="1" selected>100%</option>
+          <option value="0.75">75%</option>
+          <option value="0.5">50%</option>
+        </select>
+      </div>
+      <div class="col-md-1 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary w-100">Parse</button>
+      </div>
+    </div>
+
+    <div class="d-flex gap-3">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="wantTree" checked>
+        <label class="form-check-label" for="wantTree">Tree</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="wantMRS" checked>
+        <label class="form-check-label" for="wantMRS">MRS</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="wantDMRS" checked>
+        <label class="form-check-label" for="wantDMRS">DMRS</label>
+      </div>
+    </div>
+  </form>
+
+  <div id="spinner" class="text-center my-4">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Parsing…</span>
+    </div>
+    <p class="text-muted mt-2">Parsing…</p>
+  </div>
+
+  <div id="results"></div>
+
+  {# tooltip element required by dmrs.js #}
+  <div id="tooltip" class="tooltip" style="opacity:0; position:absolute; background:#fff;
+       border:1px solid #ccc; padding:4px; pointer-events:none;"></div>
+
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  $('#vizZoom').on('change', function () {
+    $('.result-viz').css('zoom', $(this).val());
+  });
+
+  $('#parseForm').submit(function (e) {
+    e.preventDefault();
+
+    const formData = {
+      input:      $('#inputText').val(),
+      grm:        $('#grammarSelect').val(),
+      results:    $('#numResults').val(),
+      derivation: $('#wantTree').is(':checked') ? 'json' : 'null',
+      mrs:        $('#wantMRS').is(':checked')  ? 'json' : 'null',
+      dmrs:       $('#wantDMRS').is(':checked') ? 'json' : 'null',
+    };
+
+    $('#results').empty();
+    $('#spinner').show();
+
+    $.post('{{ url_for("parse_sentence") }}', formData)
+      .done(function (data) {
+        $('#spinner').hide();
+        console.log('parse response:', data);
+        renderResults(data);
+      })
+      .fail(function (xhr) {
+        $('#spinner').hide();
+        const msg = xhr.responseJSON ? xhr.responseJSON.error : xhr.statusText;
+        $('#results').html('<div class="alert alert-danger">' + msg + '</div>');
+      });
+  });
+
+  function renderResults(data) {
+    const container = $('#results');
+
+    if (data.error) {
+      container.html('<div class="alert alert-danger">' + data.error + '</div>');
+      return;
+    }
+    if (data.readings === 0) {
+      container.html('<div class="alert alert-warning">No parses found.</div>');
+      return;
+    }
+
+    container.append(
+      '<p>' + data.readings + ' result(s) for: <em>' +
+      $('<span>').text(data.input).html() + '</em></p>'
+    );
+
+    if (data.errors && data.errors.length > 0) {
+      container.append(
+        '<div class="alert alert-warning"><strong>Serialisation errors:</strong><br>' +
+        data.errors.map(e => $('<span>').text(e).html()).join('<br>') + '</div>'
+      );
+    }
+
+    const currentZoom = () => $('#vizZoom').val();
+
+    data.results.forEach(function (result, i) {
+      const card = $('<div class="card result-card">');
+      const header = $('<div class="card-header d-flex gap-2 align-items-center">');
+      header.append('<strong>Result ' + (i + 1) + '</strong>');
+      const body = $('<div class="card-body">');
+      card.append(header).append(body);
+
+      // Append to DOM first — getBBox() requires elements to be rendered
+      container.append(card);
+
+      if (result.derivation) {
+        const btn = $('<button class="btn btn-primary btn-sm">Tree</button>');
+        const viz = $('<div class="result-viz">').css('zoom', currentZoom());
+        body.append(viz);
+        drawTree(viz[0], result.derivation);
+        btn.on('click', function () {
+          viz.toggle();
+          $(this).toggleClass('btn-primary btn-outline-primary');
+        });
+        header.append(btn);
+      }
+
+      if (result.dmrs) {
+        const dmrsId = 'dmrs-result-' + i;
+        const btn = $('<button class="btn btn-outline-primary btn-sm">DMRS</button>');
+        const viz = $('<div class="result-viz" style="display:none">').attr('id', dmrsId).css('zoom', currentZoom());
+        body.append(viz);
+        let dmrsRendered = false;
+        btn.on('click', function () {
+          viz.toggle();
+          $(this).toggleClass('btn-primary btn-outline-primary');
+          if (!dmrsRendered) {
+            DMRS('#' + dmrsId, result.dmrs);
+            const svgEl = viz.find('svg')[0];
+            if (svgEl) {
+              const gEl = svgEl.querySelector('g');
+              if (gEl) {
+                const bbox = gEl.getBBox();
+                svgEl.setAttribute('width', bbox.x + bbox.width + 20);
+              }
+            }
+            dmrsRendered = true;
+          }
+        });
+        header.append(btn);
+      }
+
+      if (result.mrs) {
+        const btn = $('<button class="btn btn-outline-primary btn-sm">MRS</button>');
+        const viz = $('<div class="result-viz" style="display:none">').css('zoom', currentZoom());
+        body.append(viz);
+        let mrsRendered = false;
+        btn.on('click', function () {
+          viz.toggle();
+          $(this).toggleClass('btn-primary btn-outline-primary');
+          if (!mrsRendered) {
+            MRS(viz[0], result.mrs);
+            mrsRendered = true;
+          }
+        });
+        header.append(btn);
+
+        const genBtn = $('<button class="btn btn-outline-success btn-sm ms-2">Generate</button>');
+        const genOut = $('<div class="mt-2" style="display:none">');
+        body.append(genOut);
+        genBtn.on('click', function () {
+          if (genOut.children().length > 0) {
+            genOut.toggle();
+            return;
+          }
+          genBtn.prop('disabled', true).text('Generating…');
+          $.post('{{ url_for("generate_sentence") }}', {
+            grm: $('#grammarSelect').val(),
+            mrs: JSON.stringify(result.mrs)
+          }).done(function (data) {
+            genBtn.prop('disabled', false).text('Generate');
+            if (data.error) {
+              genOut.html('<div class="alert alert-danger">' + data.error + '</div>');
+            } else if (data.results.length === 0) {
+              genOut.html('<p class="text-muted">No realisations found.</p>');
+            } else {
+              const ul = $('<ul class="mb-0">');
+              data.results.forEach(s => ul.append($('<li>').text(s)));
+              genOut.append('<strong>Realisations:</strong>').append(ul);
+            }
+            genOut.show();
+          }).fail(function (xhr) {
+            genBtn.prop('disabled', false).text('Generate');
+            const msg = xhr.responseJSON ? xhr.responseJSON.error : xhr.statusText;
+            genOut.html('<div class="alert alert-danger">' + msg + '</div>').show();
+          });
+        });
+        header.append(genBtn);
+      }
+    });
+
+    {# Make tree nodes clickable — same as type.html #}
+    $(".ltdb").off('click').on('click', function (event) {
+      const title = event.target.getAttribute("title");
+      window.open("{{ url_for('type', query='') }}" + title);
+    });
+  }
+</script>
+{% endblock %}
