@@ -4,6 +4,7 @@ from flask import render_template, request, session, redirect, url_for, jsonify
 
 import toml
 import pathlib
+import shutil
 import sqlite3, os, json, sys, traceback
 
 
@@ -26,6 +27,24 @@ def get_db_connection(root, db):
 
 current_directory = os.path.abspath(os.path.dirname(__file__))
 
+
+_ace_bin = None
+
+def find_ace():
+    """Locate the ACE binary once and cache it."""
+    global _ace_bin
+    if _ace_bin is not None:
+        return _ace_bin
+    found = shutil.which("ace")
+    if found:
+        _ace_bin = found
+        return _ace_bin
+    etc_dir = os.path.join(current_directory, '..', 'etc')
+    for candidate in sorted(pathlib.Path(etc_dir).glob("ace-*/ace"), reverse=True):
+        if os.access(candidate, os.X_OK):
+            _ace_bin = str(candidate)
+            return _ace_bin
+    raise FileNotFoundError("ACE binary not found. Run scripts/setup_ace.py or install ACE.")
 
 
 #session['grm']=None
@@ -249,7 +268,7 @@ def parse_sentence():
     want_dmrs = request.form.get('dmrs') == 'json'
 
     try:
-        response = ace.parse(dat, input_text, cmdargs=[f'-n{n_results}'])
+        response = ace.parse(dat, input_text, executable=find_ace(), cmdargs=[f'-n{n_results}'])
     except Exception as e:
         return jsonify({'error': f'ACE error: {e}'}), 500
 
@@ -311,7 +330,7 @@ def generate_sentence():
         mrs_obj = mrsjson.decode(mrs_json_str)
         mrs_str = simplemrs.encode(mrs_obj)
         print(f"Generating from MRS:\n{mrs_str}", file=sys.stderr)
-        response = ace.generate(dat, mrs_str)
+        response = ace.generate(dat, mrs_str, executable=find_ace())
         surfaces = [r.get('surface', '') for r in response.results()
                     if r.get('surface')]
         print(f"Generated {len(surfaces)} surface(s): {surfaces}", file=sys.stderr)
