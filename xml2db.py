@@ -33,17 +33,6 @@ else:
 conn = sqlite3.connect(dbfile)    # loads dbfile as con
 c = conn.cursor()    # creates a cursor object that can perform SQL commands with c.execute("...")
 
-f=open('tables.sql')
-
-###
-### Make tables
-### 
-try:
-    c.executescript(f.read())
-    sys.stderr.write('Creating tables for ltdb\n')
-except:
-    pass # handle the error
-conn.commit()
 
 ###
 ### Remember the examples
@@ -163,7 +152,7 @@ for typ in t.getroot():
     else:
         children=None
     if typ.get("name") in ltypes:
-        status = 'ltype'
+        status = 'lex-type'
     else:
         status = 'type'
 

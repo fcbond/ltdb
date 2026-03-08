@@ -1,15 +1,14 @@
 ### --*-- coding: utf-8 --*--
 ### shared code for the ltdb
 ###
-from __future__ import unicode_literals
-from __future__ import print_function
 
 
 import sqlite3, collections
-import cgi, re, urllib, sys
+import cgi, re,  sys
+from html import escape
 from collections import defaultdict as dd
 import json
-
+import urllib.parse as up
 
 ### labels for branching: arity, head
 headedness = {(1,0):('▲', 'unary: headed'),
@@ -21,6 +20,34 @@ headedness = {(1,0):('▲', 'unary: headed'),
               (2,None):('◬', 'binary: non-headed'),
               ('nil','nil'):(' ', ' '),
               (None,None):(' ', ' ')}
+
+### the different kinds of things we deal with
+statuses = dict()
+
+##things used when parsing
+statuses["lex-rule"] = "Lexical Rules"
+statuses["inf-rule"] = "Inflectional Rules"
+statuses["rule"] = "Syntactic Rules"
+statuses["token-mapping-rule"] = "Rules for token mapping"
+statuses["root"] = "Root Conditions for well formed utterances"
+
+## Lexical entries
+statuses["lex-entry"] = "Lexical Entries"
+statuses["generic-lex-entry"] = "Generic Lexical Entries"
+
+## types 
+statuses["lex-type"] = "Types for lexical entries (immediate supertypes of lex-entries)"
+statuses["type"] = "Other Internal Types"
+
+## pre and post processing
+statuses["lexical-filtering-rule"] = "Lexical filtering rule"
+statuses["post-generation-mapping-rule"] = "Post generation mapping rule"
+
+## interface 
+statuses["labels"] = "Labels for trees in the (parse-nodes)"
+
+
+
 
 def getpar (params):
     par=dict()
@@ -37,13 +64,11 @@ par=getpar('params')
 
 def hlt (typs):
     "hyperlink a list of space seperated types"
-    l = unicode()
+    linked = []
     if typs:
         for t in typs.split():
-            l += "<a href='%s/showtype.cgi?typ=%s'>%s</a> " % (par['cgidir'], 
-                                                           urllib.quote(t, ''),
-                                                           t)
-        return l
+            linked.append(f"<a href='{par['cgidir']}/showtype.cgi?typ={up.quote(t)}'>{t}</a>")
+        return ' '.join(linked)
     else:
         return '<br>'
 
@@ -59,11 +84,11 @@ def hltyp(match):
     for typ in c:
         types.add(typ[0])
     #print types
-    t = unicode(match.group(0))
+    t = str(match.group(0))
     #print "<br>%s %s\n" % (t, t in types)
     if t in types and not t.startswith('#'):
         return "<a href='{}/showtype.cgi?typ={}'>{}</a>".format(par['cgidir'], 
-                                                                urllib.quote(t,''),
+                                                                up.quote(t),
                                                                 t)
     else:
         return t
@@ -72,9 +97,9 @@ def hltyp(match):
 def hlall (typs):
     "hyperlink all types in a description or documentation"
     if typs:
-        typs = cgi.escape(typs)
-        ### Definition from http://moin.delph-in.net/TdlRfc
-        typs=re.sub(r'(#[\w_+*?-]+)', "<span class='coref'>\\1</span>", typs)
+        typs = escape(typs)
+        ### Definition from https://github.com/delph-in/docs/wiki/TdlRFC
+        typs=re.sub(r'( )(#[\w_+*?-]+)([ ,])', "\\1<span class='coref'>\\2</span>\\3", typs)
         return retyp.sub(hltyp, typs)
     else:
         return '<br>'
@@ -96,18 +121,18 @@ def showsents (c, typ, lexid, limit, biglimit):
         total = results[0]
         sids = dd(set)
         if lexid:
-            c.execute("""SELECT sid, wid FROM sent 
+            c.execute("""SELECT profile, sid, wid FROM sent 
                          WHERE lexid=? ORDER BY sid LIMIT ?""", (lexid, limit))
-            for (sid, wid) in c:
-                sids[sid].add((wid, wid+1))
+            for (profile, sid, wid) in c:
+                sids[profile, sid].add((wid, wid+1))
         else:
-            c.execute("""SELECT sid, kara, made FROM typind 
+            c.execute("""SELECT profile, sid, kara, made FROM typind 
                          WHERE typ=? ORDER BY sid LIMIT ?""", (typ, limit))
-            for (sid, kara, made) in c:
-                sids[sid].add((kara, made))
+            for (profile, sid, kara, made) in c:
+                sids[profile, sid].add((kara, made))
         if limit < total and biglimit > limit:
             limtext= "({:,} out of {:,}: <a href='more.cgi?typ={}&lexid={}&limit={}'>more</a>)".format(limit, total,
-                                                                                                       urllib.quote(typ,''),
+                                                                                                       up.quote(typ),
                                                                                                        lexid,
                                                                                                        biglimit)
         elif limit < total:
@@ -115,24 +140,22 @@ def showsents (c, typ, lexid, limit, biglimit):
         else:
             limtext ='({:,})'.format(total)
         print("""<h2>Corpus Examples %s</h2>""" % limtext)
-        c.execute("""SELECT profile, sid, wid, word, lexid FROM SENT 
-                        WHERE sid in (%s) order by sid, wid""" % \
-                          ','.join('?'*len(sids)), 
-                      sids.keys())
         sents = dd(dict)
-        profname=dict()
-        for (prof, sid, wid, word, lexid) in c:
-            sents[sid][wid] = (word, lexid)
-            profname[sid]=prof
+        for profile, sid in sids:
+            c.execute("""SELECT profile, sid, wid, word, lexid FROM SENT 
+            WHERE profile = ? AND sid = ? order by profile, sid, wid""",
+                      (profile, sid))
+            for (prof, sid, wid, word, lexid) in c:
+                sents[prof, sid][wid] = (word, lexid)
 
             
         print("""<ul style="list-style:none;">""")
-        for sid in sorted(sids):
+        for profile, sid in sorted(sids):
 
 
             # fetch json for deriv_tree, mrs and dmrs
             c.execute("""SELECT mrs, mrs_json, dmrs_json, deriv_json, sent, comment FROM gold 
-                        WHERE sid =  ? """, [sid])
+                        WHERE profile=? AND sid =  ? """, (profile, sid))
             for (mrs, mrs_json, dmrs_json, deriv_json, sent, comment) in c:
                 mrs = mrs
                 mrs_json = mrs_json
@@ -141,15 +164,15 @@ def showsents (c, typ, lexid, limit, biglimit):
                 sent=sent
                 #comment unused
 
-            for (kara, made) in sorted(sids[sid]):
+            for (kara, made) in sorted(sids[profile, sid]):
                 print('<li>{}<sub>{}-{}</sub> &nbsp;&nbsp; '.format(sid,kara,made))
-                for wid in sents[sid]:
-                    if wid >= kara and wid < made:
+                for wid in sents[profile, sid]:
+                    if kara and made and wid >= kara and wid < made:
                         print ("<span class='match'>%s</span>" % \
-                                   sents[sid][wid][0])
+                                   sents[profile, sid][wid][0])
                     else:
-                            print (sents[sid][wid][0])
-                print(" (%s)" % (profname[sid]))
+                            print (sents[profile, sid][wid][0])
+                print(f" ({profile})")
 
             ##############################################################
             # PRINT THE VISUALIZATIONS (only once per sentence)
@@ -330,7 +353,7 @@ def showlexs (c, lextyp, lexid, limit, biglimit):
         
     if results and results[0] > 0:
         total = results[0]
-        lem = dd(unicode) # lemma
+        lem = dict() # lemma
 
         if lexid:
             ## You want a specific word
@@ -338,22 +361,22 @@ def showlexs (c, lextyp, lexid, limit, biglimit):
             LEFT JOIN lexfreq ON lex.lexid = lexfreq.lexid
             WHERE lex.lexid=?""", (lexid,))
             for (lexid, orth, freq) in c:
-                lem[lexid] = cgi.escape(orth, quote=True)
+                lem[lexid] = escape(orth)
         else:
             ## You want a lexical type
             c.execute("""SELECT lex.lexid, orth, freq FROM lex 
             LEFT JOIN lexfreq ON lex.lexid = lexfreq.lexid
             WHERE typ=? ORDER BY freq DESC LIMIT ?""", (lextyp, 5 * limit))
             for (lxid, orth, freq) in c:
-                lem[lxid] = cgi.escape(orth, quote=True)
+                lem[lxid] = escape(orth)
 
                 
         c.execute("""SELECT lexid,  word, freq
 FROM lexfreq WHERE lexid in (%s) ORDER BY lexid, freq DESC""" % \
                       ','.join('?'*len(lem)), 
-                  lem.keys())
+                  list(lem.keys()))
         lf = dd(int) # frequency
-        sf = dd(unicode) # surface forms
+        sf = dd(str) # surface forms
         for (lxid, word,freq) in c:
         ### if the word was not in the corpus
             if not word:
@@ -361,13 +384,13 @@ FROM lexfreq WHERE lexid in (%s) ORDER BY lexid, freq DESC""" % \
             if not freq:
                 freq=0
             sf[lxid] += "<span title='freq=%s'>%s</span>  " % (freq, 
-                                                                cgi.escape(word, quote=True))
+                                                                escape(word))
             lf[lxid] +=freq
         #lf=lf[:50]
         #sf=sf[:50]
         if limit < total and biglimit > limit:
             limtext= "({:,} out of {:,}: <a href='more.cgi?lextyp={}&lexid={}&limit={}'>more</a>)".format(limit, total,
-                                                                                                         urllib.quote(lextyp, ''),
+                                                                                                         up.quote(lextyp),
                                                                                                          lexid,
                                                                                                          biglimit)
         elif limit < total:
@@ -375,11 +398,11 @@ FROM lexfreq WHERE lexid in (%s) ORDER BY lexid, freq DESC""" % \
         else:
             limtext ='({:,})'.format(total)
             
-        print ("""<h2>Lexical Examples: {:,} {}</h2>""".format(min(len(lf),limit),
+        print ("""<h2>Lexical Examples: {:,}  {}</h2>""".format(min(len(lf),limit),
                                                                limtext))
         print("""<table><th>lexid</th><th>Lemma</th><th>Surface</th>
 <th>Frequency</th></tr>""")  ### FIXME <th>Sentences
-        for lxid in sorted(lf.keys()[:min(len(lf),limit)], key = lambda x: lf[x], reverse=True):
+        for lxid in sorted(list(lf.keys())[:min(len(lf),limit)], key = lambda x: lf[x], reverse=True):
             print(u"""<td><a href='showtype.cgi?lexid={}'>{}</a></td>
 <td>{}</td>
 <td>{}</td>
@@ -420,51 +443,60 @@ def header():
 """ % (par['ver'], par['cssdir'], par['cssdir'])
 
 def searchbar():
-    return """
+    """
+    Return the Searchbar
+    """
+    return f"""
 <div id="outline">
 <div id="header">
 <div id="menu">
-<a href='%s/index.html'>Home</a>&nbsp;&nbsp;
-<a href='%s/ltypes.cgi'>Lex Types</a>&nbsp;&nbsp;
-<a href='%s/rules.cgi'>Rules</a>
+<a href='{par['cssdir']}/index.html'>Home</a>&nbsp;&nbsp;
+<a href='{par['cgidir']}/ltypes.cgi'>Lex Types</a>&nbsp;&nbsp;
+<a href='{par['cgidir']}/rules.cgi'>Rules</a>
 </div> <!-- end of menu -->
-<div id="confusing">  <!-- search for word -->
-<div class='form'>
-<form name="frm1" action="%s/search.cgi" method="GET">
-Lemma:&nbsp;<input type="text" name="lemma" size=15
- placeholder="lemma">
-<input type="submit" value="Go" name="submitbtn">
-</form>
-</div>
+<div id="confusing">
 <div class='form'>
 
-<form name="frm2" action="%s/search.cgi" method="GET">
+<form name="frm2" action="{par['cgidir']}/search.cgi" method="GET">
 Type:&nbsp;<input type="text" name="typ" size=20
  placeholder="lextype, lexid, rule or type">
 <input type="submit" value="Go" name="submitbtn">
 </form>
 </div>
+  <!-- search for word -->
+<div class='form'>
+<form name="frm1" action="{par['cgidir']}/search.cgi" method="GET">
+Lemma:&nbsp;<input type="text" name="lemma" size=15
+ placeholder="lemma">
+<input type="submit" value="Go" name="submitbtn">
+</form>
+</div>
+  <!-- search for predicate in mrs -->
+<div class='form'>
+<form name="frm3" action="{par['cgidir']}/search.cgi" method="GET">
+Predicate:&nbsp;<input type="text" name="pred" size=15
+ placeholder="pred_x">
+<input type="submit" value="Go" name="submitbtn">
+</form>
+</div>
 </div> <!-- end of confusing -->
 </div> <!-- end of header -->
-"""  %  (par['cssdir'], 
-                                      par['cgidir'], par['cgidir'], 
-                                      par['cgidir'], par['cgidir'])
-
+"""
 
     
-def footer():
+def footer(version):
     return """</div> <!-- end of outline -->
   <br>
   <address>
-  <a href='http://moin.delph-in.net/LkbLtdb'>Linguistic Type Database</a> 
-    for the grammar %s; 
-  <br>By Chikara Hashimoto, Luis Morgado da Costa and Francis Bond; 
+  <a href='https://github.com/delph-in/docs/wiki/LkbLtdb'>Linguistic Type Database</a> 
+    for the grammar {}; 
+  <br>By Chikara Hashimoto, Luis Morgado da Costa, Michael Goodman and Francis Bond; 
   Maintained by Francis Bond &lt;<a href='mailto:bond@ieee.org'>bond@ieee.org</a>&gt;;
     <br>
     <a href ='https://github.com/fcbond/ltdb'>Source code (GitHub)</a>
   </address>
   </body>
-</html>""" % (par['ver'])
+</html>""".format(version)
 
 
 def munge_desc(typ,description):
@@ -488,7 +520,7 @@ def munge_desc(typ,description):
     """
     exes = []
     nams = []
-    namere=re.compile(r"""<name\s+lang=["'](.*)['"]>(.*)</name>""")
+    namere=re.compile(r"""<name\s+lang=["'](.*)['"]>(.*)(</name>)?""")
     desc = []
     count = 1
     for l in description.splitlines():
@@ -498,15 +530,15 @@ def munge_desc(typ,description):
             if l.startswith("<ex>"):
                 ex = l[4:].strip()
                 exes.append((ex,typ,1))
-                desc.append("\n{:d}. {}\n".format(count, ex))
+                desc.append("\n{:d}. *{}*\n".format(count, ex))
             elif l.startswith("<nex>"):
                 ex = l[5:].strip()
                 exes.append((ex,typ,0))
-                desc.append("\n{:d}. ∗ {}\n".format(count, ex))
+                desc.append("\n{:d}. ∗ *{}*\n".format(count, ex))
             else: # l.startswith("<mex>")
                 ex = l[5:].strip()
                 exes.append((ex,typ,1))
-                desc.append("\n{:d}. ⊛ {}\n".format(count, ex))
+                desc.append("\n{:d}. ⊛ *{}*\n".format(count, ex))
             if ex.startswith('*'):
                 print("Warning: don't use '*' in examples, just use <nex>:", l,
                       file=sys.stderr)
@@ -549,4 +581,14 @@ def get_leminfo (lemma,c):
                  LEFT JOIN types ON lex.typ = types.typ
                  WHERE orth GLOB ?
     ORDER BY orth = ? DESC""", ('*{0}*'.format(lemma), lemma))
+    return c.fetchall()
+
+def get_predsents (pred,c):
+    """
+    get predicates from mrs_json
+    put quotes around to match the entire predicate
+    """
+    c.execute("""SELECT sid, profile, sent, deriv_json, mrs_json, dmrs_json
+    FROM gold
+    WHERE instr(mrs_json, ?) > 0""",  (f'"{pred}"',))
     return c.fetchall()
