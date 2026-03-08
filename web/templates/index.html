@@ -73,7 +73,7 @@
     <span id="grammarCount">{{ grammars|length }}</span> grammar(s) available
   </div>
   
-  <form id="grammarForm" action="/" method="POST">
+  <form id="grammarForm" action="{{ url_for('home') }}" method="POST">
     <div class="row g-2" id="grammarGrid">
       {% for grammar in grammars %}
         {% set summary = summ[grammar] %}
