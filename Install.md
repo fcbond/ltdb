@@ -1,0 +1,81 @@
+# Installing LTDB
+
+## Requirements
+
+- Python 3.8+
+- Apache 2 with `mod_proxy`, `mod_proxy_http`, `mod_headers`
+- SQLite3
+
+## Deployment (Apache + gunicorn)
+
+The app runs under gunicorn, with Apache acting as a reverse proxy.
+Static files are served directly by Apache.
+
+### 1. Copy the app and set ownership
+
+```bash
+sudo cp -r /path/to/ltdb /var/www/ltdb
+sudo chown -R www-data:www-data /var/www/ltdb
+```
+
+### 2. Set up the Python environment
+
+```bash
+cd /var/www/ltdb
+sudo -u www-data python3 -m venv .venv
+sudo -u www-data .venv/bin/pip install -r requirements.txt
+sudo -u www-data .venv/bin/pip install gunicorn
+```
+
+### 3. Create the log directory
+
+```bash
+sudo mkdir -p /var/log/ltdb
+sudo chown www-data:www-data /var/log/ltdb
+```
+
+### 4. Install and start the gunicorn service
+
+```bash
+sudo cp ltdb.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now ltdb
+sudo systemctl status ltdb   # confirm it is running
+```
+
+### 5. Configure Apache
+
+```bash
+sudo a2enmod proxy proxy_http headers
+sudo cp ltdb-apache.conf /etc/apache2/conf-available/ltdb.conf
+sudo a2enconf ltdb
+sudo systemctl reload apache2
+```
+
+The app will be available at `https://compling.upol.cz/ltdb`.
+
+## Updating the app
+
+```bash
+cd /path/to/ltdb && git pull
+sudo rsync -a --exclude='.git' --exclude='.venv' . /var/www/ltdb/
+sudo systemctl restart ltdb
+```
+
+## Troubleshooting
+
+Check gunicorn logs:
+```bash
+sudo journalctl -u ltdb -f
+sudo tail -f /var/log/ltdb/error.log
+```
+
+Check Apache logs:
+```bash
+sudo tail -f /var/log/apache2/error.log
+```
+
+If encodings are wrong, add to `/etc/apache2/apache2.conf`:
+```
+SetEnv PYTHONIOENCODING utf8
+```
