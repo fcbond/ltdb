@@ -13,7 +13,8 @@ from .db import get_db, get_md, \
     get_type, get_lxids,  \
     get_wrds_by_lexids, get_wrds_by_ltypes, \
     get_phenomena_by_lexids, get_sents, get_gold, \
-    get_phenomena_by_cx, get_lxid
+    get_phenomena_by_cx, get_lxid, \
+    get_short_summary
 
 from .ltdb import rst2html
 
@@ -44,6 +45,7 @@ def home():
         if file.endswith('.db'):
             grammars.append(file)
     grammars.sort()
+    summ = get_short_summary(current_directory, grammars)
     if 'grm' in request.form:
         session['grm'] = request.form['grm']
     page='index'
@@ -52,6 +54,7 @@ def home():
         page=page,
         title='LTDB',
         grammars=grammars,
+        summ=summ,
         grm =  session.get('grm', None)
     )
 

@@ -425,4 +425,37 @@ def get_tb_summary(conn):
 
     return summary
 
+def get_short_summary(current_directory, grammars):
+    """
+    Return a brief summary of all the grammars
 
+    you should give a dictionary of dictionaries 
+    summ[grm]['Name'] = GRAMMAR_NAME
+    website: website
+    rules: number of rules
+    lexicon: number of entries
+    trees: number of trees
+    license: url
+    """
+    summ = dict()
+    for grm in grammars:
+        summ[grm]= dict()
+        dbpath = os.path.join(current_directory, f'db/{grm}')
+        conn = sqlite3.connect(dbpath)
+        c = conn.cursor()
+        c.execute("""
+        SELECT att, val
+        FROM meta
+        WHERE att IN ('GRAMMAR_NAME', 'WEBSITE', 'LICENSE')
+        UNION
+        select 'RULES', count(*) from types 
+        where status in ('rule', 'lex-rule')
+        UNION
+        select 'LEXICON', count(*) from types 
+        where status in ('lex-entry', 'generic-lex-entry')
+        UNION
+        SELECT 'TREES', COUNT(DISTINCT sid || ',' || profile) 
+        FROM sent
+        """) 
+        summ[grm] = dict(c.fetchall())
+    return summ
