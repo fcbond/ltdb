@@ -1,6 +1,6 @@
 """Route declaration."""
 from flask import current_app as app
-from flask import render_template, request, session
+from flask import render_template, request, session, redirect, url_for
 
 import toml
 import pathlib
@@ -48,6 +48,7 @@ def home():
     summ = get_short_summary(current_directory, grammars)
     if 'grm' in request.form:
         session['grm'] = request.form['grm']
+        return redirect(url_for('grammar'))
     page='index'
     return render_template(
         f"index.html",

@@ -4,7 +4,7 @@
         <a href="{{ url_for('home') }}" class="navbar-brand"><img width=50
 					   src="{{ url_for('static',
 					   filename='img/ltdb.png')
-					   }}"/>{{grm}}</a>
+					   }}"/>Grammars</a>
         <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarCollapse">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -12,14 +12,12 @@
 	  {% if grm %}
 
           <div class="navbar-nav">
-	    <!-- Add overview of all grammars -->
 	    <a href="{{ url_for('grammar') }}"
-	       class="nav-item nav-link">Grammar</a>
-		      <!-- {% if page == pg %} active{% endif %}" -->
-	       <a href="{{ url_for('rules') }}"
-		  class="nav-item nav-link">Rules</a>
-	       <a href="{{ url_for('ltypes') }}"
-		  class="nav-item nav-link">Lexical Types</a>
+	       class="nav-item nav-link{{ ' active' if request.endpoint == 'grammar' }}">{{grm}}</a>
+	    <a href="{{ url_for('rules') }}"
+	       class="nav-item nav-link{{ ' active' if request.endpoint == 'rules' }}">Rules</a>
+	    <a href="{{ url_for('ltypes') }}"
+	       class="nav-item nav-link{{ ' active' if request.endpoint == 'ltypes' }}">Lexical Types</a>
 	  </div>
 	  {% endif %}
 	    <form action="{{ url_for('submit_fsearch') }}" method="post" class="form-inline my-2 my-lg-0">
