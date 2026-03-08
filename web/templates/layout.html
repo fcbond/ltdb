@@ -1,0 +1,46 @@
+<html>
+
+<head>
+    <title>{{ title }}</title>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="description" content="{{ description }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='img/ltdb.png') }}"/>
+     <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-+0n0xVW2eSR5OomGNYDnhzAbDsOXxcvSN1TPprVMTNDbiYZCxYbOOl7+AMvyTG2x" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.25/css/dataTables.bootstrap5.css">
+    {% block css %}{% endblock %}
+</head>
+
+<body class="container" bgcolor="#ddeeff">
+{% include 'navigation.html' %}
+  <div class="column">
+{% block content %}{% endblock %}
+
+
+
+<hr>
+<p>Linguistic Type Data Base
+<address>
+  Maintainer: <a href='https://fcbond.github.io'>Francis Bond </a>
+</address>
+Contributors: Francis Bond,  Michael Wayne Goodman, Luís Morgado da Costa and
+Chikara Hashimoto.
+
+<p>Source code hosted at <a href='https://github.com/fcbond/ltdb'>https://github.com/fcbond/ltdb</a>.
+
+  <hr>
+  <p>Please provide feedback on the ltdb here: <a href='https://github.com/fcbond/ltdb/issues'>ltdb github issues</a> (preferred) or email the maintainer &lt;<a href='mailto:bond@ieee.org'>bond@ieee.org</a>&gt;.
+  
+
+    
+<div>
+  
+   <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.25/js/dataTables.bootstrap5.js"></script>
+    {% block scripts %}{% endblock %}
+
+  
+</body>
+</html>

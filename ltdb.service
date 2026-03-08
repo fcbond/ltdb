@@ -1,0 +1,20 @@
+[Unit]
+Description=LTDB Flask Application (gunicorn)
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/ltdb
+Environment="PATH=/var/www/ltdb/.venv/bin"
+ExecStart=/var/www/ltdb/.venv/bin/gunicorn \
+    --workers 2 \
+    --bind unix:/run/ltdb/ltdb.sock \
+    --access-logfile /var/log/ltdb/access.log \
+    --error-logfile /var/log/ltdb/error.log \
+    wsgi:app
+RuntimeDirectory=ltdb
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target

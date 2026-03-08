@@ -1,0 +1,46 @@
+{% extends 'layout.html' %}
+
+{% block css %}
+<link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+
+<!-- Color and sort according to type   -->
+
+<div class="container">
+  <h1>Rules for {{meta['SHORT_GRAMMAR_NAME']}}</h1>
+
+
+  <table id='data' class="table table-hover table-borderless table-sm">
+    <caption>Rules and their types</caption>
+    <thead class="thead-light">
+    <tr>
+      <th>Rule</th> <th>Type</th> <th>lname</th> <th>status</th>
+      <th>Frequency</th> <th>Arity/Head</th>
+    </tr>
+    </thead>
+    <tbody>
+      {%- for (rule, type, name, status, freq, arity, head) in data %}
+      <tr class="{{status}}">
+	<td><a href="{{url_for('type', query=rule)}}">{{rule}}</a></td>
+	<td><a href="{{url_for('type', query=type)}}">{{type}}</a></td>
+	<td>{{name}}</td>
+	<td>{{status}}</td>
+	<td>{{freq}}</td>
+	<td>{{arity}}/{{head}}</td>
+      </tr>
+      {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    $(document).ready(function () {
+	$('#data').DataTable({"pageLength": 25,
+			      "lengthMenu": [ [25, 50, 100, -1], [25, 50, 100, "All"] ]});
+    });
+  </script>
+{% endblock %}

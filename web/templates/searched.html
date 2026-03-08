@@ -1,0 +1,40 @@
+{% extends 'layout.html' %}
+
+{% block css %}
+<link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+
+<!-- Color and sort according to type   -->
+
+<div class="container">
+  {%- if results %}
+  <h1>Results for: <code>{{searched}}</code></h1>
+
+  {%- for t in results %}
+  <h2>{{t|title}}</h2>
+    <ul>
+  {%- for r in results[t] %}
+  {%- if t == 'lemmas' %}
+  <li><a href="{{url_for('type', query=r[1])}}"><i>{{r[0]}}</i> ({{r[1]}})</a>
+  {%- else %} 
+  <li><a href="{{url_for('type', query=r[0])}}">{{r[0]}}</a> ({{r[1]}})
+     {%- endif %}
+    <!-- {{r[1:]}} -->
+    {% endfor %}
+    </ul>
+  {% endfor %}  
+    {%- else %}
+ <h1>No result for:  <code>{{searched}}</code></h1>
+ {%- endif %}
+  {% endblock %}
+
+{% block scripts %}
+  <script>
+    $(document).ready(function () {
+	$('#data').DataTable({"pageLength": 25,
+			      "lengthMenu": [ [25, 50, 100, -1], [25, 50, 100, "All"] ]});
+    });
+  </script>
+{% endblock %}
