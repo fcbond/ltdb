@@ -1,10 +1,10 @@
 """Route declaration."""
 from flask import current_app as app
-from flask import render_template, request, session, redirect, url_for
+from flask import render_template, request, session, redirect, url_for, jsonify
 
 import toml
 import pathlib
-import sqlite3, os
+import sqlite3, os, json, sys, traceback
 
 
 from .db import get_db, get_md, \
@@ -199,6 +199,136 @@ def type(query):
         results=results
     )
 
+
+
+def dat_path_for(grm):
+    """Return the .dat path for a grammar filename, or None if it doesn't exist."""
+    dat = os.path.join(current_directory, 'db', grm[:-3] + '.dat')
+    return dat if os.path.exists(dat) else None
+
+
+@app.route('/demo')
+def demo():
+    """Show the interactive parsing demo page."""
+    grammars_with_dat = sorted(
+        f for f in os.listdir(os.path.join(current_directory, 'db'))
+        if f.endswith('.db') and dat_path_for(f)
+    )
+    grm = session.get('grm')
+    # Fall back to first available grammar if current one has no .dat
+    if grm and not dat_path_for(grm):
+        grm = grammars_with_dat[0] if grammars_with_dat else None
+    return render_template('demo.html',
+                           title='LTDB Demo',
+                           grm=grm,
+                           grammars=grammars_with_dat)
+
+
+@app.route('/parse', methods=['POST'])
+def parse_sentence():
+    """Parse a sentence with ACE and return JSON in delphin-viz format."""
+    from delphin import ace, dmrs as dmrs_module
+    from delphin.codecs import simplemrs, dmrsjson, mrsjson
+
+    grm = request.form.get('grm') or session.get('grm')
+    if not grm:
+        return jsonify({'error': 'No grammar selected'}), 400
+
+    dat = dat_path_for(grm)
+    if not dat:
+        return jsonify({'error': f'No compiled grammar (.dat) for {grm}. '
+                                 f'Run grm2db.py --ace to build it.'}), 400
+
+    input_text = request.form.get('input', '').strip()
+    if not input_text:
+        return jsonify({'error': 'No input provided'}), 400
+
+    n_results = min(int(request.form.get('results', 5)), 10)
+    want_derivation = request.form.get('derivation') == 'json'
+    want_mrs = request.form.get('mrs') == 'json'
+    want_dmrs = request.form.get('dmrs') == 'json'
+
+    try:
+        response = ace.parse(dat, input_text, cmdargs=[f'-n{n_results}'])
+    except Exception as e:
+        return jsonify({'error': f'ACE error: {e}'}), 500
+
+    results = []
+    errors = []
+    for i, result in enumerate(response.results()):
+        r = {'result-id': i}
+
+        if want_derivation:
+            try:
+                r['derivation'] = result.derivation().to_dict(
+                    fields=['id', 'entity', 'score', 'form', 'tokens'])
+            except Exception as e:
+                r['derivation'] = None
+                errors.append(f'result {i} derivation: {e}')
+
+        if want_mrs or want_dmrs:
+            mrs_obj = None
+            try:
+                mrs_obj = result.mrs()
+                if want_mrs:
+                    r['mrs'] = json.loads(mrsjson.encode(mrs_obj))
+            except Exception as e:
+                r['mrs'] = None
+                errors.append(f'result {i} mrs: {e}')
+
+            if want_dmrs:
+                try:
+                    r['dmrs'] = json.loads(dmrsjson.encode(dmrs_module.from_mrs(mrs_obj)))
+                except Exception as e:
+                    r['dmrs'] = None
+                    errors.append(f'result {i} dmrs: {e}')
+
+        results.append(r)
+
+    return jsonify({'input': input_text, 'readings': len(results),
+                    'results': results, 'errors': errors})
+
+
+@app.route('/generate', methods=['POST'])
+def generate_sentence():
+    """Generate surface strings from an MRS using ACE."""
+    from delphin import ace
+    from delphin.codecs import mrsjson, simplemrs
+
+    grm = request.form.get('grm') or session.get('grm')
+    if not grm:
+        return jsonify({'error': 'No grammar selected'}), 400
+
+    dat = dat_path_for(grm)
+    if not dat:
+        return jsonify({'error': f'No compiled grammar (.dat) for {grm}'}), 400
+
+    mrs_json_str = request.form.get('mrs')
+    if not mrs_json_str:
+        return jsonify({'error': 'No MRS provided'}), 400
+
+    try:
+        mrs_obj = mrsjson.decode(mrs_json_str)
+        mrs_str = simplemrs.encode(mrs_obj)
+        print(f"Generating from MRS:\n{mrs_str}", file=sys.stderr)
+        response = ace.generate(dat, mrs_str)
+        surfaces = [r.get('surface', '') for r in response.results()
+                    if r.get('surface')]
+        print(f"Generated {len(surfaces)} surface(s): {surfaces}", file=sys.stderr)
+    except Exception as e:
+        traceback.print_exc(file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+
+    if not surfaces:
+        notes = response.get('NOTES', [])
+        unknown = [n for n in notes if 'unknown in the semantic index' in n]
+        if unknown:
+            return jsonify({'error':
+                'This grammar is not configured for generation '
+                '(missing generation-roots in ACE config). '
+                'Try the ERG instead.', 'results': []})
+
+    return jsonify({'results': surfaces})
 
 
 @app.route('/search', methods=['POST'])

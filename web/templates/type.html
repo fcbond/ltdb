@@ -186,8 +186,9 @@
     {% for result in results %}
       {% for p, s in phenomena %} 
 	$("#toggle{{result}}{{p}}{{s}}").click(function(){
-          $("#{{result}}{{p}}{{s}}").toggle(); 
-        });  
+          $("#{{result}}{{p}}{{s}}").toggle();
+          $(this).toggleClass("btn-outline-primary btn-primary");
+        });
 	{# TOGGLE OFF ALL VISUALS  #}
 	$("#{{result}}{{p}}{{s}}").toggle(); 
       {% endfor %}

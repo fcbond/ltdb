@@ -330,21 +330,34 @@ function MRS(parentElement, mrsData){
             // object has "properties" field or not.
             var varName = $(this).data('var');
             return mrsData.variables[varName].hasOwnProperty("properties");
-        }).tooltip({
-            track: true,
-            tooltipClass: 'mrs-variable-info',
-            content: function(){
-                var varName = $(this).data('var');
-                var variable = mrsData.variables[varName];
-                var func = variable.type == 'e' ? eArgKey : xArgKey;
-                var features = keySort(Object.keys(variable.properties), func);
+        }).each(function() {
+            var varName = $(this).data('var');
+            var variable = mrsData.variables[varName];
+            var func = variable.type == 'e' ? eArgKey : xArgKey;
+            var features = keySort(Object.keys(variable.properties), func);
+            var rows = [];
+            for (var i=0; i < features.length; i++) {
+                var attr = features[i];
+                rows.push(attr + '=' + variable.properties[attr]);
+            }
+            var content = rows.join(', ');
 
-                var rows = [];
-                for (var i=0; i < features.length; i++) {        
-                    var attr = features[i];
-                    rows.push('<tr><td class="variable-feat-name">'+attr+'</td><td class="variable-feat-val">'+variable.properties[attr]+'</td></tr>');
-                }
-                return '<table>' + rows.join('') + '</table>';
+            if (typeof $.fn.tooltip === 'function' && $.fn.tooltip.reflow === undefined) {
+                // jQuery UI
+                $(this).tooltip({
+                    track: true,
+                    tooltipClass: 'mrs-variable-info',
+                    content: '<table>' + rows.map(function(r){
+                        var parts = r.split('=');
+                        return '<tr><td class="variable-feat-name">'+parts[0]+'</td><td class="variable-feat-val">'+parts[1]+'</td></tr>';
+                    }).join('') + '</table>'
+                });
+            } else if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+                // Bootstrap 5
+                this.setAttribute('data-bs-toggle', 'tooltip');
+                this.setAttribute('data-bs-placement', 'top');
+                this.setAttribute('data-bs-title', content);
+                new bootstrap.Tooltip(this);
             }
         });
     }

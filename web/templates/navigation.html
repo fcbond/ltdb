@@ -18,6 +18,8 @@
 	       class="nav-item nav-link{{ ' active' if request.endpoint == 'rules' }}">Rules</a>
 	    <a href="{{ url_for('ltypes') }}"
 	       class="nav-item nav-link{{ ' active' if request.endpoint == 'ltypes' }}">Lexical Types</a>
+	    <a href="{{ url_for('demo') }}"
+	       class="nav-item nav-link{{ ' active' if request.endpoint == 'demo' }}">Demo</a>
 	  </div>
 	  {% endif %}
 	    <form action="{{ url_for('submit_fsearch') }}" method="post" class="form-inline my-2 my-lg-0">

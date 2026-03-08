@@ -47,10 +47,11 @@ function render_tree(svg, tree) {
     const daughters = [];
     let wtot = -DAUGHTER_HSPACE;
     let dtr_label_mean = 0;
+    const daughterNodes = tree.daughters || [];
 
-    for (let i = 0; i < tree.daughters.length; i++) {
+    for (let i = 0; i < daughterNodes.length; i++) {
         wtot += DAUGHTER_HSPACE;
-        daughters[i] = render_tree(svg, tree.daughters[i]);
+        daughters[i] = render_tree(svg, daughterNodes[i]);
         dtr_label_mean += wtot + daughters[i].labelcenter;
         wtot += daughters[i].mywidth;
     }
