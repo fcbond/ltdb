@@ -2,6 +2,8 @@
 ### Make a database for a grammar, based on the METADATA file
 ###
 import sys, os
+import re
+import shutil
 import argparse
 import tempfile
 import sqlite3
@@ -82,16 +84,97 @@ INSERT INTO typfreq (typ, freq)
 
 
 
+def find_ace(ace_bin=None):
+    """Locate the ACE binary.
+
+    Checks, in order: the supplied path, the system PATH, then any
+    ace-* subdirectory inside the 'etc/' folder next to this script.
+
+    Args:
+        ace_bin: Explicit path supplied by the user, or None.
+
+    Returns:
+        Path to a usable ACE binary.
+
+    Raises:
+        FileNotFoundError: If no ACE binary can be found.
+    """
+    if ace_bin:
+        p = Path(ace_bin)
+        if p.is_file() and os.access(p, os.X_OK):
+            return str(p)
+        raise FileNotFoundError(f"ACE binary not found or not executable: {ace_bin}")
+
+    # Try system PATH first
+    found = shutil.which("ace")
+    if found:
+        return found
+
+    # Fall back to etc/ace-*/ beside the scripts directory
+    etc_dir = Path(__file__).parent.parent / "etc"
+    for candidate in sorted(etc_dir.glob("ace-*/ace"), reverse=True):
+        if os.access(candidate, os.X_OK):
+            return str(candidate)
+
+    raise FileNotFoundError(
+        "ACE binary not found. Install it and put it on PATH, or pass --ace-bin."
+    )
+
+
+_ANSI_ESCAPE = re.compile(r'\x1B\[[0-9;]*m')
+
+
+def compile_ace(cfg_path, out_path, log_path, ace_bin=None):
+    """Compile a grammar with ACE, writing output to a .dat file.
+
+    Args:
+        cfg_path: Path to the ACE config (.tdl) file.
+        out_path: Destination path for the compiled grammar (.dat).
+        log_path: Path for the compilation log.
+        ace_bin: Path to the ACE binary, or None to auto-discover.
+    """
+    from delphin import ace
+
+    binary = find_ace(ace_bin)
+    print(f"Compiling ACE grammar: {cfg_path} -> {out_path}", file=sys.stderr)
+    print(f"Using ACE binary: {binary}", file=sys.stderr)
+
+    with open(log_path, 'w') as log:
+        log.write(f"# ace -g {cfg_path} -G {out_path}\n\n")
+
+    try:
+        # stderr must be a real file with a fileno(); strip ANSI codes after
+        with open(log_path, 'ab') as raw:
+            ace.compile(cfg_path, out_path, executable=binary, stderr=raw)
+
+        # Post-process: strip ANSI escape codes in place
+        text = Path(log_path).read_text(errors='replace')
+        Path(log_path).write_text(_ANSI_ESCAPE.sub('', text))
+
+        with open(log_path, 'a') as log:
+            log.write("\n# Compilation successful\n")
+        print(f"ACE compilation succeeded: {out_path}", file=sys.stderr)
+    except Exception as e:
+        with open(log_path, 'a') as log:
+            log.write(f"\n# Compilation failed: {e}\n")
+        print(f"ACE compilation failed: {e}", file=sys.stderr)
+        raise
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
                     prog = 'grm2db',
                     description = 'Take a delphin grammar and make a db from it and its corpora',
                     epilog = 'Text at the bottom of help')
-    parser.add_argument('--checkgrm',  action='store_true',
+    parser.add_argument('--checkgrm', action='store_true',
                         help='Check the grammar version in the treebank')
     parser.add_argument('--outdir', type=Path,
                         help="Output directory for the database")
+    parser.add_argument('--ace', action='store_true',
+                        help="Compile the grammar with ACE, producing a .dat file")
+    parser.add_argument('--ace-bin', type=Path, metavar='PATH',
+                        help="Path to the ACE binary (default: search PATH then etc/ace-*/ace)")
     parser.add_argument('metadata', type=Path,
                         help="METADATA file for the grammar")
 
@@ -160,3 +243,11 @@ if __name__ == '__main__':
     log.close()
 
     print(f"Made {out_dir}/{dbname} for {md['SHORT_GRAMMAR_NAME']}")
+
+    if args.ace:
+        stem = dbname[:-3]  # strip .db
+        dat_path = os.path.join(out_dir, stem + '.dat')
+        ace_log_path = os.path.join(out_dir, stem + '-ace.log')
+        cfg_path = os.path.join(os.path.dirname(args.metadata), md['ACE_CONFIG_FILE'])
+        compile_ace(cfg_path, dat_path, ace_log_path, ace_bin=args.ace_bin)
+        print(f"Made {dat_path} for {md['SHORT_GRAMMAR_NAME']}")
