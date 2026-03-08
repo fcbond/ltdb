@@ -117,6 +117,11 @@ def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
                         carg = obj.conjunction.get('SYNSEM.LKEYS.KEYREL.CARG', default=None)
                         altcarg = obj.conjunction.get('SYNSEM.LKEYS.ALTKEYREL.CARG', default=None)
                         les[obj.identifier] = (str(parents[0]), orth, pred, altpred, carg, altcarg, obj.documentation())
+                        tdls.append((obj.identifier,
+                                    path[len(base):], lineno,
+                                    event,
+                                    tdl.format(obj),
+                                    obj.documentation()))
                 else:  # not a lexical entry
                     tdls.append((obj.identifier,
                                 path[len(base):], lineno,
