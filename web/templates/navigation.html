@@ -1,7 +1,7 @@
 <header>
   <nav class="navbar fixed-top navbar-expand-sm navbar-light bg-light">
       <div class="container-fluid">
-        <a href="/" class="navbar-brand"><img width=50
+        <a href="{{ url_for('home') }}" class="navbar-brand"><img width=50
 					   src="{{ url_for('static',
 					   filename='img/ltdb.png')
 					   }}"/>{{grm}}</a>
@@ -22,7 +22,7 @@
 		  class="nav-item nav-link">Lexical Types</a>
 	  </div>
 	  {% endif %}
-	    <form action="/search" method="post" class="form-inline my-2 my-lg-0">
+	    <form action="{{ url_for('submit_fsearch') }}" method="post" class="form-inline my-2 my-lg-0">
               <input type="text" id="search" name="search" required placeholder="lemma/type/predicate">
 	      <button type="submit" class="btn btn-outline-secondary">
 		🔍
