@@ -152,34 +152,30 @@
     });
 
 
-    {% for p, s in phenomena %} 
+    {% for p, s in phenomena %}
     {# PRINT DERIVATION TREE FROM JSON #}
     $( document ).ready(function() {
-       elem = document.getElementById('derivj{{p}}{{s}}');
-      deriv_json_string = '{{gold[(p,s)]['derivj'] | safe}}';
-      deriv_json = JSON.parse(deriv_json_string);
+      const elem = document.getElementById('derivj{{p}}{{s}}');
+      const deriv_json = JSON.parse('{{gold[(p,s)]['derivj'] | safe}}');
       drawTree(elem, deriv_json);
-    
-      elemChild = document.createElement('span');
+      const elemChild = document.createElement('span');
       elemChild.innerHTML = '<br><br>';
       elem.appendChild(elemChild);
-      });
+    });
 
-      {# PRINT DMRS FROM JSON #}
-      $( document ).ready(function() {
-      elem = document.getElementById('dmrsj{{p}}{{s}}');
-      dmrs_json_string = '{{gold[(p,s)]['dmrsj'] | safe}}';
-      dmrs_json = JSON.parse(dmrs_json_string);
+    {# PRINT DMRS FROM JSON #}
+    $( document ).ready(function() {
+      const elem = document.getElementById('dmrsj{{p}}{{s}}');
+      const dmrs_json = JSON.parse('{{gold[(p,s)]['dmrsj'] | safe}}');
       DMRS(elem, dmrs_json);
-      });
+    });
 
-  {# PRINT MRS FROM JSON #}
-      $( document ).ready(function() {
-      elem = document.getElementById('mrsj{{p}}{{s}}');
-      mrs_json_string = '{{gold[(p,s)]['mrsj'] | safe}}';
-      mrs_json = JSON.parse(mrs_json_string);
+    {# PRINT MRS FROM JSON #}
+    $( document ).ready(function() {
+      const elem = document.getElementById('mrsj{{p}}{{s}}');
+      const mrs_json = JSON.parse('{{gold[(p,s)]['mrsj'] | safe}}');
       MRS(elem, mrs_json);
-      });
+    });
 
       
 
@@ -200,12 +196,11 @@
 
     {# Make tree nodes clickable #}
     $(document).ready(function(){
-          $(".ltdb").click(function(event){
-  	    var elem = event.target;
-	    var title = elem.getAttribute("title");
-            window.open("../type/" + title);
-        });
-        });
+      $(".ltdb").click(function(event){
+        const title = event.target.getAttribute("title");
+        window.open("{{ url_for('type', query='') }}" + title);
+      });
+    });
 
   </script>
 

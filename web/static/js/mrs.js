@@ -66,12 +66,10 @@ function MRS(parentElement, mrsData){
             if (name == 'RELS') {
                 var itemFunc = relFeatStruct;
             } else if (name == 'HCONS') {
-                // filter out ICONS values from the constraints list
-                var value = value.filter(constraint => constraint.high != null && constraint.high.match(/h(andle)?\d+/));
+                value = value.filter(constraint => constraint.high != null && constraint.high.match(/h(andle)?\d+/));
                 var itemFunc = hconsFeatStruct;
             } else if (name == 'ICONS') {
-                // filter out HCONS values from the constraints list
-                var value = value.filter(constraint => constraint.high == null || !constraint.high.match(/h(andle)?\d+/));
+                value = value.filter(constraint => constraint.high == null || !constraint.high.match(/h(andle)?\d+/));
                 var itemFunc = iconsFeatStruct;
             }
 
@@ -352,9 +350,9 @@ function MRS(parentElement, mrsData){
     }
 
     function getArgZeroLinks(){
-        argZeroLinks = {};
-        
-        for (var i=0; i < mrsData.relations.length; i++) {        
+        const argZeroLinks = {};
+
+        for (var i=0; i < mrsData.relations.length; i++) {
             var rel = mrsData.relations[i];
             if (argZeroLinks.hasOwnProperty(rel.arguments.ARG0))
                 argZeroLinks[rel.arguments.ARG0].push(rel.lnk);

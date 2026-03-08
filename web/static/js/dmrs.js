@@ -32,7 +32,7 @@ function DMRS(parentElement, dmrs) {
         });
         dmrs.maxTopLevel = 0;
         dmrs.maxBottomLevel = 0;
-        for (dist=0; dist<dmrs.nodes.length; dist++) {
+        for (let dist=0; dist<dmrs.nodes.length; dist++) {
             dmrs.links.forEach(function(d) {
                 if (d.from == 0) return;
                 if (dist != d.distance) return;
@@ -254,8 +254,8 @@ function DMRS(parentElement, dmrs) {
               })
               .attr("x", function(d, i) {
                   d.bbox = this.getBBox();
-                  halfLen = d.bbox.width / 2;
-                  x = x_pos + halfLen;
+                  const halfLen = d.bbox.width / 2;
+                  const x = x_pos + halfLen;
                   x_pos = x + halfLen + node_dx;
                   d.x = x;
                   return x;
