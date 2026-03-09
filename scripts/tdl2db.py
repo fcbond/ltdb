@@ -9,21 +9,6 @@ from pathlib import Path
 
 from delphin import tdl
 
-###  ToDo
-# identify lextypes
-# get orth
-#
-
-## make a log in the same directory as the database
-# log = open(os.path.join(os.path.dirname(dbfile),"tdl.log"), 'w')
-# ver = open(os.path.join(os.path.dirname(dbfile),"tdl_ver"), 'w')
-
-# grammar = '/home/bond/svn/mo/ace/config-mal.tdl'
-# tdls = []
-# hierarchy = []  #(child, parent)
-# types = dd(list)
-# les = {}
-
 
 def read_cfg(ace_config):
     """
