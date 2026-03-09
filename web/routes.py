@@ -260,17 +260,38 @@ def dat_path_for(grm):
 @app.route("/demo")
 def demo():
     """Show the interactive parsing demo page."""
+    import sqlite3
+
     grammars_with_dat = sorted(
         f
         for f in os.listdir(os.path.join(current_directory, "db"))
         if f.endswith(".db") and dat_path_for(f)
     )
     grm = session.get("grm")
-    # Fall back to first available grammar if current one has no .dat
     if grm and not dat_path_for(grm):
         grm = grammars_with_dat[0] if grammars_with_dat else None
+
+    examples = {}
+    for g in grammars_with_dat:
+        dbpath = os.path.join(current_directory, "db", g)
+        with sqlite3.connect(dbpath) as conn:
+            row = conn.execute(
+                "SELECT val FROM meta WHERE att = 'EXAMPLES'"
+            ).fetchone()
+        if row:
+            try:
+                examples[g] = json.loads(row[0])
+            except (json.JSONDecodeError, TypeError):
+                examples[g] = []
+        else:
+            examples[g] = []
+
     return render_template(
-        "demo.html", title="LTDB Demo", grm=grm, grammars=grammars_with_dat
+        "demo.html",
+        title="LTDB Demo",
+        grm=grm,
+        grammars=grammars_with_dat,
+        examples=examples,
     )
 
 

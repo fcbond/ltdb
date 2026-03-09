@@ -12,6 +12,7 @@
   .result-card { margin-bottom: 1.5rem; }
   .result-viz { overflow-x: auto; padding: 0.5rem 0; max-width: 100%; }
   #spinner { display: none; }
+  #inputText::-webkit-calendar-picker-indicator { display: none !important; }
 </style>
 {% endblock %}
 
@@ -30,8 +31,16 @@
     <div class="row g-2 align-items-end mb-3">
       <div class="col-md-6">
         <label for="inputText" class="form-label">Input sentence</label>
-        <input type="text" id="inputText" name="input" class="form-control"
-               placeholder="e.g. The dog chases the cat." required>
+        <div style="position:relative">
+          <input type="text" id="inputText" name="input" class="form-control"
+                 list="exampleList" placeholder="Type or choose an example…"
+                 style="padding-right:2rem" required>
+          <button type="button" id="clearInput" tabindex="-1" title="Clear to browse history"
+                  style="position:absolute;right:.5rem;top:50%;transform:translateY(-50%);
+                         border:none;background:none;color:#6c757d;font-size:1.1rem;
+                         line-height:1;padding:0;display:none">&#215;</button>
+        </div>
+        <datalist id="exampleList"></datalist>
       </div>
       <div class="col-md-3">
         <label for="grammarSelect" class="form-label">Grammar</label>
@@ -97,12 +106,65 @@
 
 {% block scripts %}
 <script>
+  const _allExamples = {{ examples | tojson }};
+  const _MAX_HISTORY = 20;
+
+  function _historyKey(grm) { return 'ltdb-demo-history-' + grm; }
+
+  function _getHistory(grm) {
+    const stored = localStorage.getItem(_historyKey(grm));
+    if (stored) return JSON.parse(stored);
+    const defaults = _allExamples[grm] || [];
+    localStorage.setItem(_historyKey(grm), JSON.stringify(defaults));
+    return defaults;
+  }
+
+  function _addToHistory(grm, sentence) {
+    const history = [sentence, ..._getHistory(grm).filter(s => s !== sentence)]
+      .slice(0, _MAX_HISTORY);
+    localStorage.setItem(_historyKey(grm), JSON.stringify(history));
+    _updateDatalist(history);
+  }
+
+  function _updateDatalist(items) {
+    const dl = document.getElementById('exampleList');
+    dl.innerHTML = items.map(s => `<option value="${s.replace(/"/g, '&quot;')}">`).join('');
+  }
+
+  // Populate input and datalist for the given grammar
+  function _initGrammar(grm) {
+    const history = _getHistory(grm);
+    _updateDatalist(history);
+    if (!$('#inputText').val() && history.length > 0) {
+      $('#inputText').val(history[0]);
+      $('#clearInput').show();
+    }
+  }
+
+  _initGrammar($('#grammarSelect').val());
+
+  $('#inputText').on('input', function () {
+    $('#clearInput').toggle($(this).val().length > 0);
+  });
+
+  $('#clearInput').on('click', function () {
+    $('#inputText').val('').focus();
+    $(this).hide();
+  });
+
+  $('#grammarSelect').on('change', function () {
+    $('#inputText').val('');
+    _initGrammar($(this).val());
+  });
+
   $('#vizZoom').on('change', function () {
     $('.result-viz').css('zoom', $(this).val());
   });
 
   $('#parseForm').submit(function (e) {
     e.preventDefault();
+    const sentence = $('#inputText').val().trim();
+    if (sentence) _addToHistory($('#grammarSelect').val(), sentence);
 
     const formData = {
       input:      $('#inputText').val(),
@@ -119,7 +181,6 @@
     $.post('{{ url_for("parse_sentence") }}', formData)
       .done(function (data) {
         $('#spinner').hide();
-        console.log('parse response:', data);
         renderResults(data);
       })
       .fail(function (xhr) {

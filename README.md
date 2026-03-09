@@ -42,6 +42,40 @@ Options:
 The grammars are read by a web application written using Flask.
 See [Install.md](Install.md) for deployment instructions.
 
+## METADATA best practices
+
+Each grammar needs a TOML-formatted `METADATA` file. The fields recognised by ltdb are:
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `GRAMMAR_NAME` | string | yes | Full grammar name shown in the UI |
+| `SHORT_GRAMMAR_NAME` | string | yes | Short name used for the database filename |
+| `WEBSITE` | string | | Grammar project homepage URL |
+| `LICENSE` | string | | License name or URL |
+| `ACE_CONFIG_FILE` | string | yes | Path to the ACE config file (relative to METADATA) |
+| `TSDB_ROOTS` | list of strings | | Directories containing treebank profiles (default: `["tsdb/gold/"]`) |
+| `PROFILES` | list of strings | | Specific profile names to include (default: all found under `TSDB_ROOTS`) |
+| `EXAMPLES` | list of strings | | Example sentences shown in the parse demo and used to seed input history |
+
+The `EXAMPLES` field is especially useful for the demo page: sentences are pre-loaded
+into the input box and the browser history list, so users can try the grammar immediately.
+
+Example `METADATA`:
+
+```toml
+GRAMMAR_NAME = "English Resource Grammar"
+SHORT_GRAMMAR_NAME = "erg"
+WEBSITE = "https://delph-in.github.io/docs/erg/"
+LICENSE = "MIT"
+ACE_CONFIG_FILE = "ace/config.tdl"
+TSDB_ROOTS = ["tsdb/gold/"]
+EXAMPLES = [
+  "Abrams hired two competent programmers.",
+  "The dog chases the cat.",
+  "Kim arrived.",
+]
+```
+
 ## Docstring format
 
 TDL docstrings are rendered as Markdown. Standard Markdown formatting
