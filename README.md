@@ -6,6 +6,14 @@ treebank. Lexical types can be seen as detailed parts-of-speech.
 Information about the types are constructed from the linguists
 documentation in the grammar, a kind of literate programming.
 
+## Development setup
+
+```bash
+uv sync --extra dev   # installs app + ruff
+uv run ruff check .   # lint
+uv run ruff format .  # format
+```
+
 ## Quick Start
 
 A separate database is made for each grammar.  The description for the grammar is read from the METADATA, a single project may have multiple grammars.

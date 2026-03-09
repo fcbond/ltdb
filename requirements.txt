@@ -1,18 +1,13 @@
+# Production dependencies — canonical list is in pyproject.toml
+# Regenerate with: uv pip compile pyproject.toml -o requirements.txt
 pydelphin
 markdown-it-py
 lxml
-appdirs
-black
-click
 Flask
-isort
-itsdangerous
+Werkzeug
 Jinja2
 MarkupSafe
-mypy-extensions
-pathspec
-regex
+itsdangerous
+click
 toml
-#typed-ast==1.4.1
-typing-extensions
-Werkzeug
+gunicorn

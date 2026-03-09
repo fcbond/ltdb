@@ -1,0 +1,36 @@
+[project]
+name = "ltdb"
+version = "0.1.0"
+description = "Linguistic Type Database — Flask web app for DELPH-IN grammars"
+requires-python = ">=3.12"
+dependencies = [
+    "pydelphin",
+    "markdown-it-py",
+    "lxml",
+    "Flask",
+    "Werkzeug",
+    "Jinja2",
+    "MarkupSafe",
+    "itsdangerous",
+    "click",
+    "toml",
+    "gunicorn",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+]
+
+[tool.uv]
+python-version = "3.12"
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["web"]

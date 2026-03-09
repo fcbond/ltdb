@@ -24,11 +24,6 @@ CREATE TABLE lex (lexid TEXT primary key,
 		  carg TEXT,
 		  altcarg TEXT,
 		  docstring TEXT);
--- preprocess this
-CREATE TABLE ltypes (typ TEXT primary key,
-		     words TEXT,
-		     lfreq INTEGER default 0,
-		     cfreq INTEGER DEFAULT 0);
 -- words in the database (assumes unique profile+sid+wid)
 -- each sentence has words and their lexical ids, ordered by wid
 CREATE TABLE sent (sid INTEGER,

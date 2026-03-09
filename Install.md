@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.12+ (managed automatically by `uv`)
 - Apache 2 with `mod_proxy`, `mod_proxy_http`, `mod_headers`
 - SQLite3
 
@@ -22,10 +22,11 @@ sudo chown -R www-data:www-data /var/www/ltdb
 
 ```bash
 cd /var/www/ltdb
-sudo -u www-data python3 -m venv .venv
-sudo -u www-data .venv/bin/pip install -r requirements.txt
-sudo -u www-data .venv/bin/pip install gunicorn
+sudo -u www-data uv sync
 ```
+
+(`uv` creates `.venv` and installs all dependencies from `pyproject.toml` automatically.
+Install `uv` with `curl -LsSf https://astral.sh/uv/install.sh | sh` if not present.)
 
 ### 3. Create the log directory
 
@@ -77,6 +78,7 @@ python scripts/setup_ace.py
 cd /path/to/ltdb && git pull
 sudo rsync -a --exclude='.git' --exclude='.venv' . /var/www/ltdb/
 sudo chmod 644 /var/www/ltdb/web/db/*.db /var/www/ltdb/web/db/*.dat
+cd /var/www/ltdb && sudo -u www-data uv sync
 sudo systemctl restart ltdb
 ```
 
