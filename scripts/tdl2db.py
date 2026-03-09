@@ -108,7 +108,7 @@ def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
                         orths = obj.conjunction.get(ORTH, default=None)
                         try:
                             orth = ' '.join([str(s) for s in orths.values()])
-                        except:
+                        except Exception:
                             orth = ''
                             print('No Orthography', obj.identifier,
                                   sep='\t', file=log)
