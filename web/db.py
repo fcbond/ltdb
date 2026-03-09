@@ -369,8 +369,8 @@ def get_phenomena_by_cx(conn, cx):
     ### get a sample
     phenomena = dd(list)
     c.execute(
-        """SELECT a.profile, a.sid, COALESCE(a.kara, -1),
-    COALESCE(a.made, -1), max(b.wid)
+        """SELECT a.profile, a.sid, COALESCE(a.kara, 0),
+    COALESCE(a.made, max(b.wid) + 1), max(b.wid)
     FROM typind as a LEFT JOIN sent as b
     ON a.profile=b.profile and a.sid=b.sid
     WHERE a.typ = ?
@@ -379,7 +379,7 @@ def get_phenomena_by_cx(conn, cx):
     LIMIT ? OFFSET ?""",
         (cx, limit, offset),
     )
-    for profile, sid, kara, made, max in c:
+    for profile, sid, kara, made, maxwid in c:
         phenomena[profile, sid].append((kara, made))
 
     return maxp, phenomena
