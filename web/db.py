@@ -350,10 +350,10 @@ def get_sents(conn, psids):
         return dd(dict)
     c = conn.cursor()
     sents = dd(dict)
-    placeholders = ','.join(['(?,?)'] * len(psids))
+    conditions = ' OR '.join(['(profile=? AND sid=?)'] * len(psids))
     params = [x for ps in psids for x in ps]
     c.execute(f"""SELECT profile, sid, wid, word, lexid FROM sent
-    WHERE (profile, sid) IN ({placeholders})
+    WHERE {conditions}
     ORDER BY profile, sid, wid""", params)
     for (prof, sid, wid, word, lexid) in c:
         sents[prof, sid][wid] = word
@@ -370,11 +370,11 @@ def get_gold(conn, psids):
         return dd(dict)
     c = conn.cursor()
     data = dd(dict)
-    placeholders = ','.join(['(?,?)'] * len(psids))
+    conditions = ' OR '.join(['(profile=? AND sid=?)'] * len(psids))
     params = [x for ps in psids for x in ps]
     c.execute(f"""SELECT profile, sid, deriv_json, mrs, mrs_json, dmrs_json, sent
     FROM gold
-    WHERE (profile, sid) IN ({placeholders})""", params)
+    WHERE {conditions}""", params)
     for (prof, sid, deriv_json, mrs, mrs_json, dmrs_json, sent) in c:
         data[prof, sid]['mrs'] = mrs
         data[prof, sid]['mrsj'] = mrs_json

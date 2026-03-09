@@ -34,6 +34,17 @@ Options:
 The grammars are read by a web application written using Flask.
 See [Install.md](Install.md) for deployment instructions.
 
+## Docstring format
+
+TDL docstrings are rendered as Markdown. Standard Markdown formatting
+(headings, bold, italic, lists, code) is supported. The following ltdb-specific
+tags are also recognised:
+
+- `<ex>text` — grammatical example
+- `<nex>text` — ungrammatical example (prefixed ∗)
+- `<mex>text` — marginal example (prefixed ⊛)
+- `<name lang='xx'>Name</name>` — name of the type in language `xx`
+
 There is `more documentation <http://moin.delph-in.net/LkbLtdb>`__ at
 the DELPH-IN Wiki.
 
