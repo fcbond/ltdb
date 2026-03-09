@@ -5,6 +5,7 @@
 	rel="stylesheet">
   <link href="{{ url_for('static', filename='css/delphin-viz.css') }}"
 	      rel="stylesheet">
+  <style>{{ pygments_css }}</style>
 
 <script src="{{ url_for('static', filename='js/tree.js') }}"        
 	language='javascript'></script>
@@ -124,8 +125,8 @@
     </ul>
   </a>
 {% endif %}
-<h3>TDL</h3> 
-  <pre class='code'>{{info['tdl']}}</pre> 
+<h3>TDL</h3>
+  {{ tdl_html | safe }}
   <p>{{ info['src'] }}, {{ info['line'] }}
 {% endif %}
     

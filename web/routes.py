@@ -3,12 +3,16 @@
 import json
 import os
 import pathlib
+import re as _re
 import shutil
 import sys
 import traceback
 
+from delphin.highlight import TDLLexer
 from flask import current_app as app
 from flask import jsonify, redirect, render_template, request, session, url_for
+from pygments import highlight
+from pygments.formatters import HtmlFormatter
 
 from .db import (
     get_db,
@@ -30,6 +34,25 @@ from .db import (
     search_for,
 )
 from .ltdb import rst2html
+
+_tdl_formatter = HtmlFormatter(style="friendly")
+PYGMENTS_CSS = _tdl_formatter.get_style_defs(".highlight")
+_type_span_re = _re.compile(r'<span class="(nc|n)">([^<]+)</span>')
+
+
+def tdl2html(tdl_str):
+    """Render a TDL string to syntax-highlighted HTML with clickable type links."""
+    if not tdl_str:
+        return ""
+    html = highlight(tdl_str, TDLLexer(), _tdl_formatter)
+    return _type_span_re.sub(
+        lambda m: (
+            f'<a href="{url_for("type", query=m.group(2))}"'
+            f' class="{m.group(1)}">{m.group(2)}</a>'
+        ),
+        html,
+    )
+
 
 current_directory = os.path.abspath(os.path.dirname(__file__))
 
@@ -216,6 +239,8 @@ def type(query):
         info=typeinfo,
         grm=grm,
         desc=desc,
+        tdl_html=tdl2html(typeinfo.get("tdl") if typeinfo else None),
+        pygments_css=PYGMENTS_CSS,
         lexids=lexids,
         words=words,
         maxp=maxp,
