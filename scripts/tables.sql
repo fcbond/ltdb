@@ -77,6 +77,10 @@ CREATE TABLE tdl (typ TEXT,
 -- Hierarchy extracted by PyDelphin		 
 CREATE TABLE hie (child TEXT,
                   parent TEXT);
--- Metadata (from METADATA		 
+-- Metadata (from METADATA
 CREATE TABLE meta (att TEXT,
                    val TEXT);
+CREATE INDEX idx_lex_typ ON lex(typ);
+CREATE INDEX idx_sent_lexid ON sent(lexid);
+CREATE INDEX idx_typind_typ ON typind(typ);
+CREATE INDEX idx_lexind_lexid ON lexind(lexid);

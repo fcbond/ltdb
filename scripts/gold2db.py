@@ -44,13 +44,11 @@ def ver_match(ver, profile, log):
             return False
         
     elif len(grms) > 1:
-        print(f"Warning: "
-              "two different grammars used in this profile {profile}",
+        print(f"Warning: two different grammars used in this profile {profile}",
               file=sys.stderr)
         return False
     elif len(grms) == 0:
-        print(f"Warning: "
-              "no grammar indicated in this profile {root}",
+        print(f"Warning: no grammar indicated in this profile {root}",
               file=sys.stderr)
         return False
 
@@ -95,12 +93,9 @@ def process_results(root,log):
                     log.write(response['i-input']) ### FIXME
                     log.write("\n\n")
                     log.write(repr(e))
-                    if hasattr(e, 'message'):
-                        log.write(e.message)
-                        log.write("\n\n")
                     if mrs_str:
                         log.write(mrs_str)
-                    dmrs_obj = None  
+                    dmrs_obj = None
                 try:
                     if dmrs_obj:
                         dmrs_json = dmrsjson.encode(dmrs_obj)
@@ -109,17 +104,13 @@ def process_results(root,log):
                 except Exception as e:
                     log.write("\n\nDMRS failed to serialize to JSON:\n")
                     log.write(f"{root}: {profile} {sid} {e}\n")
-                    log.write(response['i-input']) ### FIXME
+                    log.write(response['i-input'])
                     log.write("\n\n")
                     log.write(repr(e))
-                    if hasattr(e, 'message'):
-                        log.write(e.message)
-                        log.write("\n\n")
                     if mrs_str:
                         log.write(mrs_str)
                     dmrs_json = '{}'
             for warn in caught_warnings:
-            # STORE gfor warn in caught_warnings:
                 log.write(f"\n\nWarning: {warn.message}\n")
                 log.write(f"{root}: {profile} {sid}\n")
             gold.append((profile,
@@ -219,8 +210,4 @@ def process_tsdb(conn, ver, checkgrm, golddir, log, profiles):
                 gold2db(conn, gold, log)
                 sent2db(conn, sent, log)
                 nodes2db(conn, lexind, typind, log)
-
-#process_tsdb('ERG-dict (2020)', '/home/bond/tmp/2020-for-ltdb/tsdb/gold/omw', log)
-#process_tsdb('ERG-dict (2020)', '/home/bond/tmp/2020-for-ltdb/tsdb/gold/ntucle', log)
-#process_tsdb('ERG-dict (2020)', '/home/bond/tmp/2020-for-ltdb/tsdb/gold/sh-spec', log)
 

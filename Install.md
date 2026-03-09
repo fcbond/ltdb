@@ -54,11 +54,29 @@ sudo systemctl reload apache2
 
 The app will be available at `https://compling.upol.cz/ltdb`.
 
+## Adding grammars
+
+Copy compiled `.db` files (and `.dat` files for the demo) to `web/db/`, then
+fix permissions so gunicorn (`www-data`) can read them:
+
+```bash
+sudo cp path/to/*.db path/to/*.dat /var/www/ltdb/web/db/
+sudo chmod 644 /var/www/ltdb/web/db/*.db /var/www/ltdb/web/db/*.dat
+```
+
+The parse/generate demo also requires the ACE binary. Download it with:
+
+```bash
+cd /var/www/ltdb && source .venv/bin/activate
+python scripts/setup_ace.py
+```
+
 ## Updating the app
 
 ```bash
 cd /path/to/ltdb && git pull
 sudo rsync -a --exclude='.git' --exclude='.venv' . /var/www/ltdb/
+sudo chmod 644 /var/www/ltdb/web/db/*.db /var/www/ltdb/web/db/*.dat
 sudo systemctl restart ltdb
 ```
 

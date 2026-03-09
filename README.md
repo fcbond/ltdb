@@ -13,14 +13,23 @@ A separate database is made for each grammar.  The description for the grammar i
 Compile a database with:
 
 ```
-$ python scripts/grm2db.py path/to/METADATA
+$ python scripts/grm2db.py --outdir web/db path/to/METADATA
 ```
 
---checkgrm only includes treebanks made by the same version
---outdir specifies the output directory 
-         a temporary directory will be made otherwise
+Add `--ace` to also compile an ACE `.dat` file (required for the parse demo):
 
-If all goes well, copy the database to web/db/.
+```
+$ python scripts/grm2db.py --outdir web/db --ace path/to/METADATA
+```
+
+Run `python scripts/setup_ace.py` first to download the ACE binary if it is
+not already on your PATH.
+
+Options:
+- `--checkgrm` only includes treebanks made by the same grammar version
+- `--outdir`   output directory (a temporary directory is used otherwise)
+- `--ace`      also compile a `.dat` file for the parse/generate demo
+- `--ace-bin`  path to ACE binary (default: search PATH then `etc/ace-*/ace`)
 
 The grammars are read by a web application written using Flask.
 See [Install.md](Install.md) for deployment instructions.

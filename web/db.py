@@ -38,7 +38,6 @@ def holders(lst):
 def get_md(conn):
     c = conn.cursor()
     c.execute("SELECT att, val FROM meta")
-    print(c)
     md = dict()
     for (att, val) in c:
         md[att]=val
@@ -136,7 +135,7 @@ def get_lxids(conn, typ):
              LEFT JOIN lexfreq ON lex.lexid = lexfreq.lexid
              WHERE typ=? 
     ORDER BY freq DESC
-    LIMIT {lim / 2}""", (typ,))
+    LIMIT {lim // 2}""", (typ,))
     lem = dict()
     for (lxid, orth, freq) in c:
         lem[lxid] = (orth, freq)
@@ -150,7 +149,7 @@ def get_lxid(conn, typ):
     c = conn.cursor()
     c.execute(f"""SELECT lexid, word, COALESCE(freq,0) FROM lexfreq
              WHERE lexid=? 
-    LIMIT {lim / 2}""", (typ,))
+    LIMIT {lim // 2}""", (typ,))
     lem = dict()
     for (lxid, orth, freq) in c:
         lem[lxid] = (orth, freq)
@@ -310,12 +309,10 @@ def get_phenomena_by_cx(conn, cx):
     try to pick short sentences
     """
     c = conn.cursor()
-        ### get the total number
-    c = conn.cursor()
-    c.execute(f"""SELECT COUNT(*) 
+    c.execute(f"""SELECT COUNT(*)
     FROM (
-    SELECT DISTINCT profile, sid 
-    FROM typind 
+    SELECT DISTINCT profile, sid
+    FROM typind
     WHERE typ = ?
     )""", (cx,))
     result = c.fetchone()
@@ -335,9 +332,7 @@ def get_phenomena_by_cx(conn, cx):
     WHERE a.typ = ?
     GROUP BY b.profile, b.sid
     ORDER BY max(b.wid)
-    LIMIT ?""", (cx, sentlim))
-    print("CX", cx)
-    
+    LIMIT ? OFFSET ?""", (cx, limit, offset))
     for (profile, sid, kara, made, max) in c:
         phenomena[profile, sid].append((kara, made))
         
@@ -351,14 +346,17 @@ def get_sents(conn, psids):
     return enough information to display it
     sent[(p, s)][wid] = word
     """
+    if not psids:
+        return dd(dict)
     c = conn.cursor()
     sents = dd(dict)
-    for profile, sid in psids:
-        c.execute("""SELECT profile, sid, wid, word, lexid FROM SENT 
-        WHERE profile = ? AND sid = ? order by profile, sid, wid""",
-                  (profile, sid))
-        for (prof, sid, wid, word, lexid) in c:
-            sents[prof, sid][wid] = word
+    placeholders = ','.join(['(?,?)'] * len(psids))
+    params = [x for ps in psids for x in ps]
+    c.execute(f"""SELECT profile, sid, wid, word, lexid FROM sent
+    WHERE (profile, sid) IN ({placeholders})
+    ORDER BY profile, sid, wid""", params)
+    for (prof, sid, wid, word, lexid) in c:
+        sents[prof, sid][wid] = word
     return sents
 
 def get_gold(conn, psids):
@@ -368,19 +366,21 @@ def get_gold(conn, psids):
     sent[(p, s)]['mrs'] = mrs
     ...
     """
+    if not psids:
+        return dd(dict)
     c = conn.cursor()
     data = dd(dict)
-    for profile, sid in psids:
-        c.execute("""SELECT profile, sid, deriv_json, mrs, mrs_json, dmrs_json, sent
-        FROM GOLD 
-        WHERE profile = ? AND sid = ?""",
-                  (profile, sid))
-        for (prof, sid, deriv_json, mrs, mrs_json, dmrs_json, sent) in c:
-            data[prof, sid]['mrs'] = mrs
-            data[prof, sid]['mrsj'] = mrs_json
-            data[prof, sid]['dmrsj'] = dmrs_json
-            data[prof, sid]['derivj'] = deriv_json
-            data[prof, sid]['item'] = sent
+    placeholders = ','.join(['(?,?)'] * len(psids))
+    params = [x for ps in psids for x in ps]
+    c.execute(f"""SELECT profile, sid, deriv_json, mrs, mrs_json, dmrs_json, sent
+    FROM gold
+    WHERE (profile, sid) IN ({placeholders})""", params)
+    for (prof, sid, deriv_json, mrs, mrs_json, dmrs_json, sent) in c:
+        data[prof, sid]['mrs'] = mrs
+        data[prof, sid]['mrsj'] = mrs_json
+        data[prof, sid]['dmrsj'] = dmrs_json
+        data[prof, sid]['derivj'] = deriv_json
+        data[prof, sid]['item'] = sent
     return data
 
 def get_summary(conn):

@@ -29,18 +29,19 @@ def read_cfg (ace_config):
     read the config file, find the grammar, version and path to orthography
     """
     cfg = dict()
-    for l in open(ace_config):
-        for attr in ["version",
-                     "grammar-top",
-                     "orth-path"]:
-            match =  re.findall(rf'{attr}\s+:=\s+"?([^"]+)"?.', l.strip())
+    with open(ace_config) as fh:
+        for l in fh:
+            for attr in ["version", "grammar-top", "orth-path"]:
+                match = re.findall(rf'{attr}\s+:=\s+"?([^"]+)"?.', l.strip())
+                if match:
+                    cfg[attr] = match[0]
+    cfg['grammar_file'] = os.path.normpath(
+        os.path.join(os.path.dirname(ace_config), cfg['grammar-top']))
+    with open(os.path.join(os.path.dirname(ace_config), cfg['version'])) as fh:
+        for l in fh:
+            match = re.findall(rf'\*grammar-version\*\s+"([^"]+)"', l.strip())
             if match:
-                cfg[attr] = match[0]
-    cfg['grammar_file'] = os.path.normpath(os.path.join(os.path.dirname(ace_config), cfg['grammar-top']))
-    for l in open(os.path.join(os.path.dirname(ace_config), cfg['version'])):
-        match = re.findall(rf'\*grammar-version\*\s+"([^"]+)"', l.strip())
-        if match:
-            cfg['ver'] = match[0]
+                cfg['ver'] = match[0]
     return cfg
 
 
@@ -52,7 +53,6 @@ def read_grm (cfg, log):
     grammarfile=cfg['grammar_file']
     path = Path(grammarfile)
     base = path.parent
-    print("FILE", grammarfile, "BASE:", base)
     for event, obj, lineno in tdl.iterparse(grammarfile):
         if  event == "LineComment":
             continue
@@ -170,23 +170,6 @@ def intodb(conn, tdls, types, hierarchy, les):
 
     c.executemany("""INSERT OR IGNORE INTO types (typ, status, parents, children)
     VALUES (?,?,?,?) """, typs)
-
-    # too slow
-    # c.execute("""CREATE TEMPORARY TABLE subs 
-    #            AS  SELECT parent, group_concat(child, ' ') as kids
-    #            FROM hie GROUP BY parent""")
-    # c.execute("""UPDATE types 
-    # SET children = (SELECT kids FROM subs 
-    # WHERE types.typ = subs.parent AND types.children is NULL)""")
-    # c.execute("""drop table subs""")
-
-    # c.execute("""CREATE TEMPORARY TABLE sups 
-    #            AS  SELECT child, group_concat(parent, ' ') as olds
-    #            FROM hie GROUP BY child""")
-    # c.execute("""UPDATE types 
-    # SET parents = (SELECT olds FROM sups 
-    # WHERE types.typ = sups.child AND types.parents is NULL)""")
-    # c.execute("""drop table sups""")
 
     ### lexical items
     litems = []

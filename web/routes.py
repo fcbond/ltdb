@@ -2,7 +2,6 @@
 from flask import current_app as app
 from flask import render_template, request, session, redirect, url_for, jsonify
 
-import toml
 import pathlib
 import shutil
 import sqlite3, os, json, sys, traceback
@@ -18,12 +17,6 @@ from .db import get_db, get_md, \
     get_short_summary
 
 from .ltdb import rst2html
-
-def get_db_connection(root, db):
-    dbpath = os.path.join(root, db)
-    conn = sqlite3.connect(dbpath)
-    #conn.row_factory = sqlite3.Row
-    return conn
 
 current_directory = os.path.abspath(os.path.dirname(__file__))
 
@@ -45,11 +38,6 @@ def find_ace():
             _ace_bin = str(candidate)
             return _ace_bin
     raise FileNotFoundError("ACE binary not found. Run scripts/setup_ace.py or install ACE.")
-
-
-#session['grm']=None
-#'db/ERG_(2020).db'
-#grm='db/Portuguese_(2022-08-10).db'
 
 
 
@@ -81,7 +69,9 @@ def home():
 @app.route("/grammar.html")
 def grammar():
     """show the grammar page"""
-    grm = session['grm']
+    grm = session.get('grm')
+    if not grm:
+        return redirect(url_for('home'))
     conn = get_db(current_directory, grm)
     md = get_md(conn)
     summ = get_summary(conn)
@@ -98,7 +88,9 @@ def grammar():
 @app.route("/rules.html")
 def rules():
     """show the rules"""
-    grm = session['grm']
+    grm = session.get('grm')
+    if not grm:
+        return redirect(url_for('home'))
     conn = get_db(current_directory, grm)
     md   = get_md(conn)
     data = get_rules(conn)
@@ -113,7 +105,9 @@ def rules():
 @app.route("/ltypes.html")
 def ltypes():
     """show the lexical types"""
-    grm = session['grm']
+    grm = session.get('grm')
+    if not grm:
+        return redirect(url_for('home'))
     conn = get_db(current_directory, grm)
     
     md   = get_md(conn)
@@ -147,7 +141,9 @@ def type(query):
      * labels
      * root
      """
-    grm = session['grm']
+    grm = session.get('grm')
+    if not grm:
+        return redirect(url_for('home'))
     conn = get_db(current_directory, grm)
 
     typeinfo=get_type(conn, query)
@@ -329,11 +325,9 @@ def generate_sentence():
     try:
         mrs_obj = mrsjson.decode(mrs_json_str)
         mrs_str = simplemrs.encode(mrs_obj)
-        print(f"Generating from MRS:\n{mrs_str}", file=sys.stderr)
         response = ace.generate(dat, mrs_str, executable=find_ace())
         surfaces = [r.get('surface', '') for r in response.results()
                     if r.get('surface')]
-        print(f"Generated {len(surfaces)} surface(s): {surfaces}", file=sys.stderr)
     except Exception as e:
         traceback.print_exc(file=sys.stderr)
         return jsonify({'error': str(e)}), 500
@@ -352,7 +346,9 @@ def generate_sentence():
 
 @app.route('/search', methods=['POST'])
 def submit_fsearch():
-    grm = session['grm']
+    grm = session.get('grm')
+    if not grm:
+        return redirect(url_for('home'))
     conn = get_db(current_directory, grm)
     
     searched = request.form['search']

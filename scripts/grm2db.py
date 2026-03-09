@@ -14,9 +14,8 @@ from pathlib import Path
 from tdl2db import read_cfg, read_grm, intodb
 from gold2db import process_tsdb
 
-### check we have a new enough version
-if not sys.version_info > (3, 8):
-    print(f"you must use Python newer than 3.7 not {sys.version}")
+if sys.version_info < (3, 8):
+    sys.exit(f"Python 3.8+ required, got {sys.version}")
 
 
 def read_metadata(metadata_path):
@@ -185,14 +184,13 @@ if __name__ == '__main__':
     ### Read Metadata
     ###
     md = read_metadata(args.metadata)
-    print(md)
     if not md:
-        sys.exit("No usable metadata, giving up"),
+        sys.exit("No usable metadata, giving up")
 
     out_dir = args.outdir or tempfile.mkdtemp()
     os.makedirs(out_dir, exist_ok=True)
 
-    nam = md['SHORT_GRAMMAR_NAME'] or 'unknown'
+    nam = md.get('SHORT_GRAMMAR_NAME', 'unknown')
     
     print(f"Making the db for {nam} in {out_dir}")
     
@@ -201,53 +199,35 @@ if __name__ == '__main__':
 
     md['Version'] = cfg['ver'] 
 
-    log = open(os.path.join(out_dir, f"{md['Version']}-tdl.log"), 'w')
-    ###
-    ### read the info from the tdl
-    ###
-    tdls, types, hierarchy, les = read_grm(cfg, log)
-
-    #print(tdls, types, hierarchy, les)
-    ###
-    ### make the db
-    ###
-    dbname=f"{cfg['ver'].replace(' ', '_')}.db"
+    dbname = f"{cfg['ver'].replace(' ', '_')}.db"
     conn = make_db(out_dir, dbname)
-
-    ## add the information to the database
-    
     meta_to_db(conn, md)
-   
-    intodb(conn, tdls, types, hierarchy, les)
 
-    ###
-    ### add the info from gold
-    ###
+    log_path = os.path.join(out_dir, f"{md['Version']}-tdl.log")
+    with open(log_path, 'w') as log:
+        tdls, types, hierarchy, les = read_grm(cfg, log)
+        intodb(conn, tdls, types, hierarchy, les)
 
-
-    tsdb_roots = md.get('TSDB_ROOTS',  [ 'tsdb/gold/' ])
-    profiles = md.get('PROFILES',  None)
-    for root in tsdb_roots:
-        golddir =  os.path.normpath(os.path.join(os.path.dirname(args.metadata),
-                                                 root))
-        print(f'Processing profiles under {golddir}')
-        if profiles is not None:
-            print(f'If they are in {profiles}')
-        if os.path.isdir(golddir):
-            process_tsdb(conn, cfg['ver'], args.checkgrm,
-                         golddir, log, profiles)
-
+        tsdb_roots = md.get('TSDB_ROOTS', ['tsdb/gold/'])
+        profiles = md.get('PROFILES', None)
+        for root in tsdb_roots:
+            golddir = os.path.normpath(
+                os.path.join(os.path.dirname(args.metadata), root))
+            print(f'Processing profiles under {golddir}')
+            if profiles is not None:
+                print(f'If they are in {profiles}')
+            if os.path.isdir(golddir):
+                process_tsdb(conn, cfg['ver'], args.checkgrm,
+                             golddir, log, profiles)
 
     post_process_corpus(conn)
 
-    log.close()
-
-    print(f"Made {out_dir}/{dbname} for {md['SHORT_GRAMMAR_NAME']}")
+    print(f"Made {out_dir}/{dbname} for {nam}")
 
     if args.ace:
-        stem = dbname[:-3]  # strip .db
+        stem = dbname[:-3]
         dat_path = os.path.join(out_dir, stem + '.dat')
         ace_log_path = os.path.join(out_dir, stem + '-ace.log')
         cfg_path = os.path.join(os.path.dirname(args.metadata), md['ACE_CONFIG_FILE'])
         compile_ace(cfg_path, dat_path, ace_log_path, ace_bin=args.ace_bin)
-        print(f"Made {dat_path} for {md['SHORT_GRAMMAR_NAME']}")
+        print(f"Made {dat_path} for {nam}")
