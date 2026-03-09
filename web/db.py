@@ -1,6 +1,8 @@
-import sqlite3, os
-from flask import current_app, g
+import os
+import sqlite3
 from collections import defaultdict as dd
+
+from flask import g
 
 ### limit for most queries
 ### not much point showing more examples than this
@@ -10,17 +12,17 @@ sentlim = 8
 
 
 def get_db(root, db):
-    if 'db' not in g:
+    if "db" not in g:
         g.db = sqlite3.connect(
-            os.path.join(root, f'db/{db}')
-            #detect_types=sqlite3.PARSE_DECLTYPES
+            os.path.join(root, f"db/{db}")
+            # detect_types=sqlite3.PARSE_DECLTYPES
         )
-#        g.db.row_factory = sqlite3.Row
+    #        g.db.row_factory = sqlite3.Row
     return g.db
 
 
 def close_db(e=None):
-    db = g.pop('db', None)
+    db = g.pop("db", None)
 
     if db is not None:
         db.close()
@@ -31,40 +33,43 @@ def close_db(e=None):
 
 def holders(lst):
     """
-    return the parameter placeholders for a query 
+    return the parameter placeholders for a query
     """
-    return ','.join(['?']*len(lst))
+    return ",".join(["?"] * len(lst))
+
 
 def get_md(conn):
     c = conn.cursor()
     c.execute("SELECT att, val FROM meta")
     md = dict()
-    for (att, val) in c:
-        md[att]=val
+    for att, val in c:
+        md[att] = val
     return md
 
 
 def get_rules(conn):
     c = conn.cursor()
-        
-    c.execute(f"""SELECT types.typ, parents, lname, status, COALESCE(freq,0), arity, head 
+
+    c.execute("""SELECT types.typ, parents, lname, status,
+    COALESCE(freq,0), arity, head
     FROM types left join typfreq on types.typ=typfreq.typ
     WHERE status in ('rule', 'lex-rule', 'inf-rule', 'root') 
     ORDER BY status, types.typ""")
-        
+
     results = c.fetchall()
     return results
+
 
 def get_ltypes(conn):
     c = conn.cursor()
 
-    c.execute(f"""SELECT lex.typ, lname, count(lex.typ), COALESCE(freq,0), '' 
+    c.execute("""SELECT lex.typ, lname, count(lex.typ), COALESCE(freq,0), '' 
     FROM types LEFT JOIN lex ON types.typ = lex.typ
     LEFT JOIN typfreq ON lex.typ = typfreq.typ
     WHERE status ='lex-type' 
     GROUP BY lex.typ ORDER BY lex.typ""")
     results = c.fetchall()
-    
+
     return results
 
 
@@ -77,29 +82,37 @@ def search_for(conn, query):
     """
     c = conn.cursor()
     results = dd(list)
-    
+
     ## lemmas
-    c.execute(f"""SELECT orth, typ, 'freq', 'words'
+    c.execute(
+        """SELECT orth, typ, 'freq', 'words'
     FROM lex
-    WHERE orth glob ?""", [query])
-    if (returned := c.fetchall()):
-        results['lemmas'] =  returned
+    WHERE orth glob ?""",
+        [query],
+    )
+    if returned := c.fetchall():
+        results["lemmas"] = returned
 
     ## predicates
-    c.execute(f"""SELECT pred, lexid, typ FROM lex WHERE pred glob ?
+    c.execute(
+        """SELECT pred, lexid, typ FROM lex WHERE pred glob ?
     UNION SELECT altpred, lexid, typ FROM lex WHERE altpred glob ?""",
-              [query, query])
-    if (returned := c.fetchall()):
-        results['predicates'] = returned
+        [query, query],
+    )
+    if returned := c.fetchall():
+        results["predicates"] = returned
 
     ## types
-    c.execute(f"""SELECT types.typ, parents, status, freq,
+    c.execute(
+        """SELECT types.typ, parents, status, freq,
     lname 
     FROM types left join typfreq on types.typ=typfreq.typ
     WHERE types.typ glob  ?
-    ORDER BY status, types.typ""", [query])
-    
-    for (typ, parents, status, freq, lname) in c:
+    ORDER BY status, types.typ""",
+        [query],
+    )
+
+    for typ, parents, status, freq, lname in c:
         results[status].append((typ, parents, freq, lname))
 
     return results
@@ -111,19 +124,23 @@ def get_type(conn, typ):
     """
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("""SELECT  parents,  children,  cat,  val,
+    c.execute(
+        """SELECT  parents,  children,  cat,  val,
     cont, definition,  status, arity, head, 
     lname, tdl.docstring,
     criteria, reference, todo,
     src, line, kind, tdl 
     FROM types LEFT JOIN tdl 
     ON types.typ = tdl.typ
-    WHERE types.typ=? limit 1""", (typ,))
+    WHERE types.typ=? limit 1""",
+        (typ,),
+    )
     row = c.fetchone()
     if row:
-        return dict(zip(row.keys(), row))  
+        return dict(zip(row.keys(), row))
     else:
         return dict()
+
 
 def get_lxids(conn, typ):
     """
@@ -131,41 +148,49 @@ def get_lxids(conn, typ):
     or {} if the type is not a lexical type
     """
     c = conn.cursor()
-    c.execute(f"""SELECT lex.lexid, orth, COALESCE(freq,0) FROM lex 
+    c.execute(
+        f"""SELECT lex.lexid, orth, COALESCE(freq,0) FROM lex 
              LEFT JOIN lexfreq ON lex.lexid = lexfreq.lexid
              WHERE typ=? 
     ORDER BY freq DESC
-    LIMIT {lim // 2}""", (typ,))
+    LIMIT {lim // 2}""",
+        (typ,),
+    )
     lem = dict()
-    for (lxid, orth, freq) in c:
+    for lxid, orth, freq in c:
         lem[lxid] = (orth, freq)
-        
+
     return lem
+
 
 def get_lxid(conn, typ):
     """
-    return lexical item 
+    return lexical item
     """
     c = conn.cursor()
-    c.execute(f"""SELECT lexid, word, COALESCE(freq,0) FROM lexfreq
+    c.execute(
+        f"""SELECT lexid, word, COALESCE(freq,0) FROM lexfreq
              WHERE lexid=? 
-    LIMIT {lim // 2}""", (typ,))
+    LIMIT {lim // 2}""",
+        (typ,),
+    )
     lem = dict()
-    for (lxid, orth, freq) in c:
+    for lxid, orth, freq in c:
         lem[lxid] = (orth, freq)
-        
+
     return lem
 
 
 def get_wrds_by_ltypes(conn, wlimit=5):
     """
-    return a dictionary with words and frequencies 
+    return a dictionary with words and frequencies
     for all the lexical types
     """
-    words=dd(lambda: dd(int))
+    words = dd(lambda: dd(int))
     c = conn.cursor()
 
-    c.execute(f""" 
+    c.execute(
+        """ 
     WITH types_with_words AS (
         SELECT DISTINCT lex.typ
         FROM lex
@@ -179,7 +204,8 @@ def get_wrds_by_ltypes(conn, wlimit=5):
                 lex.typ, 
                 lexfreq.word, 
                 lexfreq.freq,
-                ROW_NUMBER() OVER (PARTITION BY lex.typ ORDER BY lexfreq.freq DESC) AS rank
+                ROW_NUMBER() OVER (
+                    PARTITION BY lex.typ ORDER BY lexfreq.freq DESC) AS rank
             FROM lex
             JOIN lexfreq ON lex.lexid = lexfreq.lexid
             GROUP BY lex.typ, lexfreq.word, lexfreq.freq
@@ -215,57 +241,64 @@ def get_wrds_by_ltypes(conn, wlimit=5):
     SELECT typ, word, 0 AS word_count FROM top_orths
     
     ORDER BY typ, word_count DESC, word
-    """, (wlimit, wlimit))
-    for (ltype, word, freq) in c:
+    """,
+        (wlimit, wlimit),
+    )
+    for ltype, word, freq in c:
         words[ltype][word] = freq
     return words
-    
-    
+
+
 def get_wrds_by_lexids(conn, lexids):
     """
     return a dictionary with words and frequencies for each lexid
     words[lexid][word] = freq
     """
     c = conn.cursor()
-    words=dd(lambda: dd(int))
-    c.execute(f"""
+    words = dd(lambda: dd(int))
+    c.execute(
+        f"""
     SELECT lexid, word, count(word) FROM sent
     WHERE (lexid IN ({holders(lexids)}))
     GROUP BY lexid, word 
     ORDER BY lexid
-    LIMIT {lim}""", lexids)
-    for (lexid, word, freq) in c:
+    LIMIT {lim}""",
+        lexids,
+    )
+    for lexid, word, freq in c:
         words[lexid][word] = freq
     return words
+
 
 def calculate_offset_limit(N, L):
     """
     Calculate appropriate OFFSET and LIMIT values for SQL query.
-    
+
     Args:
         N (int): Total number of available examples
         L (int): Desired number of examples
-        
+
     Returns:
         tuple: (offset, limit) values to use in SQL query
     """
     if L >= N:
-        # If we want more examples than exist, return all 
-        offset, limit  = 0, N
+        # If we want more examples than exist, return all
+        offset, limit = 0, N
     else:
         # Skip first 20% of examples
         offset = round(N * 0.2)
-        
-        # Make sure we still have at least L examples 
+
+        # Make sure we still have at least L examples
         remaining = N - offset
         if remaining < L:
             # Adjust offset down so we get at least L examples
             offset = N - L
         limit = L
     return offset, limit
-   
+
+
 def get_phenomena_by_lexids(conn, lexids):
-    """ 
+    """
     return a dict of profile, sid, with the lexid in question marked
     phenom[profile, sid = [(from, to), ....]
 
@@ -273,12 +306,15 @@ def get_phenomena_by_lexids(conn, lexids):
     """
     ### get the total number
     c = conn.cursor()
-    c.execute(f"""SELECT COUNT(*) 
+    c.execute(
+        f"""SELECT COUNT(*) 
     FROM (
     SELECT DISTINCT profile, sid 
     FROM sent 
     WHERE lexid IN ({holders(lexids)})
-    )""", (lexids))
+    )""",
+        (lexids),
+    )
     result = c.fetchone()
     if result:
         maxp = result[0]
@@ -288,33 +324,40 @@ def get_phenomena_by_lexids(conn, lexids):
     offset, limit = calculate_offset_limit(maxp, sentlim)
 
     ### get a sample
-    phenomena=dd(list)
-    c.execute(f"""SELECT a.profile, a.sid, a.wid , max(b.wid)
+    phenomena = dd(list)
+    c.execute(
+        f"""SELECT a.profile, a.sid, a.wid , max(b.wid)
     FROM sent as a LEFT JOIN sent as b
     ON a.profile=b.profile and a.sid=b.sid
     WHERE a.lexid IN ({holders(lexids)})
     GROUP BY b.profile, b.sid
     ORDER BY max(b.wid) 
-    LIMIT ? OFFSET ?""", (lexids + [limit, offset]))
-    for (profile, sid, wid, max) in c:
-        phenomena[profile, sid].append((wid, wid+1))
+    LIMIT ? OFFSET ?""",
+        (lexids + [limit, offset]),
+    )
+    for profile, sid, wid, max in c:
+        phenomena[profile, sid].append((wid, wid + 1))
     return maxp, phenomena
 
+
 def get_phenomena_by_cx(conn, cx):
-    """ 
+    """
     return a dict of profile, sid, with the cx in question marked
-    use for rules, roots, dlr, iflr, 
+    use for rules, roots, dlr, iflr,
 
     phenom[profile, sid = [(from, to), ....]
     try to pick short sentences
     """
     c = conn.cursor()
-    c.execute(f"""SELECT COUNT(*)
+    c.execute(
+        """SELECT COUNT(*)
     FROM (
     SELECT DISTINCT profile, sid
     FROM typind
     WHERE typ = ?
-    )""", (cx,))
+    )""",
+        (cx,),
+    )
     result = c.fetchone()
     if result:
         maxp = result[0]
@@ -324,20 +367,22 @@ def get_phenomena_by_cx(conn, cx):
     offset, limit = calculate_offset_limit(maxp, sentlim)
 
     ### get a sample
-    phenomena=dd(list)
-    c.execute(f"""SELECT a.profile, a.sid, COALESCE(a.kara, -1),
+    phenomena = dd(list)
+    c.execute(
+        """SELECT a.profile, a.sid, COALESCE(a.kara, -1),
     COALESCE(a.made, -1), max(b.wid)
     FROM typind as a LEFT JOIN sent as b
     ON a.profile=b.profile and a.sid=b.sid
     WHERE a.typ = ?
     GROUP BY b.profile, b.sid
     ORDER BY max(b.wid)
-    LIMIT ? OFFSET ?""", (cx, limit, offset))
-    for (profile, sid, kara, made, max) in c:
+    LIMIT ? OFFSET ?""",
+        (cx, limit, offset),
+    )
+    for profile, sid, kara, made, max in c:
         phenomena[profile, sid].append((kara, made))
-        
-    return maxp, phenomena
 
+    return maxp, phenomena
 
 
 def get_sents(conn, psids):
@@ -350,14 +395,18 @@ def get_sents(conn, psids):
         return dd(dict)
     c = conn.cursor()
     sents = dd(dict)
-    conditions = ' OR '.join(['(profile=? AND sid=?)'] * len(psids))
+    conditions = " OR ".join(["(profile=? AND sid=?)"] * len(psids))
     params = [x for ps in psids for x in ps]
-    c.execute(f"""SELECT profile, sid, wid, word, lexid FROM sent
+    c.execute(
+        f"""SELECT profile, sid, wid, word, lexid FROM sent
     WHERE {conditions}
-    ORDER BY profile, sid, wid""", params)
-    for (prof, sid, wid, word, lexid) in c:
+    ORDER BY profile, sid, wid""",
+        params,
+    )
+    for prof, sid, wid, word, lexid in c:
         sents[prof, sid][wid] = word
     return sents
+
 
 def get_gold(conn, psids):
     """
@@ -370,18 +419,22 @@ def get_gold(conn, psids):
         return dd(dict)
     c = conn.cursor()
     data = dd(dict)
-    conditions = ' OR '.join(['(profile=? AND sid=?)'] * len(psids))
+    conditions = " OR ".join(["(profile=? AND sid=?)"] * len(psids))
     params = [x for ps in psids for x in ps]
-    c.execute(f"""SELECT profile, sid, deriv_json, mrs, mrs_json, dmrs_json, sent
+    c.execute(
+        f"""SELECT profile, sid, deriv_json, mrs, mrs_json, dmrs_json, sent
     FROM gold
-    WHERE {conditions}""", params)
-    for (prof, sid, deriv_json, mrs, mrs_json, dmrs_json, sent) in c:
-        data[prof, sid]['mrs'] = mrs
-        data[prof, sid]['mrsj'] = mrs_json
-        data[prof, sid]['dmrsj'] = dmrs_json
-        data[prof, sid]['derivj'] = deriv_json
-        data[prof, sid]['item'] = sent
+    WHERE {conditions}""",
+        params,
+    )
+    for prof, sid, deriv_json, mrs, mrs_json, dmrs_json, sent in c:
+        data[prof, sid]["mrs"] = mrs
+        data[prof, sid]["mrsj"] = mrs_json
+        data[prof, sid]["dmrsj"] = dmrs_json
+        data[prof, sid]["derivj"] = deriv_json
+        data[prof, sid]["item"] = sent
     return data
+
 
 def get_summary(conn):
     """
@@ -415,6 +468,7 @@ def get_summary(conn):
 
     return summary
 
+
 def get_tb_summary(conn):
     """
     Return a summary of the treebank"
@@ -432,11 +486,12 @@ def get_tb_summary(conn):
 
     return summary
 
+
 def get_short_summary(current_directory, grammars):
     """
     Return a brief summary of all the grammars
 
-    you should give a dictionary of dictionaries 
+    you should give a dictionary of dictionaries
     summ[grm]['Name'] = GRAMMAR_NAME
     website: website
     rules: number of rules
@@ -446,7 +501,7 @@ def get_short_summary(current_directory, grammars):
     """
     summ = dict()
     for grm in grammars:
-        dbpath = os.path.join(current_directory, f'db/{grm}')
+        dbpath = os.path.join(current_directory, f"db/{grm}")
         with sqlite3.connect(dbpath) as conn:
             c = conn.cursor()
             c.execute("""

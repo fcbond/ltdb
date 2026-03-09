@@ -1,7 +1,7 @@
 """Download and install the ACE parser binary into etc/."""
-import os
-import sys
+
 import platform
+import sys
 import tarfile
 import urllib.request
 from pathlib import Path
@@ -25,8 +25,11 @@ def report_progress(block_count, block_size, total_size):
     downloaded = block_count * block_size
     if total_size > 0:
         pct = min(downloaded / total_size * 100, 100)
-        print(f"\r  {pct:.1f}%  ({downloaded // 1024} / {total_size // 1024} KB)",
-              end='', flush=True)
+        print(
+            f"\r  {pct:.1f}%  ({downloaded // 1024} / {total_size // 1024} KB)",
+            end="",
+            flush=True,
+        )
 
 
 def download(url, dest):
@@ -57,7 +60,9 @@ def install_linux():
         tf.extractall(ETC_DIR)
 
     if not ace_bin.exists():
-        raise FileNotFoundError(f"Expected ACE binary not found after extraction: {ace_bin}")
+        raise FileNotFoundError(
+            f"Expected ACE binary not found after extraction: {ace_bin}"
+        )
 
     print(f"ACE installed at {ace_bin}")
     return ace_bin

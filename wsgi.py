@@ -1,5 +1,7 @@
 """App entry point."""
+
 from werkzeug.middleware.proxy_fix import ProxyFix
+
 from web import create_app
 
 app = create_app()

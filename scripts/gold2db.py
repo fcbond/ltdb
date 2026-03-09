@@ -1,10 +1,14 @@
-import sqlite3, sys, re, os
-from collections import defaultdict as dd
-from delphin import itsdb, derivation, dmrs, tsdb
-from delphin.codecs import simplemrs, dmrsjson, mrsjson
 import json
-
+import os
+import re
+import sqlite3
+import sys
 import warnings
+from collections import defaultdict as dd
+
+from delphin import dmrs, itsdb, tsdb
+from delphin.codecs import dmrsjson, mrsjson, simplemrs
+
 
 def extract_span(terminal):
     """
@@ -23,74 +27,84 @@ def extract_span(terminal):
     else:
         return None
 
+
 def get_surface_form(terminal, surf_str):
     span = extract_span(terminal)
     if span:
-        return surf_str[span[0]:span[1]]
+        return surf_str[span[0] : span[1]]
     else:
         return terminal.form
 
+
 def ver_match(ver, profile, log):
-    """ 
+    """
     returns True iff the version matches the runs
     """
-    grms = set(tsdb.split(l)[7] for l in tsdb.open(profile, 'run'))
+    grms = set(tsdb.split(line)[7] for line in tsdb.open(profile, "run"))
     if len(grms) == 1:
-        rungrm = grms.pop() 
+        rungrm = grms.pop()
         if rungrm == ver:
             return True
         else:
             print(f"Grammar in treebank '{rungrm}' != '{ver}'", file=log)
             return False
-        
+
     elif len(grms) > 1:
-        print(f"Warning: two different grammars used in this profile {profile}",
-              file=sys.stderr)
+        print(
+            f"Warning: two different grammars used in this profile {profile}",
+            file=sys.stderr,
+        )
         return False
     elif len(grms) == 0:
-        print(f"Warning: no grammar indicated in this profile {root}",
-              file=sys.stderr)
+        print(
+            f"Warning: no grammar indicated in this profile {profile}", file=sys.stderr
+        )
         return False
 
-def process_results(root,log):
-    lexind=dd(lambda: dd(set))        # lexind[type][(profile, sid)]((frm, to), ...)
-    typind=dd(lambda: dd(set))        # typind[type][(profile, sid)]((frm, to), ...)
-    sent=dd(list)                     # sent[(profile, sid)][(surf, lexid)]
+
+def process_results(root, log):
+    lexind = dd(lambda: dd(set))  # lexind[type][(profile, sid)]((frm, to), ...)
+    typind = dd(lambda: dd(set))  # typind[type][(profile, sid)]((frm, to), ...)
+    sent = dd(list)  # sent[(profile, sid)][(surf, lexid)]
     gold = list()
-    
+
     ts = itsdb.TestSuite(root)
     for response in ts.processed_items():
-        sid=response['i-id']
-        profile = ts.path.name 
-        if response['results']:
-            first_result=response.result(0)
+        sid = response["i-id"]
+        profile = ts.path.name
+        if response["results"]:
+            first_result = response.result(0)
             deriv = first_result.derivation()
-            tree = first_result.get('tree', '')
+            tree = first_result.get("tree", "")
             deriv_str = deriv.to_udf(indent=None)
             with warnings.catch_warnings(record=True) as caught_warnings:
                 warnings.simplefilter("always")
                 try:
-                    deriv_json = json.dumps(deriv.to_dict(fields=['id','entity','score','form','tokens']))
+                    deriv_json = json.dumps(
+                        deriv.to_dict(
+                            fields=["id", "entity", "score", "form", "tokens"]
+                        )
+                    )
                 except Exception as e:
                     log.write("\n\ncouldn't convert deriv to json:\n")
                     log.write(f"{root}: {profile} {sid} {e}\n")
-                    deriv_json = '{}'
+                    deriv_json = "{}"
                 try:
                     mrs_obj = first_result.mrs()
-                    mrs_str = simplemrs.encode(mrs_obj,indent=True)
+                    mrs_str = simplemrs.encode(mrs_obj, indent=True)
                     mrs_json = mrsjson.encode(mrs_obj)
                 except Exception as e:
                     log.write("\n\nMRS couldn't be retrieved in pydelphin:\n")
                     log.write(f"{root}: {profile} {sid} {e}\n")
                     mrs_obj = None
-                    mrs_str = ''
-                    mrs_json = '{}'
+                    mrs_str = ""
+                    mrs_json = "{}"
                 try:
-                    dmrs_obj=dmrs.from_mrs(mrs_obj)
+                    dmrs_obj = dmrs.from_mrs(mrs_obj)
                 except Exception as e:
                     log.write("\n\nMRS failed to convert to DMRS:\n")
                     log.write(f"{root}: {profile} {sid} {e}\n")
-                    log.write(response['i-input']) ### FIXME
+                    log.write(response["i-input"])  ### FIXME
                     log.write("\n\n")
                     log.write(repr(e))
                     if mrs_str:
@@ -100,35 +114,40 @@ def process_results(root,log):
                     if dmrs_obj:
                         dmrs_json = dmrsjson.encode(dmrs_obj)
                     else:
-                        dmrs_json = '{}'
+                        dmrs_json = "{}"
                 except Exception as e:
                     log.write("\n\nDMRS failed to serialize to JSON:\n")
                     log.write(f"{root}: {profile} {sid} {e}\n")
-                    log.write(response['i-input'])
+                    log.write(response["i-input"])
                     log.write("\n\n")
                     log.write(repr(e))
                     if mrs_str:
                         log.write(mrs_str)
-                    dmrs_json = '{}'
+                    dmrs_json = "{}"
             for warn in caught_warnings:
                 log.write(f"\n\nWarning: {warn.message}\n")
                 log.write(f"{root}: {profile} {sid}\n")
-            gold.append((profile,
-                         sid,
-                         response['i-input'],
-                         response['i-comment'],
-                         deriv_str,
-                         deriv_json,
-                         tree,
-                         mrs_str,
-                         mrs_json,
-                         dmrs_json))
+            gold.append(
+                (
+                    profile,
+                    sid,
+                    response["i-input"],
+                    response["i-comment"],
+                    deriv_str,
+                    deriv_json,
+                    tree,
+                    mrs_str,
+                    mrs_json,
+                    dmrs_json,
+                )
+            )
             ### get the nodes
             if deriv:
-                for  (preterminal, terminal) in zip(deriv.preterminals(),
-                                                    deriv.terminals()):
+                for preterminal, terminal in zip(
+                    deriv.preterminals(), deriv.terminals()
+                ):
                     lexid = preterminal.entity
-                    surf = get_surface_form(terminal, response['i-input'])
+                    surf = get_surface_form(terminal, response["i-input"])
                     start = preterminal.start
                     end = preterminal.end
                     ### get cfrom cto
@@ -139,75 +158,89 @@ def process_results(root,log):
                     typ = node.entity
                     start = node.start
                     end = node.end
-                    typind[typ][(profile, sid)].add((start, end))       
+                    typind[typ][(profile, sid)].add((start, end))
     return gold, sent, lexind, typind
+
 
 def gold2db(conn, gold, log):
     c = conn.cursor()
-    #c.execute("""INSERT INTO tdl (typ) VALUES ('typical')""")
+    # c.execute("""INSERT INTO tdl (typ) VALUES ('typical')""")
     for g in gold:
         try:
-            c.execute("""INSERT INTO gold (profile, sid, sent, comment, 
+            c.execute(
+                """INSERT INTO gold (profile, sid, sent, comment, 
             deriv, deriv_json, pst, 
             mrs, mrs_json, dmrs_json) 
-            VALUES (?,?,?,?,?,?,?,?,?,?)""", g)
+            VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                g,
+            )
         except sqlite3.Error as e:
-            log.write(f'ERROR:   ({e}) of type ({type(e).__name__}), {g[0]} {g[1]}\n')
+            log.write(f"ERROR:   ({e}) of type ({type(e).__name__}), {g[0]} {g[1]}\n")
     conn.commit()
+
 
 def sent2db(conn, sent, log):
     c = conn.cursor()
-    for p,s in sent:
-        for i, (w, l) in enumerate(sent[(p,s)]):
+    for p, s in sent:
+        for i, (w, lexid) in enumerate(sent[(p, s)]):
             try:
-                c.execute("""INSERT INTO sent (profile, sid, wid, word, lexid) 
-                VALUES (?,?,?,?,?)""", (p, s, i, w, l))
+                c.execute(
+                    """INSERT INTO sent (profile, sid, wid, word, lexid)
+                VALUES (?,?,?,?,?)""",
+                    (p, s, i, w, lexid),
+                )
             except sqlite3.Error as e:
-                log.write(f'ERROR:   ({e}) of type ({type(e).__name__}), {p} {s}\n')
+                log.write(f"ERROR:   ({e}) of type ({type(e).__name__}), {p} {s}\n")
     conn.commit()
+
 
 def nodes2db(conn, lexind, typind, log):
     c = conn.cursor()
-                    
-    for l in  lexind:
-        for p,s in lexind[l]:
-            for (k, m) in lexind[l][(p, s)]:
-                try:
-                    c.execute("""INSERT INTO lexind (lexid, profile, sid, kara, made) 
-                    VALUES (?,?,?,?,?)""", (l, p, s, k, m))
-                except sqlite3.Error as e:
-                    log.write(f'ERROR:   ({e}) of type ({type(e).__name__}), {p} {s}\n')
 
-    for t in  typind:
-        for p,s in typind[t]:
-            for (k, m) in typind[t][(p, s)]:
+    for lexid in lexind:
+        for p, s in lexind[lexid]:
+            for k, m in lexind[lexid][(p, s)]:
                 try:
-                    c.execute("""INSERT INTO typind (typ, profile, sid, kara, made) 
-                    VALUES (?,?,?,?,?)""", (t, p, s, k, m))
+                    c.execute(
+                        """INSERT INTO lexind (lexid, profile, sid, kara, made)
+                    VALUES (?,?,?,?,?)""",
+                        (lexid, p, s, k, m),
+                    )
                 except sqlite3.Error as e:
-                    log.write(f'ERROR:   ({e}) of type ({type(e).__name__}), {p} {s}\n')
-                    
+                    log.write(f"ERROR:   ({e}) of type ({type(e).__name__}), {p} {s}\n")
+
+    for t in typind:
+        for p, s in typind[t]:
+            for k, m in typind[t][(p, s)]:
+                try:
+                    c.execute(
+                        """INSERT INTO typind (typ, profile, sid, kara, made) 
+                    VALUES (?,?,?,?,?)""",
+                        (t, p, s, k, m),
+                    )
+                except sqlite3.Error as e:
+                    log.write(f"ERROR:   ({e}) of type ({type(e).__name__}), {p} {s}\n")
+
     conn.commit()
 
-    
+
 def process_tsdb(conn, ver, checkgrm, golddir, log, profiles):
     """
     look at all the trees in the golddir
     process those with the same version cfg['ver']
     """
     for root, dirs, files in os.walk(golddir):
-        if ('result' in files or 'result.gz' in files):
+        if "result" in files or "result.gz" in files:
             if profiles is not None:
-                profile = root.split('/')[-1]
+                profile = root.split("/")[-1]
                 if profile not in profiles:
                     continue
-            
+
             ##print (root, dirs, files)
             if (not checkgrm) or ver_match(ver, root, log):
                 print(f"Processing {root}", file=sys.stderr)
                 gold, sent, lexind, typind = process_results(root, log)
-                #print(gold[0], gold[-1])
+                # print(gold[0], gold[-1])
                 gold2db(conn, gold, log)
                 sent2db(conn, sent, log)
                 nodes2db(conn, lexind, typind, log)
-

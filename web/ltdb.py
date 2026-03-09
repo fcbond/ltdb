@@ -1,5 +1,6 @@
-import sys
 import re
+import sys
+
 from markdown_it import MarkdownIt
 
 _md = MarkdownIt()
@@ -35,9 +36,11 @@ def munge_desc(typ, description):
                 ex = line[5:].strip()
                 exes.append((ex, typ, 1))
                 desc.append(f"\n{count}. ⊛ *{ex}*\n")
-            if ex.startswith('*'):
-                print(f"Warning: don't use '*' in examples, use <nex>: {line}",
-                      file=sys.stderr)
+            if ex.startswith("*"):
+                print(
+                    f"Warning: don't use '*' in examples, use <nex>: {line}",
+                    file=sys.stderr,
+                )
             count += 1
         else:
             m = _namere.search(line)
@@ -51,6 +54,6 @@ def munge_desc(typ, description):
 def rst2html(typ, docstring):
     """Render a TDL docstring to HTML via Markdown."""
     if not docstring:
-        return ''
+        return ""
     description, _examples, _names = munge_desc(typ, docstring)
     return _md.render(description)
