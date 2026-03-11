@@ -9,6 +9,8 @@ WorkingDirectory=/var/www/ltdb
 Environment="PATH=/var/www/ltdb/.venv/bin"
 ExecStart=/var/www/ltdb/.venv/bin/gunicorn \
     --workers 2 \
+    --timeout 120 \
+    --worker-tmp-dir /dev/shm \
     --bind unix:/run/ltdb/ltdb.sock \
     --access-logfile /var/log/ltdb/access.log \
     --error-logfile /var/log/ltdb/error.log \
