@@ -229,6 +229,7 @@ if __name__ == "__main__":
                 process_tsdb(conn, cfg["ver"], args.checkgrm, golddir, log, profiles)
 
     post_process_corpus(conn)
+    conn.close()
 
     print(f"Made {out_dir}/{dbname} for {nam}")
 

@@ -54,22 +54,34 @@ def read_grm(cfg, log):
                 if isinstance(entry, tdl.FileInclude):
                     path = entry.path.with_suffix(".tdl")
                     if path.is_file():
-                        tdls, types, hierarchy, les = process_type(
-                            cfg,
-                            str(base),
-                            str(path),
-                            status,
-                            tdls,
-                            types,
-                            hierarchy,
-                            les,
-                            log,
-                        )
+                        try:
+                            tdls, types, hierarchy, les = process_type(
+                                cfg,
+                                str(base),
+                                str(path),
+                                status,
+                                tdls,
+                                types,
+                                hierarchy,
+                                les,
+                                log,
+                            )
+                        except ValueError as e:
+                            print(f"Skipping {path}: {e}", file=log)
+                            print(f"Skipping {path}: {e}", file=sys.stderr)
                     else:
                         print("INCLUDED FILE NOT FOUND: {!s}".format(path))
                 else:
                     print("WARNING unknown type:", entry.status, file=log)
     return tdls, types, hierarchy, les
+
+
+def _safe_format(obj, path, log):
+    try:
+        return tdl.format(obj)
+    except Exception as e:
+        print(f"Warning: could not format {obj.identifier} in {path}: {e}", file=log)
+        return ""
 
 
 def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
@@ -123,7 +135,7 @@ def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
                                 path[len(base) :],
                                 lineno,
                                 event,
-                                tdl.format(obj),
+                                _safe_format(obj, path, log),
                                 obj.documentation(),
                             )
                         )
@@ -134,7 +146,7 @@ def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
                             path[len(base) :],
                             lineno,
                             event,
-                            tdl.format(obj),
+                            _safe_format(obj, path, log),
                             obj.documentation(),
                         )
                     )
