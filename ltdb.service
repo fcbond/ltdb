@@ -7,6 +7,7 @@ User=www-data
 Group=www-data
 WorkingDirectory=/var/www/ltdb
 Environment="PATH=/var/www/ltdb/.venv/bin"
+EnvironmentFile=-/var/www/ltdb/.env
 ExecStart=/var/www/ltdb/.venv/bin/gunicorn \
     --workers 2 \
     --timeout 120 \

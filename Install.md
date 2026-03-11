@@ -21,6 +21,10 @@ sudo chown -R www-data:www-data /var/www/ltdb
 ### 2. Set up the Python environment
 
 ```bash
+# Ensure www-data can write its cache (needed by uv)
+sudo mkdir -p /var/www/.cache/uv /var/www/.local/share/uv/python
+sudo chown -R www-data:www-data /var/www/.cache /var/www/.local
+
 cd /var/www/ltdb
 sudo -u www-data uv sync
 ```
@@ -35,7 +39,23 @@ sudo mkdir -p /var/log/ltdb
 sudo chown www-data:www-data /var/log/ltdb
 ```
 
-### 4. Install and start the gunicorn service
+### 4. Generate a secret key
+
+Flask uses a secret key to sign session cookies. All gunicorn workers must share
+the same key, and it must persist across restarts. Generate one and store it in
+`/var/www/ltdb/.env`:
+
+```bash
+python3 -c "import secrets; print('SECRET_KEY=' + secrets.token_hex(32))" \
+    | sudo tee /var/www/ltdb/.env
+sudo chmod 600 /var/www/ltdb/.env
+sudo chown www-data:www-data /var/www/ltdb/.env
+```
+
+This file is loaded automatically by the service via `EnvironmentFile`. Never
+commit it to version control (`.env` is already in `.gitignore`).
+
+### 5. Install and start the gunicorn service
 
 ```bash
 sudo cp ltdb.service /etc/systemd/system/
@@ -44,7 +64,7 @@ sudo systemctl enable --now ltdb
 sudo systemctl status ltdb   # confirm it is running
 ```
 
-### 5. Configure Apache
+### 6. Configure Apache
 
 ```bash
 sudo a2enmod proxy proxy_http headers
