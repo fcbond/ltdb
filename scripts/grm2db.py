@@ -207,12 +207,14 @@ if __name__ == "__main__":
 
     md["Version"] = cfg["ver"]
 
-    ver = cfg["ver"].replace(" ", "_")
+    raw_ver = cfg["ver"].replace(" ", "_")
+    m = re.search(r'\(([^)]+)\)$', raw_ver)
+    ver = m.group(1) if m else raw_ver
     dbname = f"{nam}_{ver}.db"
     conn = make_db(out_dir, dbname)
     meta_to_db(conn, md)
 
-    log_path = os.path.join(out_dir, f"{nam}_{ver}-tdl.log")
+    log_path = os.path.join(out_dir, f"{nam}_{ver}.log")
     with open(log_path, "w") as log:
         tdls, types, hierarchy, les = read_grm(cfg, log)
         intodb(conn, tdls, types, hierarchy, les)
