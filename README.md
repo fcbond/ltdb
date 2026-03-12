@@ -76,6 +76,22 @@ EXAMPLES = [
 ]
 ```
 
+## URL grammar selection
+
+Any page accepts a `?grm=` query parameter to select a grammar directly,
+without going through the home page form:
+
+```
+/ltdb?grm=yue_2023.01.10          → selects grammar, redirects to grammar page
+/ltdb/demo?grm=yue_2023.01.10     → opens demo with that grammar active
+/ltdb/grammar.html?grm=erg_2025   → opens grammar summary for the ERG
+/ltdb/type/noun?grm=erg_2025      → opens type page with the ERG selected
+```
+
+The `.db` extension is optional. The grammar name must match the stem of a
+`.db` file in `web/db/`; unrecognised names are silently ignored and the
+current session grammar is preserved.
+
 ## Docstring format
 
 TDL docstrings are rendered as Markdown. Standard Markdown formatting

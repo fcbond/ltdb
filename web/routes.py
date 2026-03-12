@@ -57,6 +57,23 @@ def tdl2html(tdl_str):
 current_directory = os.path.abspath(os.path.dirname(__file__))
 
 
+def _grm_exists(grm):
+    """Return True if a .db file exists for the given grammar name."""
+    return os.path.isfile(os.path.join(current_directory, "db", grm))
+
+
+@app.before_request
+def _apply_grm_param():
+    """If ?grm= is in the query string and the grammar exists, store it in the session."""
+    grm = request.args.get("grm")
+    if not grm:
+        return
+    if not grm.endswith(".db"):
+        grm += ".db"
+    if _grm_exists(grm):
+        session["grm"] = grm
+
+
 _ace_bin = None
 
 
@@ -92,6 +109,8 @@ def home():
     summ = get_short_summary(current_directory, grammars)
     if "grm" in request.form:
         session["grm"] = request.form["grm"]
+        return redirect(url_for("grammar"))
+    if request.args.get("grm") and session.get("grm"):
         return redirect(url_for("grammar"))
     page = "index"
     return render_template(
