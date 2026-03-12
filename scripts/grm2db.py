@@ -199,7 +199,7 @@ if __name__ == "__main__":
     out_dir = args.outdir or tempfile.mkdtemp()
     os.makedirs(out_dir, exist_ok=True)
 
-    nam = md.get("SHORT_GRAMMAR_NAME", "unknown")
+    nam = md.get("SHORT_GRAMMAR_NAME") or md.get("GRAMMAR_NAME", "unknown")
 
     print(f"Making the db for {nam} in {out_dir}")
 
@@ -207,11 +207,12 @@ if __name__ == "__main__":
 
     md["Version"] = cfg["ver"]
 
-    dbname = f"{cfg['ver'].replace(' ', '_')}.db"
+    ver = cfg["ver"].replace(" ", "_")
+    dbname = f"{nam}_{ver}.db"
     conn = make_db(out_dir, dbname)
     meta_to_db(conn, md)
 
-    log_path = os.path.join(out_dir, f"{md['Version']}-tdl.log")
+    log_path = os.path.join(out_dir, f"{nam}_{ver}-tdl.log")
     with open(log_path, "w") as log:
         tdls, types, hierarchy, les = read_grm(cfg, log)
         intodb(conn, tdls, types, hierarchy, les)
