@@ -51,7 +51,7 @@ def munge_desc(typ, description):
     return "\n".join(desc), exes, nams
 
 
-def rst2html(typ, docstring):
+def docstring2html(typ, docstring):
     """Render a TDL docstring to HTML via Markdown."""
     if not docstring:
         return ""

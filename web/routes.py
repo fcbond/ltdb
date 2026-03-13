@@ -33,7 +33,7 @@ from .db import (
     get_wrds_by_ltypes,
     search_for,
 )
-from .ltdb import rst2html
+from .ltdb import docstring2html
 
 _tdl_formatter = HtmlFormatter(style="friendly")
 PYGMENTS_CSS = _tdl_formatter.get_style_defs(".highlight")
@@ -207,7 +207,7 @@ def type(query):
     desc = ""
 
     if typeinfo:
-        desc = rst2html(query, typeinfo["docstring"])
+        desc = docstring2html(query, typeinfo["docstring"])
 
         status = typeinfo["status"]
 
