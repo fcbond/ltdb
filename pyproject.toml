@@ -20,6 +20,15 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "ruff>=0.9",
+    "pytest>=8",
+    "pytest-playwright>=0.5",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "integration: requires ACE binary and compiled grammar .dat file",
 ]
 
 [tool.ruff]
