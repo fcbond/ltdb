@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from web.ltdb import munge_desc, rst2html
+from web.ltdb import docstring2html, munge_desc
 
 
 class TestMungeDesc:
@@ -71,20 +71,20 @@ class TestMungeDesc:
 
 class TestRst2Html:
     def test_empty_docstring_returns_empty(self):
-        assert rst2html("noun-le", "") == ""
+        assert docstring2html("noun-le", "") == ""
 
     def test_none_returns_empty(self):
-        assert rst2html("noun-le", None) == ""
+        assert docstring2html("noun-le", None) == ""
 
     def test_plain_text_renders_to_html(self):
-        result = rst2html("noun-le", "A simple description.")
+        result = docstring2html("noun-le", "A simple description.")
         assert "<p>" in result
         assert "A simple description." in result
 
     def test_example_rendered_as_italic(self):
-        result = rst2html("noun-le", "<ex>The dog barks.")
+        result = docstring2html("noun-le", "<ex>The dog barks.")
         assert "The dog barks." in result
 
     def test_returns_string(self):
-        result = rst2html("noun-le", "Some text.")
+        result = docstring2html("noun-le", "Some text.")
         assert isinstance(result, str)
