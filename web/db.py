@@ -12,20 +12,20 @@ sentlim = 8
 
 
 def get_db(root, db):
-    if "db" not in g:
-        g.db = sqlite3.connect(
-            os.path.join(root, f"db/{db}")
-            # detect_types=sqlite3.PARSE_DECLTYPES
-        )
-    #        g.db.row_factory = sqlite3.Row
-    return g.db
+    key = f"db_{root}_{db}"
+    conn = g.get(key)
+    if conn is None:
+        conn = sqlite3.connect(os.path.join(root, f"db/{db}"))
+        setattr(g, key, conn)
+    return conn
 
 
 def close_db(e=None):
-    db = g.pop("db", None)
-
-    if db is not None:
-        db.close()
+    for attr in list(vars(g)):
+        if attr.startswith("db_"):
+            conn = g.pop(attr, None)
+            if conn is not None:
+                conn.close()
 
 
 ############################################################
