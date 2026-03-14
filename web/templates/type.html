@@ -157,7 +157,7 @@
     {# PRINT DERIVATION TREE FROM JSON #}
     $( document ).ready(function() {
       const elem = document.getElementById('derivj{{p}}{{s}}');
-      const deriv_json = JSON.parse('{{gold[(p,s)]['derivj'] | safe}}');
+      const deriv_json = JSON.parse({{ gold[(p,s)]['derivj'] | default(none) | tojson }});
       drawTree(elem, deriv_json);
       const elemChild = document.createElement('span');
       elemChild.innerHTML = '<br><br>';
@@ -167,14 +167,14 @@
     {# PRINT DMRS FROM JSON #}
     $( document ).ready(function() {
       const elem = document.getElementById('dmrsj{{p}}{{s}}');
-      const dmrs_json = JSON.parse('{{gold[(p,s)]['dmrsj'] | safe}}');
+      const dmrs_json = JSON.parse({{ gold[(p,s)]['dmrsj'] | default(none) | tojson }});
       DMRS(elem, dmrs_json);
     });
 
     {# PRINT MRS FROM JSON #}
     $( document ).ready(function() {
       const elem = document.getElementById('mrsj{{p}}{{s}}');
-      const mrs_json = JSON.parse('{{gold[(p,s)]['mrsj'] | safe}}');
+      const mrs_json = JSON.parse({{ gold[(p,s)]['mrsj'] | default(none) | tojson }});
       MRS(elem, mrs_json);
     });
 
