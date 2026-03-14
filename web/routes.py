@@ -352,7 +352,10 @@ def parse_sentence():
     if not input_text:
         return jsonify({"error": "No input provided"}), 400
 
-    n_results = min(int(request.form.get("results", 5)), 10)
+    try:
+        n_results = min(int(request.form.get("results", 5)), 10)
+    except (ValueError, TypeError):
+        n_results = 5
     want_derivation = request.form.get("derivation") == "json"
     want_mrs = request.form.get("mrs") == "json"
     want_dmrs = request.form.get("dmrs") == "json"
@@ -461,7 +464,9 @@ def submit_fsearch():
         return redirect(url_for("home"))
     conn = get_db(current_directory, grm)
 
-    searched = request.form["search"]
+    searched = request.form.get("search", "").strip()
+    if not searched:
+        return redirect(url_for("home"))
 
     results = search_for(conn, query=searched)
 
