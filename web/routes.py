@@ -56,6 +56,18 @@ def tdl2html(tdl_str):
 
 current_directory = os.path.abspath(os.path.dirname(__file__))
 
+_summ_cache: tuple[frozenset, list, dict] | None = None
+
+
+def _db_fingerprint(db_dir: str) -> frozenset:
+    """Return a frozenset of (name, mtime, size) for every .db file in db_dir."""
+    result = set()
+    for f in os.listdir(db_dir):
+        if f.endswith(".db"):
+            st = os.stat(os.path.join(db_dir, f))
+            result.add((f, st.st_mtime, st.st_size))
+    return frozenset(result)
+
 
 def _grm_exists(grm):
     """Return True if a .db file exists for the given grammar name."""
@@ -99,14 +111,14 @@ def find_ace():
 @app.route("/", methods=["GET", "POST"])
 def home():
     """show the home page"""
-    grammars = []
-    # Iterate directory
-    for file in os.listdir(os.path.join(current_directory, "db")):
-        # check only text files
-        if file.endswith(".db"):
-            grammars.append(file)
-    grammars.sort()
-    summ = get_short_summary(current_directory, grammars)
+    global _summ_cache
+    db_dir = os.path.join(current_directory, "db")
+    fingerprint = _db_fingerprint(db_dir)
+    if _summ_cache is None or _summ_cache[0] != fingerprint:
+        grammars = sorted(name for name, _, _ in fingerprint)
+        summ = get_short_summary(current_directory, grammars)
+        _summ_cache = (fingerprint, grammars, summ)
+    grammars, summ = _summ_cache[1], _summ_cache[2]
     if "grm" in request.form:
         session["grm"] = request.form["grm"]
         return redirect(url_for("grammar"))

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sqlite3
+
 import pytest
 
 
@@ -113,6 +115,41 @@ class TestSearchPage:
 class TestDemoPage:
     def test_demo_returns_200(self, client):
         assert client.get("/demo").status_code == 200
+
+
+class TestSummaryCache:
+    def test_cache_invalidates_on_new_db(self, flask_app, tmp_path):
+        import web.routes as routes_mod
+        from tests.conftest import _init_db
+
+        client = flask_app.test_client()
+        client.get("/")  # prime the cache
+
+        db_dir = routes_mod.current_directory
+        new_db = tmp_path / "extra_1.0.db"
+        conn = sqlite3.connect(str(new_db))
+        _init_db(conn)
+        conn.close()
+
+        import shutil
+        dest = routes_mod.current_directory + "/db/extra_1.0.db"
+        shutil.copy(str(new_db), dest)
+        try:
+            resp = client.get("/")
+            assert b"extra_1.0" in resp.data
+        finally:
+            import os
+            os.unlink(dest)
+
+    def test_cache_hit_served_without_requery(self, client, monkeypatch):
+        import web.routes as routes_mod
+        client.get("/")  # prime cache
+        call_count = []
+        original = routes_mod.get_short_summary
+        monkeypatch.setattr(routes_mod, "get_short_summary",
+                            lambda *a, **kw: call_count.append(1) or original(*a, **kw))
+        client.get("/")
+        assert call_count == [], "get_short_summary should not be called on cache hit"
 
 
 class TestGrmParam:
