@@ -8,6 +8,8 @@ from web.db import (
     calculate_offset_limit,
     get_gold,
     get_ltypes,
+    get_phenomena_by_cx,
+    get_phenomena_by_lexids,
     get_lxid,
     get_lxids,
     get_md,
@@ -261,3 +263,55 @@ class TestGetTbSummary:
     def test_sentence_count(self, mem_conn):
         result = get_tb_summary(mem_conn)
         assert result["Sents"] == 1
+
+
+class TestGetPhenomenaByLexids:
+    def test_no_sentences_returns_zero(self, mem_conn):
+        maxp, phenom = get_phenomena_by_lexids(mem_conn, ["zzz_unknown"])
+        assert maxp == 0
+        assert dict(phenom) == {}
+
+    def test_known_lexid_finds_sentence(self, mem_conn):
+        maxp, phenom = get_phenomena_by_lexids(mem_conn, ["dog_n1"])
+        assert maxp == 1
+        assert ("gold", 1) in phenom
+
+    def test_multiple_lexids(self, mem_conn):
+        maxp, phenom = get_phenomena_by_lexids(mem_conn, ["dog_n1", "bark_v1"])
+        assert maxp == 1
+
+    def test_empty_lexids_returns_zero(self, mem_conn):
+        maxp, phenom = get_phenomena_by_lexids(mem_conn, [])
+        assert maxp == 0
+
+    def test_phenomena_contains_word_positions(self, mem_conn):
+        _, phenom = get_phenomena_by_lexids(mem_conn, ["dog_n1"])
+        positions = phenom["gold", 1]
+        assert len(positions) >= 1
+        assert all(isinstance(p, tuple) and len(p) == 2 for p in positions)
+
+
+class TestGetPhenomenaByCx:
+    def _seed_typind(self, conn):
+        conn.execute(
+            "INSERT INTO typind VALUES ('hd-cmp_c', 'gold', 1, 0, 3)"
+        )
+        conn.commit()
+
+    def test_no_matches_returns_zero(self, mem_conn):
+        maxp, phenom = get_phenomena_by_cx(mem_conn, "no-such-cx")
+        assert maxp == 0
+        assert dict(phenom) == {}
+
+    def test_known_cx_finds_sentence(self, mem_conn):
+        self._seed_typind(mem_conn)
+        maxp, phenom = get_phenomena_by_cx(mem_conn, "hd-cmp_c")
+        assert maxp == 1
+        assert ("gold", 1) in phenom
+
+    def test_phenomena_contains_span(self, mem_conn):
+        self._seed_typind(mem_conn)
+        _, phenom = get_phenomena_by_cx(mem_conn, "hd-cmp_c")
+        spans = phenom["gold", 1]
+        assert len(spans) >= 1
+        assert all(isinstance(s, tuple) and len(s) == 2 for s in spans)

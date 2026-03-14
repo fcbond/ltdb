@@ -36,6 +36,8 @@ CREATE TABLE gold   (sid INTEGER, profile TEXT, deriv_json TEXT,
                      mrs TEXT, mrs_json TEXT, dmrs_json TEXT, sent TEXT);
 CREATE TABLE typind (typ TEXT, profile TEXT, sid INTEGER,
                      kara INTEGER, made INTEGER);
+CREATE TABLE lexind (lexid TEXT, profile TEXT, sid INTEGER,
+                     kara INTEGER, made INTEGER);
 """
 
 SEED = """
