@@ -75,19 +75,21 @@ INSERT INTO sent VALUES (1, 'gold', 2, 'barks', 'bark_v1');
 """
 
 
+def _init_db(conn):
+    """Populate a SQLite connection with the minimal test schema and seed data."""
+    for sql in (SCHEMA, SEED):
+        for stmt in sql.strip().split(";"):
+            stmt = stmt.strip()
+            if stmt:
+                conn.execute(stmt)
+    conn.commit()
+
+
 @pytest.fixture
 def mem_conn():
     """In-memory SQLite connection with minimal ltdb schema and seed data."""
     conn = sqlite3.connect(":memory:")
-    for stmt in SCHEMA.strip().split(";"):
-        stmt = stmt.strip()
-        if stmt:
-            conn.execute(stmt)
-    for stmt in SEED.strip().split(";"):
-        stmt = stmt.strip()
-        if stmt:
-            conn.execute(stmt)
-    conn.commit()
+    _init_db(conn)
     yield conn
     conn.close()
 
@@ -99,36 +101,19 @@ def mem_conn():
 @pytest.fixture(scope="session")
 def flask_app(tmp_path_factory):
     """Flask app wired to a temp db/ directory containing one test grammar."""
-    db_dir = tmp_path_factory.mktemp("db")
+    base_dir = tmp_path_factory.mktemp("ltdb")
+    db_subdir = base_dir / "db"
+    db_subdir.mkdir()
 
-    # Write a minimal .db file the app can open
-    db_path = db_dir / "test-grammar_1.0.db"
-    conn = sqlite3.connect(str(db_path))
-    for stmt in SCHEMA.strip().split(";"):
-        stmt = stmt.strip()
-        if stmt:
-            conn.execute(stmt)
-    for stmt in SEED.strip().split(";"):
-        stmt = stmt.strip()
-        if stmt:
-            conn.execute(stmt)
-    conn.commit()
+    conn = sqlite3.connect(str(db_subdir / "test-grammar_1.0.db"))
+    _init_db(conn)
     conn.close()
 
     app = create_app()
-    app.config.update(
-        TESTING=True,
-        SECRET_KEY="test-secret",
-    )
+    app.config.update(TESTING=True, SECRET_KEY="test-secret")
 
-    # Point the app at our temp db directory
     import web.routes as routes_mod
-    routes_mod.current_directory = str(db_dir.parent)
-
-    # Create the db/ subdirectory structure the app expects
-    (db_dir.parent / "db").mkdir(exist_ok=True)
-    import shutil
-    shutil.copy(str(db_path), str(db_dir.parent / "db" / "test-grammar_1.0.db"))
+    routes_mod.current_directory = str(base_dir)
 
     yield app
 
@@ -137,6 +122,15 @@ def flask_app(tmp_path_factory):
 def client(flask_app):
     """Flask test client."""
     return flask_app.test_client()
+
+
+@pytest.fixture
+def grm_client(flask_app):
+    """Flask test client with the test grammar pre-selected in the session."""
+    c = flask_app.test_client()
+    with c.session_transaction() as sess:
+        sess["grm"] = "test-grammar_1.0.db"
+    return c
 
 
 # ---------------------------------------------------------------------------
