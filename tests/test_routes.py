@@ -112,6 +112,75 @@ class TestSearchPage:
         assert b"noun" in grm_client.post("/search", data={"search": "noun*"}).data
 
 
+class TestParseRoute:
+    def test_no_grammar_returns_400(self, client):
+        resp = client.post("/parse", data={"input": "The dog barks."})
+        assert resp.status_code == 400
+        assert b"grammar" in resp.data.lower()
+
+    def test_no_dat_file_returns_400(self, grm_client):
+        resp = grm_client.post("/parse", data={"input": "The dog barks."})
+        assert resp.status_code == 400
+        assert b".dat" in resp.data or b"compiled" in resp.data.lower()
+
+    def test_no_input_returns_400(self, grm_client, monkeypatch):
+        monkeypatch.setattr("web.routes.dat_path_for", lambda grm: "/fake/path.dat")
+        resp = grm_client.post("/parse", data={"input": ""})
+        assert resp.status_code == 400
+        assert b"input" in resp.data.lower()
+
+    def test_invalid_results_param_defaults_gracefully(self, grm_client, monkeypatch):
+        import delphin.ace as ace_mod
+
+        class _FakeResponse:
+            def results(self):
+                return []
+
+        monkeypatch.setattr(ace_mod, "parse", lambda *a, **kw: _FakeResponse())
+        monkeypatch.setattr("web.routes.dat_path_for", lambda grm: "/fake/path.dat")
+        resp = grm_client.post("/parse", data={"input": "test", "results": "notanint"})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["readings"] == 0
+
+    def test_successful_parse_returns_json(self, grm_client, monkeypatch):
+        import delphin.ace as ace_mod
+
+        class _FakeResult:
+            def derivation(self):
+                raise RuntimeError("no derivation")
+            def mrs(self):
+                raise RuntimeError("no mrs")
+
+        class _FakeResponse:
+            def results(self):
+                return [_FakeResult()]
+
+        monkeypatch.setattr(ace_mod, "parse", lambda *a, **kw: _FakeResponse())
+        monkeypatch.setattr("web.routes.dat_path_for", lambda grm: "/fake/path.dat")
+        resp = grm_client.post("/parse", data={"input": "The dog barks."})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["readings"] == 1
+        assert data["input"] == "The dog barks."
+
+
+class TestGenerateRoute:
+    def test_no_grammar_returns_400(self, client):
+        resp = client.post("/generate", data={"mrs": "{}"})
+        assert resp.status_code == 400
+
+    def test_no_dat_file_returns_400(self, grm_client):
+        resp = grm_client.post("/generate", data={"mrs": "{}"})
+        assert resp.status_code == 400
+
+    def test_no_mrs_returns_400(self, grm_client, monkeypatch):
+        monkeypatch.setattr("web.routes.dat_path_for", lambda grm: "/fake/path.dat")
+        resp = grm_client.post("/generate", data={})
+        assert resp.status_code == 400
+        assert b"MRS" in resp.data or b"mrs" in resp.data.lower()
+
+
 class TestDemoPage:
     def test_demo_returns_200(self, client):
         assert client.get("/demo").status_code == 200
