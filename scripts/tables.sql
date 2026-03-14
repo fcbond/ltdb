@@ -77,5 +77,7 @@ CREATE TABLE meta (att TEXT,
                    val TEXT);
 CREATE INDEX idx_lex_typ ON lex(typ);
 CREATE INDEX idx_sent_lexid ON sent(lexid);
+CREATE INDEX idx_sent_profile_sid ON sent(profile, sid);
+CREATE INDEX idx_gold_profile_sid ON gold(profile, sid);
 CREATE INDEX idx_typind_typ ON typind(typ);
 CREATE INDEX idx_lexind_lexid ON lexind(lexid);
