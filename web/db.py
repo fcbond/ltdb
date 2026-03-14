@@ -4,6 +4,8 @@ from collections import defaultdict as dd
 
 from flask import g
 
+from .ltdb import deriv_to_dict, mrs_to_dicts
+
 ### limit for most queries
 ### not much point showing more examples than this
 ###
@@ -409,11 +411,10 @@ def get_sents(conn, psids):
 
 
 def get_gold(conn, psids):
-    """
-    given a list of (profile, sid)
-    return the mrs, dmrs_json, mrs_json and deriv_json
-    sent[(p, s)]['mrs'] = mrs
-    ...
+    """Given a list of (profile, sid), return per-sentence linguistic data.
+
+    Keys per (profile, sid): 'mrs', 'mrsj', 'dmrsj', 'derivj', 'item'.
+    JSON fields are computed on the fly from the stored deriv/mrs strings.
     """
     if not psids:
         return dd(dict)
@@ -422,16 +423,16 @@ def get_gold(conn, psids):
     conditions = " OR ".join(["(profile=? AND sid=?)"] * len(psids))
     params = [x for ps in psids for x in ps]
     c.execute(
-        f"""SELECT profile, sid, deriv_json, mrs, mrs_json, dmrs_json, sent
-    FROM gold
-    WHERE {conditions}""",
+        f"SELECT profile, sid, deriv, mrs, sent FROM gold WHERE {conditions}",
         params,
     )
-    for prof, sid, deriv_json, mrs, mrs_json, dmrs_json, sent in c:
+    for prof, sid, deriv, mrs, sent in c:
+        mrs_d, dmrs_d = mrs_to_dicts(mrs)
         data[prof, sid]["mrs"] = mrs
-        data[prof, sid]["mrsj"] = mrs_json
-        data[prof, sid]["dmrsj"] = dmrs_json
-        data[prof, sid]["derivj"] = deriv_json
+        data[prof, sid]["mrsj"] = mrs_d
+        data[prof, sid]["dmrsj"] = dmrs_d
+        data[prof, sid]["derivj"] = deriv_to_dict(deriv)
+        data[prof, sid]["deriv"] = deriv  # raw UDF; shown as fallback when derivj is None
         data[prof, sid]["item"] = sent
     return data
 

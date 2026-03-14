@@ -107,9 +107,17 @@
 	      {# 	      class="btn btn-outline-primary btn-sm">MRS</button> #}
 
 
-	    <div id='derivj{{p}}{{s}}'><br></div>
+	    <div id='derivj{{p}}{{s}}'><br>
+	      {%- if gold[(p,s)]['derivj'] is none and gold[(p,s)]['deriv'] %}
+	      <pre class="text-muted small" title="Raw UDF (tree conversion failed)">{{gold[(p,s)]['deriv']}}</pre>
+	      {%- endif %}
+	    </div>
 	    <div id="tooltip" class="tooltip"></div>
-            <div id='dmrsj{{p}}{{s}}'></div>
+            <div id='dmrsj{{p}}{{s}}'>
+	      {%- if gold[(p,s)]['dmrsj'] is none and gold[(p,s)]['mrsj'] is not none %}
+	      <p class="text-muted small">DMRS conversion failed for this item.</p>
+	      {%- endif %}
+	    </div>
 	    <div id='mrs{{p}}{{s}}' class = 'card card-body'>
 <pre>
 {{gold[(p,s)]['mrs']}}
@@ -117,7 +125,7 @@
 	    </div>
 	    <div id='mrsj{{p}}{{s}}'><br>
               <div id="text-input" style="font-size: 150%%;">{{gold[(p,s)]['item']}}</div><br>
-	    </div>  
+	    </div>
 
 	  </li><br>
 	  {% endfor %}
@@ -156,26 +164,32 @@
     {% for p, s in phenomena %}
     {# PRINT DERIVATION TREE FROM JSON #}
     $( document ).ready(function() {
-      const elem = document.getElementById('derivj{{p}}{{s}}');
-      const deriv_json = JSON.parse('{{gold[(p,s)]['derivj'] | safe}}');
-      drawTree(elem, deriv_json);
-      const elemChild = document.createElement('span');
-      elemChild.innerHTML = '<br><br>';
-      elem.appendChild(elemChild);
+      const deriv_data = {{ gold[(p,s)]['derivj'] | tojson }};
+      if (deriv_data !== null) {
+        const elem = document.getElementById('derivj{{p}}{{s}}');
+        drawTree(elem, deriv_data);
+        const elemChild = document.createElement('span');
+        elemChild.innerHTML = '<br><br>';
+        elem.appendChild(elemChild);
+      }
     });
 
     {# PRINT DMRS FROM JSON #}
     $( document ).ready(function() {
-      const elem = document.getElementById('dmrsj{{p}}{{s}}');
-      const dmrs_json = JSON.parse('{{gold[(p,s)]['dmrsj'] | safe}}');
-      DMRS(elem, dmrs_json);
+      const dmrs_data = {{ gold[(p,s)]['dmrsj'] | tojson }};
+      if (dmrs_data !== null) {
+        const elem = document.getElementById('dmrsj{{p}}{{s}}');
+        DMRS(elem, dmrs_data);
+      }
     });
 
     {# PRINT MRS FROM JSON #}
     $( document ).ready(function() {
-      const elem = document.getElementById('mrsj{{p}}{{s}}');
-      const mrs_json = JSON.parse('{{gold[(p,s)]['mrsj'] | safe}}');
-      MRS(elem, mrs_json);
+      const mrs_data = {{ gold[(p,s)]['mrsj'] | tojson }};
+      if (mrs_data !== null) {
+        const elem = document.getElementById('mrsj{{p}}{{s}}');
+        MRS(elem, mrs_data);
+      }
     });
 
       

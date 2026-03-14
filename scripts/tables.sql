@@ -32,19 +32,14 @@ CREATE TABLE sent (sid INTEGER,
 		   word TEXT,
 		   lexid TEXT,
 		   UNIQUE(profile, sid, wid) );
--- Information from the gold profiles
--- The json could be built on the fly,
--- but it is useful to have a log of when conversion fails
+-- Information from the gold profiles; JSON is built on the fly from deriv/mrs
 CREATE TABLE gold (sid INTEGER,
-       	     	   profile TEXT,				
+       	     	   profile TEXT,
        	     	   sent TEXT,
 		   comment TEXT,
 		   deriv TEXT,
-		   deriv_json TEXT,
 		   pst TEXT,
 		   mrs TEXT,
-		   mrs_json TEXT,
-		   dmrs_json TEXT,
 		   flags TEXT,
 		   UNIQUE(profile, sid) );
 CREATE TABLE typind (typ TEXT,
