@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from web.ltdb import docstring2html, munge_desc
+from web.ltdb import docstring2html, munge_desc, sanitize_grm
 
 
 class TestMungeDesc:
@@ -88,3 +88,25 @@ class TestRst2Html:
     def test_returns_string(self):
         result = docstring2html("noun-le", "Some text.")
         assert isinstance(result, str)
+
+
+class TestSanitizeGrm:
+    @pytest.mark.parametrize("inp,expected", [
+        ("test-grammar_1.0",    "test-grammar_1.0.db"),
+        ("test-grammar_1.0.db", "test-grammar_1.0.db"),
+        ("erg_trunk",           "erg_trunk.db"),
+        ("yue_2026.03.12",      "yue_2026.03.12.db"),
+    ])
+    def test_valid_names(self, inp, expected):
+        assert sanitize_grm(inp) == expected
+
+    @pytest.mark.parametrize("inp", [
+        "../../../etc/passwd",
+        "/etc/passwd",
+        "foo/bar",
+        "foo\\bar",
+        "",
+        "   ",
+    ])
+    def test_invalid_names_return_none(self, inp):
+        assert sanitize_grm(inp) is None

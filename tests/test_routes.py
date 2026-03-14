@@ -161,3 +161,32 @@ class TestGrmParam:
 
     def test_grm_with_db_extension_works(self, client):
         assert client.get("/?grm=test-grammar_1.0.db").status_code == 302
+
+
+class TestGrmSecurity:
+    """Path traversal and injection rejection via sanitize_grm."""
+
+    @pytest.mark.parametrize("payload", [
+        "../../../etc/passwd",
+        "../../web/db/test-grammar_1.0",
+        "/etc/passwd",
+        "foo/bar.db",
+        "foo\\bar.db",
+        "",
+        "   ",
+    ])
+    def test_traversal_get_rejected(self, client, payload):
+        resp = client.get(f"/?grm={payload}")
+        assert resp.status_code == 200
+        with client.session_transaction() as sess:
+            assert "grm" not in sess or sess.get("grm") != payload
+
+    @pytest.mark.parametrize("payload", [
+        "../../../etc/passwd",
+        "/etc/passwd",
+        "foo/bar.db",
+    ])
+    def test_traversal_post_rejected(self, client, payload):
+        client.post("/", data={"grm": payload})
+        with client.session_transaction() as sess:
+            assert sess.get("grm") != payload

@@ -33,7 +33,7 @@ from .db import (
     get_wrds_by_ltypes,
     search_for,
 )
-from .ltdb import docstring2html
+from .ltdb import docstring2html, sanitize_grm
 
 _tdl_formatter = HtmlFormatter(style="friendly")
 PYGMENTS_CSS = _tdl_formatter.get_style_defs(".highlight")
@@ -69,20 +69,16 @@ def _db_fingerprint(db_dir: str) -> frozenset:
     return frozenset(result)
 
 
-def _grm_exists(grm):
-    """Return True if a .db file exists for the given grammar name."""
+def _grm_exists(grm: str) -> bool:
+    """Return True if a .db file exists for the given (already-sanitized) grammar name."""
     return os.path.isfile(os.path.join(current_directory, "db", grm))
 
 
 @app.before_request
 def _apply_grm_param():
     """If ?grm= is in the query string and the grammar exists, store it in the session."""
-    grm = request.args.get("grm")
-    if not grm:
-        return
-    if not grm.endswith(".db"):
-        grm += ".db"
-    if _grm_exists(grm):
+    grm = sanitize_grm(request.args.get("grm", ""))
+    if grm and _grm_exists(grm):
         session["grm"] = grm
 
 
@@ -124,7 +120,9 @@ def home():
         _summ_cache = (fingerprint, grammars, summ)
     grammars, summ = _summ_cache[1], _summ_cache[2]
     if "grm" in request.form:
-        session["grm"] = request.form["grm"]
+        grm = sanitize_grm(request.form["grm"])
+        if grm and _grm_exists(grm):
+            session["grm"] = grm
         return redirect(url_for("grammar"))
     if request.args.get("grm") and session.get("grm"):
         return redirect(url_for("grammar"))
