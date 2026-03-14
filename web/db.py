@@ -119,27 +119,26 @@ def search_for(conn, query):
 
 
 def get_type(conn, typ):
-    """
-    ToDo: also get the status of the children so we can link them better.
-    """
+    """Return a dict of type info, or {} if the type does not exist."""
+    prev_factory = conn.row_factory
     conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute(
-        """SELECT  parents,  children,  cat,  val,
-    cont, definition,  status, arity, head, 
-    lname, tdl.docstring,
-    criteria, reference, todo,
-    src, line, kind, tdl 
-    FROM types LEFT JOIN tdl 
-    ON types.typ = tdl.typ
-    WHERE types.typ=? limit 1""",
-        (typ,),
-    )
-    row = c.fetchone()
-    if row:
-        return dict(zip(row.keys(), row))
-    else:
-        return dict()
+    try:
+        c = conn.cursor()
+        c.execute(
+            """SELECT  parents,  children,  cat,  val,
+        cont, definition,  status, arity, head,
+        lname, tdl.docstring,
+        criteria, reference, todo,
+        src, line, kind, tdl
+        FROM types LEFT JOIN tdl
+        ON types.typ = tdl.typ
+        WHERE types.typ=? limit 1""",
+            (typ,),
+        )
+        row = c.fetchone()
+        return dict(zip(row.keys(), row)) if row else {}
+    finally:
+        conn.row_factory = prev_factory
 
 
 def get_lxids(conn, typ):
@@ -254,6 +253,8 @@ def get_wrds_by_lexids(conn, lexids):
     return a dictionary with words and frequencies for each lexid
     words[lexid][word] = freq
     """
+    if not lexids:
+        return dd(lambda: dd(int))
     c = conn.cursor()
     words = dd(lambda: dd(int))
     c.execute(

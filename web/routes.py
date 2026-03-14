@@ -8,6 +8,13 @@ import shutil
 import sys
 import traceback
 
+import sqlite3
+
+from delphin import ace as _ace
+from delphin import dmrs as _dmrs
+from delphin.codecs import dmrsjson as _dmrsjson
+from delphin.codecs import mrsjson as _mrsjson
+from delphin.codecs import simplemrs as _simplemrs
 from delphin.highlight import TDLLexer
 from flask import current_app as app
 from flask import jsonify, redirect, render_template, request, session, url_for
@@ -293,8 +300,6 @@ def dat_path_for(grm):
 @app.route("/demo")
 def demo():
     """Show the interactive parsing demo page."""
-    import sqlite3
-
     grammars_with_dat = sorted(
         f
         for f in os.listdir(os.path.join(current_directory, "db"))
@@ -331,10 +336,6 @@ def demo():
 @app.route("/parse", methods=["POST"])
 def parse_sentence():
     """Parse a sentence with ACE and return JSON in delphin-viz format."""
-    from delphin import ace
-    from delphin import dmrs as dmrs_module
-    from delphin.codecs import dmrsjson, mrsjson
-
     grm = request.form.get("grm") or session.get("grm")
     if not grm:
         return jsonify({"error": "No grammar selected"}), 400
@@ -361,7 +362,7 @@ def parse_sentence():
     want_dmrs = request.form.get("dmrs") == "json"
 
     try:
-        response = ace.parse(
+        response = _ace.parse(
             dat, input_text, executable=find_ace(), cmdargs=[f"-n{n_results}"]
         )
     except Exception as e:
@@ -386,7 +387,7 @@ def parse_sentence():
             try:
                 mrs_obj = result.mrs()
                 if want_mrs:
-                    r["mrs"] = json.loads(mrsjson.encode(mrs_obj))
+                    r["mrs"] = json.loads(_mrsjson.encode(mrs_obj))
             except Exception as e:
                 r["mrs"] = None
                 errors.append(f"result {i} mrs: {e}")
@@ -394,7 +395,7 @@ def parse_sentence():
             if want_dmrs:
                 try:
                     r["dmrs"] = json.loads(
-                        dmrsjson.encode(dmrs_module.from_mrs(mrs_obj))
+                        _dmrsjson.encode(_dmrs.from_mrs(mrs_obj))
                     )
                 except Exception as e:
                     r["dmrs"] = None
@@ -415,9 +416,6 @@ def parse_sentence():
 @app.route("/generate", methods=["POST"])
 def generate_sentence():
     """Generate surface strings from an MRS using ACE."""
-    from delphin import ace
-    from delphin.codecs import mrsjson, simplemrs
-
     grm = request.form.get("grm") or session.get("grm")
     if not grm:
         return jsonify({"error": "No grammar selected"}), 400
@@ -431,9 +429,9 @@ def generate_sentence():
         return jsonify({"error": "No MRS provided"}), 400
 
     try:
-        mrs_obj = mrsjson.decode(mrs_json_str)
-        mrs_str = simplemrs.encode(mrs_obj)
-        response = ace.generate(dat, mrs_str, executable=find_ace())
+        mrs_obj = _mrsjson.decode(mrs_json_str)
+        mrs_str = _simplemrs.encode(mrs_obj)
+        response = _ace.generate(dat, mrs_str, executable=find_ace())
         surfaces = [
             r.get("surface", "") for r in response.results() if r.get("surface")
         ]
