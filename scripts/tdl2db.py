@@ -29,6 +29,12 @@ def read_cfg(ace_config):
             match = re.findall(r'\*grammar-version\*\s+"([^"]+)"', line.strip())
             if match:
                 cfg["ver"] = match[0]
+                break
+    if "ver" not in cfg:
+        sys.exit(
+            f"Could not find *grammar-version* in {cfg['version']}; "
+            "check your ACE config file"
+        )
     return cfg
 
 
