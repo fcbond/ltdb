@@ -104,7 +104,7 @@ def process_results(root, log):
                 except Exception as e:
                     log.write("\n\nMRS failed to convert to DMRS:\n")
                     log.write(f"{root}: {profile} {sid} {e}\n")
-                    log.write(response["i-input"])  ### FIXME
+                    log.write(response["i-input"] + "\n")
                     log.write("\n\n")
                     log.write(repr(e))
                     if mrs_str:
