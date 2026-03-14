@@ -110,7 +110,11 @@ def find_ace():
 
 @app.route("/", methods=["GET", "POST"])
 def home():
-    """show the home page"""
+    """Render the home page with a grammar selector.
+
+    Grammar summaries are cached by a directory fingerprint (filename, mtime,
+    size) and recomputed only when the db/ directory changes.
+    """
     global _summ_cache
     db_dir = os.path.join(current_directory, "db")
     fingerprint = _db_fingerprint(db_dir)
