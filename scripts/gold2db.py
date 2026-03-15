@@ -1,13 +1,11 @@
-import json
 import os
 import re
 import sqlite3
 import sys
-import warnings
 from collections import defaultdict as dd
 
-from delphin import dmrs, itsdb, tsdb
-from delphin.codecs import dmrsjson, mrsjson, simplemrs
+from delphin import itsdb, tsdb
+from delphin.codecs import simplemrs
 
 
 def extract_span(terminal):
@@ -77,56 +75,13 @@ def process_results(root, log):
             deriv = first_result.derivation()
             tree = first_result.get("tree", "")
             deriv_str = deriv.to_udf(indent=None)
-            with warnings.catch_warnings(record=True) as caught_warnings:
-                warnings.simplefilter("always")
-                try:
-                    deriv_json = json.dumps(
-                        deriv.to_dict(
-                            fields=["id", "entity", "score", "form", "tokens"]
-                        )
-                    )
-                except Exception as e:
-                    log.write("\n\ncouldn't convert deriv to json:\n")
-                    log.write(f"{root}: {profile} {sid} {e}\n")
-                    deriv_json = "{}"
-                try:
-                    mrs_obj = first_result.mrs()
-                    mrs_str = simplemrs.encode(mrs_obj, indent=True)
-                    mrs_json = mrsjson.encode(mrs_obj)
-                except Exception as e:
-                    log.write("\n\nMRS couldn't be retrieved in pydelphin:\n")
-                    log.write(f"{root}: {profile} {sid} {e}\n")
-                    mrs_obj = None
-                    mrs_str = ""
-                    mrs_json = "{}"
-                try:
-                    dmrs_obj = dmrs.from_mrs(mrs_obj)
-                except Exception as e:
-                    log.write("\n\nMRS failed to convert to DMRS:\n")
-                    log.write(f"{root}: {profile} {sid} {e}\n")
-                    log.write(response["i-input"])  ### FIXME
-                    log.write("\n\n")
-                    log.write(repr(e))
-                    if mrs_str:
-                        log.write(mrs_str)
-                    dmrs_obj = None
-                try:
-                    if dmrs_obj:
-                        dmrs_json = dmrsjson.encode(dmrs_obj)
-                    else:
-                        dmrs_json = "{}"
-                except Exception as e:
-                    log.write("\n\nDMRS failed to serialize to JSON:\n")
-                    log.write(f"{root}: {profile} {sid} {e}\n")
-                    log.write(response["i-input"])
-                    log.write("\n\n")
-                    log.write(repr(e))
-                    if mrs_str:
-                        log.write(mrs_str)
-                    dmrs_json = "{}"
-            for warn in caught_warnings:
-                log.write(f"\n\nWarning: {warn.message}\n")
-                log.write(f"{root}: {profile} {sid}\n")
+            try:
+                mrs_obj = first_result.mrs()
+                mrs_str = simplemrs.encode(mrs_obj, indent=True)
+            except Exception as e:
+                log.write("\n\nMRS couldn't be retrieved in pydelphin:\n")
+                log.write(f"{root}: {profile} {sid} {e}\n")
+                mrs_str = ""
             gold.append(
                 (
                     profile,
@@ -134,11 +89,8 @@ def process_results(root, log):
                     response["i-input"],
                     response["i-comment"],
                     deriv_str,
-                    deriv_json,
                     tree,
                     mrs_str,
-                    mrs_json,
-                    dmrs_json,
                 )
             )
             ### get the nodes
@@ -164,14 +116,11 @@ def process_results(root, log):
 
 def gold2db(conn, gold, log):
     c = conn.cursor()
-    # c.execute("""INSERT INTO tdl (typ) VALUES ('typical')""")
     for g in gold:
         try:
             c.execute(
-                """INSERT INTO gold (profile, sid, sent, comment, 
-            deriv, deriv_json, pst, 
-            mrs, mrs_json, dmrs_json) 
-            VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                """INSERT INTO gold (profile, sid, sent, comment, deriv, pst, mrs)
+            VALUES (?,?,?,?,?,?,?)""",
                 g,
             )
         except sqlite3.Error as e:
