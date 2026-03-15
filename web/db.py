@@ -413,8 +413,9 @@ def get_sents(conn, psids):
 def get_gold(conn, psids):
     """Given a list of (profile, sid), return per-sentence linguistic data.
 
-    Keys per (profile, sid): 'mrs', 'mrsj', 'dmrsj', 'derivj', 'item'.
-    JSON fields are computed on the fly from the stored deriv/mrs strings.
+    Keys per (profile, sid): 'mrs', 'mrsj', 'dmrsj', 'derivj', 'deriv', 'item'.
+    'derivj'/'mrsj'/'dmrsj' are computed on the fly; 'deriv' is the raw UDF
+    string used as a fallback in templates when derivj is None.
     """
     if not psids:
         return dd(dict)

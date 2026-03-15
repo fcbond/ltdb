@@ -1,4 +1,5 @@
-function MRS(parentElement, mrsData){
+function MRS(parentElement, mrsData, textInputSelector){
+    textInputSelector = textInputSelector || '#text-input';
     // Constant pixel sizes used
     const MAXWIDTH = 600;     // width before a list of elements is wrapped 
     const XGAP = 5;           // horizontal gap between elements
@@ -282,7 +283,7 @@ function MRS(parentElement, mrsData){
                     // no lnks for this variable
                     return;
 
-                var $inputElem = $('#text-input');
+                var $inputElem = $(textInputSelector);
                 var inputText = $inputElem.html();
                 
                 // create an arrary of binary values indicating which characters
@@ -321,7 +322,7 @@ function MRS(parentElement, mrsData){
                 $(node).find(dataQuery).css({fill: 'black'}); 
                 
                 // reset highlighted input string
-                var $inputElem = $('#text-input');
+                var $inputElem = $(textInputSelector);
                 $inputElem.html($inputElem.html().replace(/<\/?span[^>]*>/g,""));
             }
         ).filter(function (){

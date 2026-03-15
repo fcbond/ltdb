@@ -81,7 +81,9 @@
     <h3>Sentences <small>({{phenomena|length}} of {{maxp}})</small></h3>
 
     
-    <ul> 
+    <div id="tooltip" class="tooltip" style="opacity:0; position:absolute; background:#fff;
+         border:1px solid #ccc; padding:4px; pointer-events:none;"></div>
+    <ul>
       {% for p, s in phenomena %}
 	{% for (kara, made) in phenomena[p,s] %}
 	  <li><div><a title='{{p}}, {{s}}'>🗩</a>
@@ -112,7 +114,6 @@
 	      <pre class="text-muted small" title="Raw UDF (tree conversion failed)">{{gold[(p,s)]['deriv']}}</pre>
 	      {%- endif %}
 	    </div>
-	    <div id="tooltip" class="tooltip"></div>
             <div id='dmrsj{{p}}{{s}}'>
 	      {%- if gold[(p,s)]['dmrsj'] is none and gold[(p,s)]['mrsj'] is not none %}
 	      <p class="text-muted small">DMRS conversion failed for this item.</p>
@@ -124,7 +125,7 @@
 </pre></div>
 	    </div>
 	    <div id='mrsj{{p}}{{s}}'><br>
-              <div id="text-input" style="font-size: 150%%;">{{gold[(p,s)]['item']}}</div><br>
+              <div id="text-input{{p}}{{s}}" style="font-size: 150%%;">{{gold[(p,s)]['item']}}</div><br>
 	    </div>
 
 	  </li><br>
@@ -188,7 +189,7 @@
       const mrs_data = {{ gold[(p,s)]['mrsj'] | tojson }};
       if (mrs_data !== null) {
         const elem = document.getElementById('mrsj{{p}}{{s}}');
-        MRS(elem, mrs_data);
+        MRS(elem, mrs_data, '#text-input{{p}}{{s}}');
       }
     });
 
