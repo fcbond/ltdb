@@ -78,19 +78,23 @@ _ace_bin = None
 
 
 def find_ace():
-    """Locate the ACE binary once and cache it."""
+    """Locate the ACE binary once and cache it.
+
+    Prefers the bundled binary under etc/ace-*/ to avoid version skew with
+    system-installed ACE binaries that may have stricter POSIX ERE handling.
+    """
     global _ace_bin
     if _ace_bin is not None:
-        return _ace_bin
-    found = shutil.which("ace")
-    if found:
-        _ace_bin = found
         return _ace_bin
     etc_dir = os.path.join(current_directory, "..", "etc")
     for candidate in sorted(pathlib.Path(etc_dir).glob("ace-*/ace"), reverse=True):
         if os.access(candidate, os.X_OK):
             _ace_bin = str(candidate)
             return _ace_bin
+    found = shutil.which("ace")
+    if found:
+        _ace_bin = found
+        return _ace_bin
     raise FileNotFoundError(
         "ACE binary not found. Run scripts/setup_ace.py or install ACE."
     )
