@@ -229,9 +229,14 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "ruff" },
+]
+
+[package.dev-dependencies]
+dev = [
     { name = "pytest" },
     { name = "pytest-playwright" },
-    { name = "ruff" },
+    { name = "requests" },
 ]
 
 [package.metadata]
@@ -245,13 +250,18 @@ requires-dist = [
     { name = "markdown-it-py" },
     { name = "markupsafe" },
     { name = "pydelphin" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
-    { name = "pytest-playwright", marker = "extra == 'dev'", specifier = ">=0.5" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.9" },
     { name = "toml" },
     { name = "werkzeug" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=9.0.2" },
+    { name = "pytest-playwright", specifier = ">=0.7.2" },
+    { name = "requests", specifier = ">=2.32" },
+]
 
 [[package]]
 name = "lxml"

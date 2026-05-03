@@ -77,6 +77,35 @@ def _apply_grm_param():
 _ace_bin = None
 
 
+def _ace_error_message(exc: Exception, dat: str) -> str:
+    """Return a human-readable error string for an ACE failure.
+
+    Inspects the exception message to surface actionable diagnostics for the
+    most common failure modes (version mismatch, missing binary, fd exhaustion).
+    """
+    msg = str(exc)
+    if "closed on startup" in msg or "process closed" in msg:
+        ace_bin = _ace_bin or "ace"
+        return (
+            f"ACE exited immediately when loading {os.path.basename(dat)}. "
+            f"This usually means the grammar was compiled with a different version "
+            f"of ACE than the one now in use ({ace_bin}). "
+            f"Rebuild the .dat file with: python scripts/grm2db.py --ace"
+        )
+    if "too many open files" in msg or "EMFILE" in msg:
+        return (
+            "ACE failed: too many open files. "
+            "The server may be under heavy load; try again in a moment."
+        )
+    if "FileNotFoundError" in type(exc).__name__ or "No such file" in msg:
+        return (
+            f"ACE binary not found. "
+            f"Run scripts/setup_ace.py to install a platform-appropriate binary, "
+            f"or set the ACE_BIN environment variable."
+        )
+    return f"ACE error: {msg}"
+
+
 def find_ace():
     """Locate the ACE binary once and cache it.
 
@@ -356,7 +385,7 @@ def parse_sentence():
         with ACEParser(dat, executable=find_ace(), cmdargs=[f"-n{n_results}"]) as parser:
             response = parser.interact(input_text)
     except Exception as e:
-        return jsonify({"error": f"ACE error: {e}"}), 500
+        return jsonify({"error": _ace_error_message(e, dat)}), 500
 
     results = []
     errors = []
@@ -431,7 +460,7 @@ def generate_sentence():
         ]
     except Exception as e:
         traceback.print_exc(file=sys.stderr)
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": _ace_error_message(e, dat)}), 500
 
     if not surfaces:
         notes = response.get("NOTES", [])

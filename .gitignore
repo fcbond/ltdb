@@ -4,3 +4,5 @@ __pycache__/
 .venv/
 web/db
 etc/
+test-results/
+playwright-report/
