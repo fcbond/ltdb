@@ -438,10 +438,12 @@ def get_gold(conn, psids):
     return data
 
 
-def get_summary(conn):
+def get_summary(conn, grm=None):
     """
     Return a summary of the grammar"
     """
+    if grm and grm in _summary_cache:
+        return _summary_cache[grm]
     c = conn.cursor()
     summary = dict()
     c.execute("""-- Get counts for regular types using typfreq
@@ -468,25 +470,53 @@ def get_summary(conn):
     for status, freq, cfreq in c:
         summary[status] = freq, cfreq
 
+    if grm:
+        _summary_cache[grm] = summary
     return summary
 
 
-def get_tb_summary(conn):
+def get_tb_summary(conn, grm=None):
     """
     Return a summary of the treebank"
     """
+    if grm and grm in _tb_summary_cache:
+        return _tb_summary_cache[grm]
     c = conn.cursor()
     summary = dict()
     c.execute("""
-    SELECT COUNT(DISTINCT profile) AS profiles, 
-    COUNT(DISTINCT sid || ',' || profile) AS sents, 
+    SELECT COUNT(DISTINCT profile) AS profiles,
+    COUNT(DISTINCT sid || ',' || profile) AS sents,
     COUNT(word) AS words FROM sent""")
     profiles, sents, words = c.fetchone()
     summary["Profiles"] = profiles
     summary["Sents"] = sents
     summary["Tokens"] = words
 
+    if grm:
+        _tb_summary_cache[grm] = summary
     return summary
+
+
+_short_summary_cache: dict = {}
+_summary_cache: dict = {}
+_tb_summary_cache: dict = {}
+
+
+def warm_caches(current_directory):
+    """Pre-populate all summary caches at server startup.
+
+    Called once per worker process so that no user request ever blocks on
+    the slow COUNT queries.
+    """
+    db_dir = os.path.join(current_directory, "db")
+    if not os.path.isdir(db_dir):
+        return
+    grammars = sorted(f for f in os.listdir(db_dir) if f.endswith(".db"))
+    get_short_summary(current_directory, grammars)
+    for grm in grammars:
+        with sqlite3.connect(os.path.join(db_dir, grm)) as conn:
+            get_summary(conn, grm)
+            get_tb_summary(conn, grm)
 
 
 def get_short_summary(current_directory, grammars):
@@ -503,6 +533,9 @@ def get_short_summary(current_directory, grammars):
     """
     summ = dict()
     for grm in grammars:
+        if grm in _short_summary_cache:
+            summ[grm] = _short_summary_cache[grm]
+            continue
         dbpath = os.path.join(current_directory, f"db/{grm}")
         with sqlite3.connect(dbpath) as conn:
             c = conn.cursor()
@@ -520,5 +553,6 @@ def get_short_summary(current_directory, grammars):
             SELECT 'TREES', COUNT(DISTINCT sid || ',' || profile)
             FROM sent
             """)
-            summ[grm] = dict(c.fetchall())
+            _short_summary_cache[grm] = dict(c.fetchall())
+        summ[grm] = _short_summary_cache[grm]
     return summ

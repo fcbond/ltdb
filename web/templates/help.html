@@ -1,0 +1,244 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="container">
+  <h1>Help</h1>
+
+  <nav class="mb-4">
+    <ul class="list-unstyled d-flex flex-wrap gap-3">
+      <li><a href="#grammars">Grammars</a></li>
+      <li><a href="#summary">Grammar Summary</a></li>
+      <li><a href="#rules">Rules</a></li>
+      <li><a href="#ltypes">Lexical Types</a></li>
+      <li><a href="#type">Type Page</a></li>
+      <li><a href="#search">Search</a></li>
+      <li><a href="#demo">Demo</a></li>
+      <li><a href="#background">Background</a></li>
+    </ul>
+  </nav>
+
+  <hr>
+
+  <h2 id="grammars">Grammars</h2>
+  <p>
+    The home page lists all grammars available in this installation. Click any row to select that
+    grammar; the navigation bar will then give access to its pages. The table shows:
+  </p>
+  <dl class="row">
+    <dt class="col-sm-2">Grammar</dt>
+    <dd class="col-sm-10">Human-readable name of the grammar.</dd>
+    <dt class="col-sm-2">File</dt>
+    <dd class="col-sm-10">The <code>.db</code> filename. The name encodes the grammar and version,
+      e.g. <code>ERG_2025.db</code>.</dd>
+    <dt class="col-sm-2">Lexicon</dt>
+    <dd class="col-sm-10">Total number of lexical entries (including generic entries used for
+      unknown words).</dd>
+    <dt class="col-sm-2">Rules</dt>
+    <dd class="col-sm-10">Total number of phrase-structure and lexical rules.</dd>
+    <dt class="col-sm-2">Trees</dt>
+    <dd class="col-sm-10">Number of treebanked sentences available for browsing. Grammars without
+      a treebank show nothing here.</dd>
+    <dt class="col-sm-2">License</dt>
+    <dd class="col-sm-10">The distribution licence for the grammar.</dd>
+    <dt class="col-sm-2">Website</dt>
+    <dd class="col-sm-10">Link to the grammar project's home page.</dd>
+  </dl>
+  <p>Use the DataTable's <strong>Filter</strong> box to search by name or filename, and click any
+    column header to sort.</p>
+
+  <hr>
+
+  <h2 id="summary">Grammar Summary</h2>
+  <p>
+    The grammar summary page (reached via the grammar name in the navigation bar) shows three
+    tables.
+  </p>
+  <h5>Grammar Metadata</h5>
+  <p>Administrative information stored in the grammar: full name, version, language, maintainer
+    contact, licence, website, and so on.</p>
+  <h5>Grammar Summary</h5>
+  <p>A count of every object type defined in the grammar, split into two columns:</p>
+  <ul>
+    <li><strong># in Grammar</strong> — total number defined in the TDL source.</li>
+    <li><strong># in Tree Bank</strong> — how many of those were actually used in at least one
+      treebanked parse.</li>
+  </ul>
+  <p>Object types include: <em>lex-type</em> (lexical types), <em>lex-entry</em> (individual
+    lexemes), <em>rule</em> (phrase-structure rules), <em>lex-rule</em> (lexical/morphological
+    rules), <em>root</em> (root conditions), and plain <em>type</em> (all other types in the
+    hierarchy).</p>
+  <h5>Treebank Summary</h5>
+  <p>Coverage statistics for the attached treebank: number of profiles (corpora), distinct
+    sentences, and total word tokens.</p>
+
+  <hr>
+
+  <h2 id="rules">Rules</h2>
+  <p>
+    The Rules page lists all phrase-structure rules, lexical rules, and root conditions defined in
+    the grammar. Columns:
+  </p>
+  <dl class="row">
+    <dt class="col-sm-2">Rule</dt>
+    <dd class="col-sm-10">The TDL identifier. Click to open the type page for that rule.</dd>
+    <dt class="col-sm-2">Type</dt>
+    <dd class="col-sm-10">The parent type the rule inherits from. Click to open its type page.</dd>
+    <dt class="col-sm-2">Name</dt>
+    <dd class="col-sm-10">Long name or description, if provided in the grammar documentation.</dd>
+    <dt class="col-sm-2">Status</dt>
+    <dd class="col-sm-10">
+      <code>rule</code> — phrase-structure rule (combines two or more daughters).<br>
+      <code>lex-rule</code> — lexical or morphological rule (applies to a single lexical sign).<br>
+      <code>root</code> — root condition (constrains what counts as a complete parse).
+    </dd>
+    <dt class="col-sm-2">Frequency</dt>
+    <dd class="col-sm-10">Number of times this rule was used in the treebank. Zero means the rule
+      exists in the grammar but was never selected in a gold parse.</dd>
+    <dt class="col-sm-2">Arity/Head</dt>
+    <dd class="col-sm-10">Number of daughters the rule takes, and which daughter is the
+      head.</dd>
+  </dl>
+  <p>The table is sortable and filterable via DataTables.</p>
+
+  <hr>
+
+  <h2 id="ltypes">Lexical Types</h2>
+  <p>
+    The Lexical Types page lists all lexical types — the types that lexical entries instantiate.
+    Columns:
+  </p>
+  <dl class="row">
+    <dt class="col-sm-2">Lexical Type</dt>
+    <dd class="col-sm-10">The TDL identifier. Click to open the type page, which shows all lexemes
+      of this type and example sentences.</dd>
+    <dt class="col-sm-2">Name</dt>
+    <dd class="col-sm-10">Long name or description from the grammar documentation.</dd>
+    <dt class="col-sm-2">Lex Freq</dt>
+    <dd class="col-sm-10">Number of lexical entries of this type.</dd>
+    <dt class="col-sm-2">Corpus Freq</dt>
+    <dd class="col-sm-10">Number of times any lexeme of this type was used in a treebanked
+      parse.</dd>
+    <dt class="col-sm-2">Words</dt>
+    <dd class="col-sm-10">A sample of the most frequent words of this type.</dd>
+  </dl>
+
+  <hr>
+
+  <h2 id="type">Type Page</h2>
+  <p>
+    Every identifier in the grammar — types, lexical entries, rules — has its own page, reached by
+    clicking its name anywhere in the interface or by searching for it. What is shown depends on
+    the <em>status</em> of the type.
+  </p>
+  <h5>All types</h5>
+  <ul>
+    <li><strong>Parents / Children</strong> — immediate supertypes and subtypes in the type
+      hierarchy; each is a link to its own page.</li>
+    <li><strong>TDL</strong> — the full type definition from the grammar source, with syntax
+      highlighting. Type names within the TDL are clickable links.</li>
+    <li><strong>Source</strong> — the file and line number where the type is defined.</li>
+  </ul>
+  <h5>Lexical types (<code>lex-type</code>)</h5>
+  <p>Shows a table of all lexemes of this type (lexeme identifier and treebank frequency) with the
+    word-forms they appear as, followed by a sample of treebanked sentences in which any of those
+    lexemes was used. The relevant word in each sentence is highlighted in green.</p>
+  <h5>Lexical entries (<code>lex-entry</code>, <code>generic-lex-entry</code>)</h5>
+  <p>Shows the word-forms for this specific lexeme and a sample of sentences in which it appears.
+  </p>
+  <h5>Rules and roots (<code>rule</code>, <code>lex-rule</code>, <code>root</code>)</h5>
+  <p>Shows a sample of treebanked sentences in which this rule or root condition was applied. The
+    span covered by the rule is highlighted.</p>
+  <h5>Sentence visualisations</h5>
+  <p>For each example sentence, up to four views can be toggled on/off with buttons:</p>
+  <dl class="row">
+    <dt class="col-sm-2">Tree</dt>
+    <dd class="col-sm-10">The derivation tree from the treebank: the sequence of grammar rules and
+      lexical entries that produced the parse.</dd>
+    <dt class="col-sm-2">MRS</dt>
+    <dd class="col-sm-10">Minimal Recursion Semantics — the flat semantic representation. Variables
+      are colour-highlighted; hovering shows their properties (tense, number, etc.).</dd>
+    <dt class="col-sm-2">DMRS</dt>
+    <dd class="col-sm-10">Dependency MRS — a graph view of the same semantics. Nodes are
+      predicates; edges are argument relations. Clicking a node highlights its dependents.</dd>
+    <dt class="col-sm-2">[MRS]</dt>
+    <dd class="col-sm-10">The raw MRS string as stored in the treebank.</dd>
+  </dl>
+
+  <hr>
+
+  <h2 id="search">Search</h2>
+  <p>
+    The search box in the navigation bar accepts any of:
+  </p>
+  <ul>
+    <li><strong>Lemma / word-form</strong> — finds lexical entries whose orthography matches.
+      Supports <code>*</code> as a wildcard (e.g. <code>run*</code>).</li>
+    <li><strong>Type name</strong> — finds any type in the hierarchy (including rules, lexical
+      types, and plain types). Wildcards supported.</li>
+    <li><strong>Predicate</strong> — finds lexical entries by their MRS predicate symbol
+      (e.g. <code>_run_v_1</code>). Wildcards supported.</li>
+  </ul>
+  <p>Results are grouped by category. Click any result to open its type page.</p>
+
+  <hr>
+
+  <h2 id="demo">Demo</h2>
+  <p>
+    The Demo page lets you parse sentences interactively using
+    <a href="http://sweaglesw.org/linguistics/ace/">ACE</a> and the selected grammar's compiled
+    <code>.dat</code> file. It is only available for grammars that have been compiled with ACE
+    (see the installation guide).
+  </p>
+  <h5>Controls</h5>
+  <dl class="row">
+    <dt class="col-sm-2">Input sentence</dt>
+    <dd class="col-sm-10">Type a sentence or choose from the history (shown in the dropdown). The
+      <strong>×</strong> button clears the field so all history entries are listed.</dd>
+    <dt class="col-sm-2">Grammar</dt>
+    <dd class="col-sm-10">Choose which compiled grammar to parse with. Only grammars with a
+      <code>.dat</code> file are listed.</dd>
+    <dt class="col-sm-2">Results</dt>
+    <dd class="col-sm-10">Maximum number of parses to return (1–10).</dd>
+    <dt class="col-sm-2">Zoom</dt>
+    <dd class="col-sm-10">Scale the visualisations to 100%, 75%, or 50%.</dd>
+    <dt class="col-sm-2">Tree / MRS / DMRS</dt>
+    <dd class="col-sm-10">Checkboxes to choose which representations to request.</dd>
+  </dl>
+  <h5>Results</h5>
+  <p>
+    Each parse is shown in a card. The <strong>Tree</strong> button (active by default) shows the
+    derivation tree. <strong>MRS</strong> and <strong>DMRS</strong> are rendered on first click
+    (lazy rendering). The <strong>Generate</strong> button sends the MRS back to ACE to produce
+    surface realisations — useful for checking the semantics round-trips correctly.
+  </p>
+  <p>
+    Your parse history is stored in the browser (localStorage) per grammar, initialised from the
+    grammar's example sentences on first visit, and capped at 20 entries.
+  </p>
+
+  <hr>
+
+  <h2 id="background">Background</h2>
+  <p>
+    DELPH-IN (<a href="https://delph-in.github.io/">delph-in.github.io</a>) grammars are
+    large-scale, precision grammars for natural language processing written in the Type Description
+    Language (TDL). They produce detailed syntactic and semantic analyses and are used in
+    both parsing and generation. Examples include the
+    <a href="http://www.delph-in.net/erg/">English Resource Grammar (ERG)</a>,
+    <a href="https://github.com/delph-in/jacy">Jacy</a> (Japanese),
+    <a href="https://github.com/delph-in/gg">GG</a> (German), and many others.
+  </p>
+  <p>
+    Semantic representations use
+    <a href="https://delph-in.github.io/docs/tools/LkbMrs/">Minimal Recursion Semantics
+    (MRS)</a>, a flat, underspecified formalism that avoids committing to a single scope reading
+    while remaining computationally tractable. DMRS (Dependency MRS) is a graph-based equivalent.
+  </p>
+  <p>
+    Treebanks attached to a grammar are collections of sentences for which a human annotator has
+    selected the correct parse from the grammar's output. Frequency counts throughout LTDB refer
+    to these gold-standard selections.
+  </p>
+
+</div>
+{% endblock %}

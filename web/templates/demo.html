@@ -186,7 +186,7 @@
       .fail(function (xhr) {
         $('#spinner').hide();
         const msg = xhr.responseJSON ? xhr.responseJSON.error : xhr.statusText;
-        $('#results').html('<div class="alert alert-danger">' + msg + '</div>');
+        $('#results').empty().append($('<div class="alert alert-danger">').text(msg));
       });
   });
 
@@ -194,7 +194,7 @@
     const container = $('#results');
 
     if (data.error) {
-      container.html('<div class="alert alert-danger">' + data.error + '</div>');
+      container.empty().append($('<div class="alert alert-danger">').text(data.error));
       return;
     }
     if (data.readings === 0) {
@@ -249,14 +249,6 @@
           $(this).toggleClass('btn-primary btn-outline-primary');
           if (!dmrsRendered) {
             DMRS('#' + dmrsId, result.dmrs);
-            const svgEl = viz.find('svg')[0];
-            if (svgEl) {
-              const gEl = svgEl.querySelector('g');
-              if (gEl) {
-                const bbox = gEl.getBBox();
-                svgEl.setAttribute('width', bbox.x + bbox.width + 20);
-              }
-            }
             dmrsRendered = true;
           }
         });
@@ -293,7 +285,7 @@
           }).done(function (data) {
             genBtn.prop('disabled', false).text('Generate');
             if (data.error) {
-              genOut.html('<div class="alert alert-danger">' + data.error + '</div>');
+              genOut.empty().append($('<div class="alert alert-danger">').text(data.error));
             } else if (data.results.length === 0) {
               genOut.html('<p class="text-muted">No realisations found.</p>');
             } else {
@@ -305,7 +297,7 @@
           }).fail(function (xhr) {
             genBtn.prop('disabled', false).text('Generate');
             const msg = xhr.responseJSON ? xhr.responseJSON.error : xhr.statusText;
-            genOut.html('<div class="alert alert-danger">' + msg + '</div>').show();
+            genOut.empty().append($('<div class="alert alert-danger">').text(msg)).show();
           });
         });
         header.append(genBtn);

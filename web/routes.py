@@ -169,8 +169,8 @@ def grammar():
         return redirect(url_for("home"))
     conn = get_db(current_directory, grm)
     md = get_md(conn)
-    summ = get_summary(conn)
-    tsumm = get_tb_summary(conn)
+    summ = get_summary(conn, grm)
+    tsumm = get_tb_summary(conn, grm)
     return render_template(
         "grammar.html",
         title=md["GRAMMAR_NAME"],
@@ -476,6 +476,12 @@ def generate_sentence():
             )
 
     return jsonify({"results": surfaces})
+
+
+@app.route("/help")
+def help():
+    """Show the help/documentation page."""
+    return render_template("help.html", title="LTDB Help", grm=session.get("grm"))
 
 
 @app.route("/search", methods=["POST"])

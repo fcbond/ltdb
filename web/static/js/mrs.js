@@ -25,8 +25,8 @@ function MRS(parentElement, mrsData, textInputSelector){
         drawFeatValPair(container, 'TOP', mrsData.top);
         drawFeatValPair(container, 'INDEX', mrsData.index);    
         drawFeatValPair(container, 'RELS', mrsData.relations); 
-        drawFeatValPair(container, 'HCONS', mrsData.constraints); 
-        drawFeatValPair(container, 'ICONS', mrsData.constraints); 
+        drawFeatValPair(container, 'HCONS', mrsData.constraints);
+        drawFeatValPair(container, 'ICONS', mrsData.icons || []);
         drawSquareBrackets(mrs, XGAP);
         
         // transform the MRS to take into account the square brackets drawn at
@@ -326,11 +326,10 @@ function MRS(parentElement, mrsData, textInputSelector){
                 $inputElem.html($inputElem.html().replace(/<\/?span[^>]*>/g,""));
             }
         ).filter(function (){
-            // only draw tooltip for variables of type e and x probably should
-            // be doing the test against whether corresponding mrs variable
-            // object has "properties" field or not.
             var varName = $(this).data('var');
-            return mrsData.variables[varName].hasOwnProperty("properties");
+            return mrsData.variables &&
+                   mrsData.variables[varName] &&
+                   mrsData.variables[varName].hasOwnProperty("properties");
         }).each(function() {
             var varName = $(this).data('var');
             var variable = mrsData.variables[varName];

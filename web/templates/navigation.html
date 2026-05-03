@@ -22,6 +22,8 @@
 	       class="nav-item nav-link{{ ' active' if request.endpoint == 'demo' }}">Demo</a>
 	  </div>
 	  {% endif %}
+	    <a href="{{ url_for('help') }}"
+	       class="nav-item nav-link{{ ' active' if request.endpoint == 'help' }}">Help</a>
 	    <form action="{{ url_for('submit_fsearch') }}" method="post" class="form-inline my-2 my-lg-0">
               <input type="text" id="search" name="search" required placeholder="lemma/type/predicate">
 	      <button type="submit" class="btn btn-outline-secondary">

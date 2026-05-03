@@ -59,21 +59,21 @@ function render_tree(svg, tree) {
     if (daughters.length) {
         dtr_label_mean /= daughters.length;
     } else {
-        lexical = render_yield(svg, tree.form);
+        lexical = render_yield(svg, tree.form || '');
         wtot = lexical.mywidth;
         dtr_label_mean = wtot / 2;
     }
 
-    const node_str = tree.hasOwnProperty("label") ? tree.label : tree.entity;
+    const entity = tree.entity || '';
+    const node_str = tree.hasOwnProperty("label") ? tree.label : entity;
 
     const g = svgelement("g");
     const n = text(svg, node_str);
-    n.setAttribute("title", tree.entity);
+    n.setAttribute("title", entity);
     n.classList.add("ltdb");
 
-    // add a title element for node tooltips
     const title = svgelement('title');
-    title.innerHTML = tree.entity;
+    title.textContent = entity;
     n.appendChild(title);
 
     g.appendChild(n);

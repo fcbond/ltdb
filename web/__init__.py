@@ -3,6 +3,7 @@
 import os
 import secrets
 import sys
+import threading
 
 from flask import Flask
 
@@ -21,8 +22,10 @@ def create_app():
 
     with app.app_context():
         from . import routes  # noqa: F401
-        from .db import close_db
+        from .db import close_db, warm_caches
 
         app.teardown_appcontext(close_db)
+        _db_dir = os.path.dirname(__file__)
+        threading.Thread(target=warm_caches, args=(_db_dir,), daemon=True).start()
 
         return app
