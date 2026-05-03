@@ -29,7 +29,6 @@ def _wait_for_port(port, timeout=20):
 def gunicorn_url():
     """Start a gunicorn server for the session; yield its base URL."""
     port = _free_port()
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     env = {**os.environ, "SECRET_KEY": "test-secret-not-for-production"}
 
     proc = subprocess.Popen(
@@ -41,7 +40,7 @@ def gunicorn_url():
             "--timeout=60",
             "wsgi:app",
         ],
-        cwd=repo_root,
+        cwd=_REPO_ROOT,
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -67,8 +66,16 @@ def base_url(gunicorn_url):
     return gunicorn_url
 
 
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 # Grammar/sentence constants shared across test modules
 GRAMMAR = "ERG_2025.db"
+
+_DAT = os.path.join(_REPO_ROOT, "web", "db", GRAMMAR[:-3] + ".dat")
+needs_dat = pytest.mark.skipif(
+    not os.path.exists(_DAT),
+    reason=f"{GRAMMAR[:-3]}.dat not found — run: python scripts/grm2db.py --ace",
+)
 
 SENTENCES = [
     "The dog barked.",

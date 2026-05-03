@@ -8,20 +8,11 @@ Run with:
     uv run pytest tests/test_demo_browser.py -v            # headless
 """
 
-import os
+import re
 
 import pytest
 
-from .conftest import GRAMMAR, SENTENCES
-
-_DAT = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "web", "db", GRAMMAR[:-3] + ".dat",
-)
-needs_dat = pytest.mark.skipif(
-    not os.path.exists(_DAT),
-    reason=f"{GRAMMAR[:-3]}.dat not found — run: python scripts/grm2db.py --ace",
-)
+from .conftest import GRAMMAR, SENTENCES, needs_dat
 
 TIMEOUT = 30_000  # ms
 
@@ -89,7 +80,6 @@ def test_mrs_renders_on_click(page, gunicorn_url):
 
     page.wait_for_selector(".result-card", timeout=TIMEOUT)
 
-    import re
     mrs_btn = page.locator(".result-card").first.get_by_role("button", name=re.compile(r"^MRS$"))
     assert mrs_btn.is_visible(), "MRS button missing — mrs may be null in response"
     mrs_btn.click()

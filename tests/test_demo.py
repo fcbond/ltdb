@@ -8,25 +8,16 @@ the session so tests run against the real WSGI stack, not Flask's dev server.
 """
 
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 import requests
 
-from .conftest import GRAMMAR, LONG_SENTENCE, SENTENCES
+from .conftest import GRAMMAR, LONG_SENTENCE, SENTENCES, needs_dat
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-_DAT = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "web", "db", GRAMMAR[:-3] + ".dat",
-)
-needs_dat = pytest.mark.skipif(
-    not os.path.exists(_DAT),
-    reason=f"{GRAMMAR[:-3]}.dat not found — run: python scripts/grm2db.py --ace",
-)
 
 
 def _parse(base_url, sentence, *, n=1, tree=True, mrs=True, dmrs=True):
@@ -125,21 +116,18 @@ def test_concurrent_parses_no_errors(gunicorn_url):
 
     with ThreadPoolExecutor(max_workers=10) as pool:
         futures = {pool.submit(_parse, gunicorn_url, s): s for s in inputs}
-        responses = {fut: (s, fut.result()) for fut, s in futures.items()}
+        responses = [(s, fut.result()) for fut, s in futures.items()]
 
-    failures = [
-        f"[{s!r}] HTTP {r.status_code}: {r.text[:150]}"
-        for _, (s, r) in responses.items()
-        if r.status_code != 200
-    ]
+    failures, missing_mrs = [], []
+    for s, r in responses:
+        if r.status_code != 200:
+            failures.append(f"[{s!r}] HTTP {r.status_code}: {r.text[:150]}")
+        else:
+            data = r.json()
+            if data.get("readings", 0) > 0 and data["results"][0].get("mrs") is None:
+                missing_mrs.append(s)
+
     assert not failures, f"{len(failures)}/{n_requests} requests failed:\n" + "\n".join(failures[:5])
-
-    missing_mrs = [
-        s for _, (s, r) in responses.items()
-        if r.status_code == 200
-        and r.json().get("readings", 0) > 0
-        and r.json()["results"][0].get("mrs") is None
-    ]
     assert not missing_mrs, f"MRS null in {len(missing_mrs)} responses (fd leak?): {missing_mrs[:3]}"
 
 

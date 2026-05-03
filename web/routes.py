@@ -90,7 +90,7 @@ def _ace_error_message(exc: Exception, dat: str) -> str:
             f"ACE exited immediately when loading {os.path.basename(dat)}. "
             f"This usually means the grammar was compiled with a different version "
             f"of ACE than the one now in use ({ace_bin}). "
-            f"Rebuild the .dat file with: python scripts/grm2db.py --ace"
+            "Rebuild the .dat file with: python scripts/grm2db.py --ace"
         )
     if "too many open files" in msg or "EMFILE" in msg:
         return (
@@ -99,9 +99,9 @@ def _ace_error_message(exc: Exception, dat: str) -> str:
         )
     if "FileNotFoundError" in type(exc).__name__ or "No such file" in msg:
         return (
-            f"ACE binary not found. "
-            f"Run scripts/setup_ace.py to install a platform-appropriate binary, "
-            f"or set the ACE_BIN environment variable."
+            "ACE binary not found. "
+            "Run scripts/setup_ace.py to install a platform-appropriate binary, "
+            "or set the ACE_BIN environment variable."
         )
     return f"ACE error: {msg}"
 
