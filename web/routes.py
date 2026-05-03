@@ -80,21 +80,26 @@ _ace_bin = None
 def find_ace():
     """Locate the ACE binary once and cache it.
 
-    Prefers the bundled binary under etc/ace-*/ to avoid version skew with
-    system-installed ACE binaries that may have stricter POSIX ERE handling.
+    Checks ACE_BIN env var first, then system PATH, then the bundled binary
+    under etc/ace-*/ as a last resort.  Run scripts/setup_ace.py to install
+    a platform-appropriate bundled binary.
     """
     global _ace_bin
     if _ace_bin is not None:
+        return _ace_bin
+    env_bin = os.environ.get("ACE_BIN")
+    if env_bin and os.access(env_bin, os.X_OK):
+        _ace_bin = env_bin
+        return _ace_bin
+    found = shutil.which("ace")
+    if found:
+        _ace_bin = found
         return _ace_bin
     etc_dir = os.path.join(current_directory, "..", "etc")
     for candidate in sorted(pathlib.Path(etc_dir).glob("ace-*/ace"), reverse=True):
         if os.access(candidate, os.X_OK):
             _ace_bin = str(candidate)
             return _ace_bin
-    found = shutil.which("ace")
-    if found:
-        _ace_bin = found
-        return _ace_bin
     raise FileNotFoundError(
         "ACE binary not found. Run scripts/setup_ace.py or install ACE."
     )
@@ -321,7 +326,7 @@ def demo():
 @app.route("/parse", methods=["POST"])
 def parse_sentence():
     """Parse a sentence with ACE and return JSON in delphin-viz format."""
-    from delphin import ace
+    from delphin.ace import ACEParser
     from delphin import dmrs as dmrs_module
     from delphin.codecs import dmrsjson, mrsjson
 
@@ -348,9 +353,8 @@ def parse_sentence():
     want_dmrs = request.form.get("dmrs") == "json"
 
     try:
-        response = ace.parse(
-            dat, input_text, executable=find_ace(), cmdargs=[f"-n{n_results}"]
-        )
+        with ACEParser(dat, executable=find_ace(), cmdargs=[f"-n{n_results}"]) as parser:
+            response = parser.interact(input_text)
     except Exception as e:
         return jsonify({"error": f"ACE error: {e}"}), 500
 
@@ -420,7 +424,8 @@ def generate_sentence():
     try:
         mrs_obj = mrsjson.decode(mrs_json_str)
         mrs_str = simplemrs.encode(mrs_obj)
-        response = ace.generate(dat, mrs_str, executable=find_ace())
+        with ace.ACEGenerator(dat, executable=find_ace()) as gen:
+            response = gen.interact(mrs_str)
         surfaces = [
             r.get("surface", "") for r in response.results() if r.get("surface")
         ]
