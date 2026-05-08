@@ -1,9 +1,9 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 
 <head>
     <title>{{ title }}</title>
     <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="description" content="{{ description }}">
     <link rel="shortcut icon" href="{{ url_for('static', filename='img/ltdb.png') }}"/>
      <!-- Bootstrap CSS -->
@@ -12,10 +12,11 @@
     {% block css %}{% endblock %}
 </head>
 
-<body class="container" bgcolor="#ddeeff">
+<body class="container" style="background-color: #ddeeff;">
 {% include 'navigation.html' %}
   <div class="column">
 {% block content %}{% endblock %}
+</div>
 
 
 
@@ -33,12 +34,9 @@ Chikara Hashimoto.
   <p>Please provide feedback on the ltdb here: <a href='https://github.com/fcbond/ltdb/issues'>ltdb github issues</a> (preferred) or email the maintainer &lt;<a href='mailto:bond@ieee.org'>bond@ieee.org</a>&gt;.
   
 
-    
-<div>
-  
-   <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.js"></script>
-    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.25/js/dataTables.bootstrap5.js"></script>
+   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.js"></script>
+    <script src="https://cdn.datatables.net/1.10.25/js/dataTables.bootstrap5.js"></script>
     {% block scripts %}{% endblock %}
 
   

@@ -2,7 +2,7 @@
 *.pyc
 __pycache__/
 .venv/
-web/db
+web/db/
 etc/
 test-results/
 playwright-report/

@@ -39,8 +39,14 @@
     <li><strong>Demo</strong> — parse a sentence interactively and view the derivation tree, MRS, and DMRS</li>
     <li><strong>Search</strong> — look up any lemma, type, or predicate using the search box in the navigation bar</li>
   </ul>
+  {% if is_static_mirror %}
+    <div class="alert alert-info" role="alert">
+      This is a static backup mirror. Interactive parsing, generation, and full
+      search are available in the <a href="{{ full_ltdb_base_url }}">full LTDB</a>.
+    </div>
+  {% endif %}
   
-  {% if grm == None %}
+  {% if grm == None and not is_static_mirror %}
     <div class="alert alert-danger" role="alert">
       <strong>Please Select a Grammar</strong> - Choose from the available grammars below to get started.
     </div>
@@ -66,6 +72,7 @@
       {% for grammar in grammars %}
       {% set s = summ[grammar] %}
       <tr data-grm="{{ grammar }}" data-name="{{ s.get('GRAMMAR_NAME', grammar) }}"
+          {% if is_static_mirror %}data-href="{{ grammar_href(grammar) }}"{% endif %}
           {% if grammar == grm %}class="selected"{% endif %}>
         <td>{{ s.get('GRAMMAR_NAME', grammar.split('_')[0]) }}</td>
         <td class="text-muted font-monospace small">{{ grammar }}</td>
@@ -113,10 +120,14 @@
   $('#grammarTable tbody').on('click', 'tr', function () {
     const grm = this.dataset.grm;
     const name = this.dataset.name;
+    {% if is_static_mirror %}
+    window.location.href = this.dataset.href;
+    {% else %}
     document.getElementById('loadingMsg').textContent = 'Loading ' + name + '\u2026';
     document.getElementById('loadingOverlay').classList.add('active');
     document.getElementById('grmInput').value = grm;
     document.getElementById('grammarForm').submit();
+    {% endif %}
   });
 </script>
 {% endblock %}

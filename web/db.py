@@ -14,11 +14,16 @@ sentlim = 8
 
 
 def get_db(root, db):
+    if "db" in g and g.get("db_name") != db:
+        g.db.close()
+        g.pop("db", None)
+        g.pop("db_name", None)
     if "db" not in g:
         g.db = sqlite3.connect(
             os.path.join(root, f"db/{db}")
             # detect_types=sqlite3.PARSE_DECLTYPES
         )
+        g.db_name = db
     #        g.db.row_factory = sqlite3.Row
     return g.db
 
@@ -28,6 +33,7 @@ def close_db(e=None):
 
     if db is not None:
         db.close()
+    g.pop("db_name", None)
 
 
 ############################################################
@@ -433,7 +439,8 @@ def get_gold(conn, psids):
         data[prof, sid]["mrsj"] = mrs_d
         data[prof, sid]["dmrsj"] = dmrs_d
         data[prof, sid]["derivj"] = deriv_to_dict(deriv)
-        data[prof, sid]["deriv"] = deriv  # raw UDF; shown as fallback when derivj is None
+        # Raw UDF; shown as fallback when derivj is None.
+        data[prof, sid]["deriv"] = deriv
         data[prof, sid]["item"] = sent
     return data
 

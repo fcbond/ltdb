@@ -1,7 +1,7 @@
 <header>
   <nav class="navbar fixed-top navbar-expand-sm navbar-light bg-light">
       <div class="container-fluid">
-        <a href="{{ url_for('home') }}" class="navbar-brand"><img width=50
+        <a href="{{ url_for('mirror_home') if is_static_mirror else url_for('home') }}" class="navbar-brand"><img width="50" alt="LTDB"
 					   src="{{ url_for('static',
 					   filename='img/ltdb.png')
 					   }}"/>Grammars</a>
@@ -12,16 +12,23 @@
 	  {% if grm %}
 
           <div class="navbar-nav">
-	    <a href="{{ url_for('grammar') }}"
-	       class="nav-item nav-link{{ ' active' if request.endpoint == 'grammar' }}">{{grm}}</a>
-	    <a href="{{ url_for('rules') }}"
-	       class="nav-item nav-link{{ ' active' if request.endpoint == 'rules' }}">Rules</a>
-	    <a href="{{ url_for('ltypes') }}"
-	       class="nav-item nav-link{{ ' active' if request.endpoint == 'ltypes' }}">Lexical Types</a>
-	    <a href="{{ url_for('demo') }}"
-	       class="nav-item nav-link{{ ' active' if request.endpoint == 'demo' }}">Demo</a>
+	    <a href="{{ grammar_href() }}"
+	       class="nav-item nav-link{{ ' active' if request.endpoint in ('grammar', 'mirror_grammar') }}">{{grm}}</a>
+	    <a href="{{ rules_href() }}"
+	       class="nav-item nav-link{{ ' active' if request.endpoint in ('rules', 'mirror_rules') }}">Rules</a>
+	    <a href="{{ ltypes_href() }}"
+	       class="nav-item nav-link{{ ' active' if request.endpoint in ('ltypes', 'mirror_ltypes') }}">Lexical Types</a>
+	    {% if not is_static_mirror %}
+	      <a href="{{ url_for('demo') }}"
+		 class="nav-item nav-link{{ ' active' if request.endpoint == 'demo' }}">Demo</a>
+	    {% endif %}
 	  </div>
 	  {% endif %}
+	  {% if is_static_mirror %}
+	    <span class="navbar-text ms-2">
+	      <a href="{{ full_ltdb_base_url }}">Full LTDB</a>
+	    </span>
+	  {% else %}
 	    <a href="{{ url_for('help') }}"
 	       class="nav-item nav-link{{ ' active' if request.endpoint == 'help' }}">Help</a>
 	    <form action="{{ url_for('submit_fsearch') }}" method="post" class="form-inline my-2 my-lg-0">
@@ -30,6 +37,7 @@
 		🔍
               </button>
 	    </form>
+	  {% endif %}
 	    
 	  
 	</div>

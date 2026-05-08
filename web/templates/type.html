@@ -39,14 +39,14 @@
 	{% if info['parents'] %}
       <li>Parents:
 	{% for p in info['parents'].split() %}
-	<a href="{{url_for('type', query=p)}}">{{p}}</a>{{ ", " if not loop.last else "" }}
+	<a href="{{type_href(p)}}">{{p}}</a>{{ ", " if not loop.last else "" }}
 	{% endfor %}
 	{% endif %}
       	{%- if info['children'] %}
 	{%- set kids = info['children'].split() %}
       <li>Children:
        	{% for p in kids[:limit] %} 
-       	<a href="{{url_for('type', query=p)}}">{{p}}</a> {{ ", " if not loop.last else "" }} 
+       	<a href="{{type_href(p)}}">{{p}}</a> {{ ", " if not loop.last else "" }} 
        	{% endfor %}
 	{% if kids|length > limit %}
 	(and {{kids|length - limit}} more)
@@ -76,6 +76,16 @@
       {% endfor %}
       </tbody>
     </table>
+    {% endif %}
+    {% if is_static_mirror and info['status'] in static_mirror_statuses %}
+    <section id="examples"
+	     class="ltdb-examples"
+	     data-grammar="{{ grm[:-3] if grm.endswith('.db') else grm }}"
+	     data-type="{{ query }}"
+	     data-db="{{ example_db_href(grm) }}">
+      <h3>Sentences</h3>
+      <p class="text-muted">Loading examples...</p>
+    </section>
     {% endif %}
     {%if sents %}
     <h3>Sentences <small>({{phenomena|length}} of {{maxp}})</small></h3>
@@ -144,6 +154,10 @@
 
 {% block scripts %}
 
+  {% if is_static_mirror %}
+  <script src="../../assets/sql-wasm.js"></script>
+  <script src="../../assets/ltdb-examples.js"></script>
+  {% endif %}
 
 
   <script>
@@ -215,7 +229,7 @@
     $(document).ready(function(){
       $(".ltdb").click(function(event){
         const title = event.target.getAttribute("title");
-        window.open("{{ url_for('type', query='') }}" + title);
+        window.open("{{ type_href('') }}" + title + "{{ '.html' if is_static_mirror else '' }}");
       });
     });
 

@@ -4,6 +4,7 @@ pydelphin
 markdown-it-py
 lxml
 Flask
+Frozen-Flask
 Werkzeug
 Jinja2
 MarkupSafe
