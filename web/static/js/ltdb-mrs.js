@@ -427,11 +427,19 @@
 
   function propsHtml(name, vars) {
     const e = vars[name];
-    if (!e || !e.props || !Object.keys(e.props).length) return "";
-    const ps = Object.entries(e.props)
-      .map(([f, v]) => `${esc(f)}: <span class="ltdb-mrs-val">${esc(v)}</span>`)
-      .join(" ");
-    return ` <span class="ltdb-mrs-vp">[${esc(e.type)} ${ps}]</span>`;
+    if (!e) return "";
+    const sort = e.type || varSort(name);
+    const type = esc(sort);
+    const cls = "ltdb-mrs-pop-t ltdb-mrs-pop-t-" + sort;
+    if (!e.props || !Object.keys(e.props).length) {
+      return ` <span class="ltdb-mrs-vp">[${type}]</span>`;
+    }
+    const rows = Object.entries(e.props)
+      .map(([f, v]) => `<tr><td class="ltdb-pop-k">${esc(f)}</td><td class="ltdb-pop-v">${esc(v)}</td></tr>`)
+      .join("");
+    const popup = `<span class="ltdb-pop"><span class="${cls}">${type}</span>` +
+      `<table class="ltdb-pop-tbl">${rows}</table></span>`;
+    return ` <span class="ltdb-mrs-vp ltdb-mrs-vp-x" tabindex="0">[${type}]${popup}</span>`;
   }
 
   function ensureMrsStyles() {
@@ -448,7 +456,12 @@
       .ltdb-mrs-pred{font-weight:700}
       .ltdb-mrs-lnk{color:#999;font-size:11px;margin-left:1px}
       .ltdb-mrs-feat{color:#666}
-      .ltdb-mrs-vp{color:#999;font-size:11px}
+      .ltdb-mrs-ep-args{padding-left:8px;font-size:11px;color:#555;border-top:1px solid #eee;margin-top:1px;padding-top:1px}
+      .ltdb-mrs-ep-arg{margin-right:8px;white-space:nowrap}
+      .ltdb-mrs-vp{color:#999;font-size:11px;position:relative}
+      .ltdb-mrs-vp-x{cursor:help}
+      .ltdb-mrs-vp-x:hover .ltdb-pop,
+      .ltdb-mrs-vp-x:focus .ltdb-pop{display:inline-block}
       .ltdb-mrs-val{color:#444}
       .ltdb-mrs-hc,.ltdb-mrs-ic{font-size:12px;color:#444;margin-top:3px}
       .ltdb-mrs-v{font-weight:600}
@@ -477,24 +490,27 @@
         const lnk = ep.lnk
           ? `<span class="ltdb-mrs-lnk">&lt;${ep.lnk.from}:${ep.lnk.to}&gt;</span>`
           : "";
+        // Line 1: predicate  lnk  LBL:h  ARG0:v[props]
         const lbl = ep.label
           ? ` <span class="ltdb-mrs-feat">LBL:</span>${spanV(ep.label)}`
           : "";
         const a0 = ep.arg0
           ? ` <span class="ltdb-mrs-feat">ARG0:</span>${spanV(ep.arg0)}${propsHtml(ep.arg0, vs)}`
           : "";
-        const rest = Object.entries(ep.args || {})
-          .map(([f, v]) => {
-            const vh =
-              v && v.carg !== undefined
+        // Line 2: remaining arguments, each as  FEAT:val
+        const restArgs = Object.entries(ep.args || {});
+        const restHtml = restArgs.length
+          ? `<div class="ltdb-mrs-ep-args">${restArgs.map(([f, v]) => {
+              const vh = v && v.carg !== undefined
                 ? `<span class="ltdb-mrs-val">"${esc(v.carg)}"</span>`
                 : spanV(String(v));
-            return `<br><span style="padding-left:8px"><span class="ltdb-mrs-feat">${esc(f)}:</span>${vh}</span>`;
-          })
-          .join("");
+              return `<span class="ltdb-mrs-ep-arg"><span class="ltdb-mrs-feat">${esc(f)}:</span>${vh}</span>`;
+            }).join("")}</div>`
+          : "";
         return (
           `<div class="ltdb-mrs-ep">` +
-          `<span class="ltdb-mrs-pred">${esc(ep.predicate)}</span>${lnk}${lbl}${a0}${rest}` +
+          `<div><span class="ltdb-mrs-pred">${esc(ep.predicate)}</span>${lnk}${lbl}${a0}</div>` +
+          restHtml +
           `</div>`
         );
       })
@@ -519,6 +535,17 @@
         <div class="ltdb-mrs-rels">${relsHtml}</div>
         ${hcHtml}${icHtml}
       </div>`;
+  }
+
+  // Shared tooltip for DMRS node sortinfo (created once, reused across diagrams)
+  let _dmrsTip = null;
+  function dmrsTip() {
+    if (!_dmrsTip) {
+      _dmrsTip = document.createElement("div");
+      _dmrsTip.id = "ltdb-dmrs-tip";
+      document.body.appendChild(_dmrsTip);
+    }
+    return _dmrsTip;
   }
 
   // ── SVG DMRS renderer ─────────────────────────────────────────────────────
@@ -557,6 +584,23 @@
       .ltdb-dmrs-arc.top{stroke:#bbb;stroke-dasharray:4 2}
       .ltdb-dmrs-elbl{fill:#555;text-anchor:middle;font-size:10px}
       .ltdb-dmrs-ah{fill:#555}
+      /* shared dark-card style for both MRS variable popups and DMRS tooltips */
+      .ltdb-pop,#ltdb-dmrs-tip{
+        display:none;background:#1e293b;color:#f1f5f9;
+        border-radius:6px;padding:7px 10px;font:12px/1.4 monospace;
+        box-shadow:0 4px 14px rgba(0,0,0,.4);z-index:1000;
+        pointer-events:none}
+      .ltdb-pop{position:absolute;left:0;top:calc(100% + 3px);pointer-events:none}
+      .ltdb-pop-t{display:block;font-weight:700;margin-bottom:4px;font-size:13px}
+      .ltdb-pop-t-x{color:#4ade80}
+      .ltdb-pop-t-e{color:#60a5fa}
+      .ltdb-pop-t-h{color:#c084fc}
+      .ltdb-pop-t-i,.ltdb-pop-t-u,.ltdb-pop-t-p,.ltdb-pop-t-q,.ltdb-pop-t-a{color:#fbbf24}
+      .ltdb-pop-tbl{border-collapse:collapse;width:100%}
+      .ltdb-pop-tbl tr+tr td{padding-top:1px}
+      .ltdb-pop-k{color:#94a3b8;padding-right:12px;white-space:nowrap;font-size:11px}
+      .ltdb-pop-v{color:#f1f5f9;font-weight:600;white-space:nowrap}
+      #ltdb-dmrs-tip{position:fixed}
     `;
     document.head.appendChild(s);
   }
@@ -720,6 +764,34 @@
         svgEl("text", { class: "ltdb-dmrs-txt", x: cx, y: nodeY + NH / 2 },
           nodeLabel(n))
       );
+
+      // Hover tooltip showing sortinfo features
+      const sortEntries = Object.entries(n.sortinfo || {}).filter(([k]) => k !== "cvarsort");
+      if (sortEntries.length) {
+        const sort = (n.sortinfo || {}).cvarsort || "u";
+        const rows = sortEntries
+          .map(([k, v]) => `<tr><td class="ltdb-pop-k">${k}</td><td class="ltdb-pop-v">${v}</td></tr>`)
+          .join("");
+        const tipHtml = `<span class="ltdb-pop-t ltdb-pop-t-${sort}">${sort}</span>` +
+          `<table class="ltdb-pop-tbl">${rows}</table>`;
+        g.style.cursor = "help";
+        g.addEventListener("mouseenter", (evt) => {
+          const tip = dmrsTip();
+          tip.innerHTML = tipHtml;
+          tip.style.display = "block";
+          tip.style.left = (evt.clientX + 12) + "px";
+          tip.style.top = (evt.clientY - 8) + "px";
+        });
+        g.addEventListener("mousemove", (evt) => {
+          const tip = dmrsTip();
+          tip.style.left = (evt.clientX + 12) + "px";
+          tip.style.top = (evt.clientY - 8) + "px";
+        });
+        g.addEventListener("mouseleave", () => {
+          dmrsTip().style.display = "none";
+        });
+      }
+
       nodeG.appendChild(g);
     });
     svg.appendChild(nodeG);
