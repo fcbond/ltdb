@@ -322,10 +322,13 @@
     const BASE = 10000;
     mrs.rels.forEach((ep, i) => { ep._nid = BASE + i; });
 
-    // arg0 → ep (quantifiers excluded so the bound variable maps to the restriction EP)
+    // arg0 → ep: non-quantifiers preferred; quantifiers fill in variables they alone bind
     const arg0Map = {};
     mrs.rels.forEach((ep) => {
       if (!isQuantifier(ep) && ep.arg0) arg0Map[ep.arg0] = ep;
+    });
+    mrs.rels.forEach((ep) => {
+      if (isQuantifier(ep) && ep.arg0 && !(ep.arg0 in arg0Map)) arg0Map[ep.arg0] = ep;
     });
 
     // Scope representatives: primary target for H links at each label
@@ -422,7 +425,7 @@
   }
 
   function spanV(name) {
-    return `<span class="ltdb-mrs-v ltdb-mrs-${varSort(name)}">${esc(name)}</span>`;
+    return `<span class="ltdb-mrs-v ltdb-mrs-${varSort(name)}" data-var="${esc(name)}">${esc(name)}</span>`;
   }
 
   function propsHtml(name, vars) {
@@ -430,16 +433,12 @@
     if (!e) return "";
     const sort = e.type || varSort(name);
     const type = esc(sort);
-    const cls = "ltdb-mrs-pop-t ltdb-mrs-pop-t-" + sort;
     if (!e.props || !Object.keys(e.props).length) {
       return ` <span class="ltdb-mrs-vp">[${type}]</span>`;
     }
-    const rows = Object.entries(e.props)
-      .map(([f, v]) => `<tr><td class="ltdb-pop-k">${esc(f)}</td><td class="ltdb-pop-v">${esc(v)}</td></tr>`)
-      .join("");
-    const popup = `<span class="ltdb-pop"><span class="${cls}">${type}</span>` +
-      `<table class="ltdb-pop-tbl">${rows}</table></span>`;
-    return ` <span class="ltdb-mrs-vp ltdb-mrs-vp-x" tabindex="0">[${type}]${popup}</span>`;
+    // Store props in data attribute; tooltip is shown via JS (no popup in DOM flow)
+    const encoded = esc(JSON.stringify({ sort, props: e.props }));
+    return ` <span class="ltdb-mrs-vp ltdb-mrs-vp-x" tabindex="0" data-vp="${encoded}">[${type}]</span>`;
   }
 
   function ensureMrsStyles() {
@@ -458,17 +457,19 @@
       .ltdb-mrs-feat{color:#666}
       .ltdb-mrs-ep-args{padding-left:8px;font-size:11px;color:#555;border-top:1px solid #eee;margin-top:1px;padding-top:1px}
       .ltdb-mrs-ep-arg{margin-right:8px;white-space:nowrap}
-      .ltdb-mrs-vp{color:#999;font-size:11px;position:relative}
+      .ltdb-mrs-vp{color:#999;font-size:11px}
       .ltdb-mrs-vp-x{cursor:help}
-      .ltdb-mrs-vp-x:hover .ltdb-pop,
-      .ltdb-mrs-vp-x:focus .ltdb-pop{display:inline-block}
       .ltdb-mrs-val{color:#444}
       .ltdb-mrs-hc,.ltdb-mrs-ic{font-size:12px;color:#444;margin-top:3px}
-      .ltdb-mrs-v{font-weight:600}
+      .ltdb-mrs-v{font-weight:600;cursor:pointer;border-radius:3px;padding:0 1px}
       .ltdb-mrs-h{color:#7b35c9}
       .ltdb-mrs-e{color:#1565c0}
       .ltdb-mrs-x{color:#2e7d32}
       .ltdb-mrs-i,.ltdb-mrs-u,.ltdb-mrs-p,.ltdb-mrs-q,.ltdb-mrs-a{color:#795548}
+      .ltdb-mrs-v.hl-var{background:#fee2e2;box-shadow:0 0 0 2px #ef4444}
+      .ltdb-mrs-v.hl-h{background:#dbeafe;box-shadow:0 0 0 2px #3b82f6}
+      .ltdb-mrs-v.hl-h2{background:#eff6ff;box-shadow:0 0 0 2px #93c5fd}
+      .ltdb-mrs-ep.hl-ep{background:#eff6ff;border-color:#93c5fd}
     `;
     document.head.appendChild(s);
   }
@@ -507,8 +508,9 @@
               return `<span class="ltdb-mrs-ep-arg"><span class="ltdb-mrs-feat">${esc(f)}:</span>${vh}</span>`;
             }).join("")}</div>`
           : "";
+        const lblAttr = ep.label ? ` data-lbl="${esc(ep.label)}"` : "";
         return (
-          `<div class="ltdb-mrs-ep">` +
+          `<div class="ltdb-mrs-ep"${lblAttr}>` +
           `<div><span class="ltdb-mrs-pred">${esc(ep.predicate)}</span>${lnk}${lbl}${a0}</div>` +
           restHtml +
           `</div>`
@@ -535,6 +537,101 @@
         <div class="ltdb-mrs-rels">${relsHtml}</div>
         ${hcHtml}${icHtml}
       </div>`;
+
+    // Wire up variable-property tooltips using the shared fixed-position tip div
+    // (keeps popup HTML out of the DOM flow, avoids flex card layout jumps)
+    container.querySelectorAll(".ltdb-mrs-vp-x[data-vp]").forEach((el) => {
+      let tipHtml = null;
+      function buildTip() {
+        if (tipHtml) return tipHtml;
+        const { sort, props } = JSON.parse(el.dataset.vp);
+        const rows = Object.entries(props)
+          .map(([f, v]) => `<tr><td class="ltdb-pop-k">${esc(f)}</td><td class="ltdb-pop-v">${esc(v)}</td></tr>`)
+          .join("");
+        tipHtml = `<span class="ltdb-pop-t ltdb-pop-t-${esc(sort)}">${esc(sort)}</span>` +
+          `<table class="ltdb-pop-tbl">${rows}</table>`;
+        return tipHtml;
+      }
+      function showTip(x, y) {
+        const tip = dmrsTip();
+        tip.innerHTML = buildTip();
+        tip.style.display = "block";
+        tip.style.left = (x + 12) + "px";
+        tip.style.top = (y - 8) + "px";
+      }
+      el.addEventListener("mouseenter", (e) => showTip(e.clientX, e.clientY));
+      el.addEventListener("mousemove",  (e) => {
+        const tip = dmrsTip();
+        tip.style.left = (e.clientX + 12) + "px";
+        tip.style.top  = (e.clientY - 8) + "px";
+      });
+      el.addEventListener("mouseleave", () => dmrsTip().style.display = "none");
+      el.addEventListener("focus", () => {
+        const r = el.getBoundingClientRect();
+        showTip(r.right, r.top + r.height / 2);
+      });
+      el.addEventListener("blur", () => dmrsTip().style.display = "none");
+    });
+
+    // Build qeq map: handle → its partner (bidirectional)
+    const qeqPartner = {};
+    (mrs.hcons || []).forEach((hc) => {
+      if (hc.rel === "qeq") {
+        qeqPartner[hc.high] = hc.low;
+        qeqPartner[hc.low] = hc.high;
+      }
+    });
+
+    let _activeVar = null;
+
+    function clearHl() {
+      container.querySelectorAll(".hl-var,.hl-h,.hl-h2").forEach((el) =>
+        el.classList.remove("hl-var", "hl-h", "hl-h2")
+      );
+      container.querySelectorAll(".hl-ep").forEach((el) =>
+        el.classList.remove("hl-ep")
+      );
+      _activeVar = null;
+    }
+
+    container.addEventListener("click", (evt) => {
+      const el = evt.target.closest("[data-var]");
+      if (!el) { clearHl(); return; }
+
+      const name = el.dataset.var;
+      // Toggle off if clicking the same variable again
+      if (name === _activeVar) { clearHl(); return; }
+      clearHl();
+      _activeVar = name;
+
+      if (varSort(name) === "h") {
+        // Highlight clicked handle — solid blue
+        container.querySelectorAll(`[data-var="${name}"]`).forEach((e) =>
+          e.classList.add("hl-h")
+        );
+        // Highlight qeq partner — lighter blue
+        const partner = qeqPartner[name];
+        if (partner) {
+          container.querySelectorAll(`[data-var="${partner}"]`).forEach((e) =>
+            e.classList.add("hl-h2")
+          );
+          // Tint the EP card whose LBL equals the low side of the qeq
+          const low = qeqPartner[name] || name;
+          container.querySelectorAll(`[data-lbl="${low}"]`).forEach((e) =>
+            e.classList.add("hl-ep")
+          );
+          container.querySelectorAll(`[data-lbl="${name}"]`).forEach((e) =>
+            e.classList.add("hl-ep")
+          );
+        }
+      } else {
+        // Non-handle: highlight all occurrences in coral
+        container.querySelectorAll(`[data-var="${name}"]`).forEach((e) =>
+          e.classList.add("hl-var")
+        );
+      }
+      evt.stopPropagation();
+    });
   }
 
   // Shared tooltip for DMRS node sortinfo (created once, reused across diagrams)
@@ -573,7 +670,8 @@
     const s = document.createElement("style");
     s.id = "ltdb-dmrs-style";
     s.textContent = `
-      .ltdb-dmrs-svg{max-width:100%;height:auto;overflow:visible;font:12px sans-serif}
+      .ltdb-dmrs-wrap{overflow-x:auto;max-width:100%}
+      .ltdb-dmrs-svg{overflow:visible;font:12px sans-serif}
       .ltdb-dmrs-box{fill:#fff;stroke:#61748a;stroke-width:1.25}
       .ltdb-dmrs-txt{fill:#222;text-anchor:middle;dominant-baseline:central;pointer-events:none}
       .ltdb-dmrs-arc{fill:none;stroke-width:1.1}
@@ -726,7 +824,23 @@
           ? nodeY - level * LH
           : nodeY + NH + Math.abs(level) * LH;
 
-        const d = `M${x1},${yEdge} C${x1},${arcY} ${x2},${arcY} ${x2},${yEdge}`;
+        // Orthogonal routing (after delphin-viz): source x is offset 10px toward
+        // the target so multiple arcs leaving the same node spread into a "V"
+        // rather than stacking on top of each other. Target stays centred.
+        const XOFF = 10;
+        const goRight = x2 >= x1;
+        const x1s = x1 + (goRight ? XOFF : -XOFF);   // offset source end
+        const r = Math.min(15, Math.abs(arcY - yEdge) * 0.45, Math.abs(x2 - x1s) * 0.35);
+        const dy = above ? r : -r;
+        const dx = goRight ? r : -r;
+        const d = [
+          `M${x1s},${yEdge}`,
+          `L${x1s},${arcY + dy}`,
+          `Q${x1s},${arcY} ${x1s + dx},${arcY}`,
+          `L${x2 - dx},${arcY}`,
+          `Q${x2},${arcY} ${x2},${arcY + dy}`,
+          `L${x2},${yEdge}`,
+        ].join(" ");
         const hasArrow = post !== "eq";
         linkG.appendChild(
           svgEl("path", {
@@ -736,7 +850,7 @@
           })
         );
         if (link.rargname) {
-          const midX = (x1 + x2) / 2;
+          const midX = (x1s + x2) / 2;
           const midY = above ? arcY - 3 : arcY + 11;
           linkG.appendChild(
             svgEl("text", { class: "ltdb-dmrs-elbl", x: midX, y: midY },
@@ -796,7 +910,10 @@
     });
     svg.appendChild(nodeG);
 
-    container.appendChild(svg);
+    const wrap = document.createElement("div");
+    wrap.className = "ltdb-dmrs-wrap";
+    wrap.appendChild(svg);
+    container.appendChild(wrap);
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────

@@ -7,6 +7,10 @@
   .result-viz { overflow-x: auto; padding: 0.5rem 0; max-width: 100%; }
   #spinner { display: none; }
   #inputText::-webkit-calendar-picker-indicator { display: none !important; }
+  .copy-btn { border:none;background:none;color:#6c757d;padding:0 .25rem;font-size:.85rem;
+              line-height:1;cursor:pointer;transition:color .15s; }
+  .copy-btn:hover { color:#0d6efd; }
+  .copy-btn.copied { color:#198754; }
 </style>
 {% endblock %}
 
@@ -174,6 +178,17 @@
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
+  function makeCopyBtn(getText) {
+    const btn = $('<button class="copy-btn" title="Copy to clipboard">&#128203;</button>');
+    btn.on('click', function () {
+      navigator.clipboard.writeText(getText()).then(() => {
+        btn.addClass('copied').text('✓');
+        setTimeout(() => btn.removeClass('copied').html('&#128203;'), 1500);
+      });
+    });
+    return btn;
+  }
+
   function renderResults(data) {
     const container = $('#results');
 
@@ -227,6 +242,11 @@
           $(this).toggleClass('btn-primary btn-outline-primary');
         });
         header.append(btn);
+        header.append(makeCopyBtn(() =>
+          typeof result.derivation === 'string'
+            ? result.derivation
+            : JSON.stringify(result.derivation, null, 2)
+        ));
       }
 
       if (result.mrs_str && $('#wantMRS').is(':checked')) {
@@ -247,6 +267,7 @@
           }
         });
         header.append(btn);
+        header.append(makeCopyBtn(() => result.mrs_str));
       }
 
       if (result.mrs_str && $('#wantDMRS').is(':checked')) {
