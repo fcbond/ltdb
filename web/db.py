@@ -416,12 +416,12 @@ def get_sents(conn, psids):
     return sents
 
 
-def get_gold(conn, psids):
+def get_gold(conn, psids, convert=True):
     """Given a list of (profile, sid), return per-sentence linguistic data.
 
     Keys per (profile, sid): 'mrs', 'mrsj', 'dmrsj', 'derivj', 'deriv', 'item'.
-    'derivj'/'mrsj'/'dmrsj' are computed on the fly; 'deriv' is the raw UDF
-    string used as a fallback in templates when derivj is None.
+    If convert is true, 'derivj'/'mrsj'/'dmrsj' are computed on the fly. The
+    raw 'deriv' and 'mrs' strings are always returned for browser rendering.
     """
     if not psids:
         return dd(dict)
@@ -434,11 +434,16 @@ def get_gold(conn, psids):
         params,
     )
     for prof, sid, deriv, mrs, sent in c:
-        mrs_d, dmrs_d = mrs_to_dicts(mrs)
         data[prof, sid]["mrs"] = mrs
-        data[prof, sid]["mrsj"] = mrs_d
-        data[prof, sid]["dmrsj"] = dmrs_d
-        data[prof, sid]["derivj"] = deriv_to_dict(deriv)
+        if convert:
+            mrs_d, dmrs_d = mrs_to_dicts(mrs)
+            data[prof, sid]["mrsj"] = mrs_d
+            data[prof, sid]["dmrsj"] = dmrs_d
+            data[prof, sid]["derivj"] = deriv_to_dict(deriv)
+        else:
+            data[prof, sid]["mrsj"] = None
+            data[prof, sid]["dmrsj"] = None
+            data[prof, sid]["derivj"] = None
         # Raw UDF; shown as fallback when derivj is None.
         data[prof, sid]["deriv"] = deriv
         data[prof, sid]["item"] = sent
@@ -509,6 +514,30 @@ _summary_cache: dict = {}
 _tb_summary_cache: dict = {}
 
 
+def _has_ltdb_summary_schema(path):
+    """Return True if a database has the tables used by summary queries."""
+    if not os.path.isfile(path) or os.path.getsize(path) == 0:
+        return False
+    with sqlite3.connect(path) as conn:
+        tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+    return {"gold", "lexfreq", "meta", "sent", "types"}.issubset(tables)
+
+
+def _valid_grammar_files(db_dir):
+    """Return grammar database filenames with the LTDB summary schema."""
+    return sorted(
+        file
+        for file in os.listdir(db_dir)
+        if file.endswith(".db")
+        and _has_ltdb_summary_schema(os.path.join(db_dir, file))
+    )
+
+
 def warm_caches(current_directory):
     """Pre-populate all summary caches at server startup.
 
@@ -518,7 +547,7 @@ def warm_caches(current_directory):
     db_dir = os.path.join(current_directory, "db")
     if not os.path.isdir(db_dir):
         return
-    grammars = sorted(f for f in os.listdir(db_dir) if f.endswith(".db"))
+    grammars = _valid_grammar_files(db_dir)
     get_short_summary(current_directory, grammars)
     for grm in grammars:
         with sqlite3.connect(os.path.join(db_dir, grm)) as conn:

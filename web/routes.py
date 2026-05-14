@@ -76,6 +76,8 @@ STATIC_MIRROR_STATUSES = {
     ).split(",")
     if status.strip()
 }
+STATIC_MIRROR_ALL_NON_LEX = os.environ.get("STATIC_MIRROR_ALL_NON_LEX") == "1"
+STATIC_MIRROR_DYNAMIC_TYPES = os.environ.get("STATIC_MIRROR_DYNAMIC_TYPES") == "1"
 
 
 def _is_mirror_request():
@@ -111,10 +113,19 @@ def _mirror_type_status(grm, query):
 
 
 def _mirror_has_static_type(grm, query):
-    return _mirror_type_status(grm, query) in STATIC_MIRROR_STATUSES
+    status = _mirror_type_status(grm, query)
+    if STATIC_MIRROR_ALL_NON_LEX:
+        return status not in (None, "lex-entry", "generic-lex-entry")
+    return status in STATIC_MIRROR_STATUSES
 
 
 def _mirror_type_href(grm, query, render_url_for):
+    if STATIC_MIRROR_DYNAMIC_TYPES:
+        return render_url_for(
+            "mirror_type_shell",
+            grammar=_stem_for_grm(grm),
+            type=query,
+        )
     if _mirror_has_static_type(grm, query):
         return render_url_for("mirror_type", grm=_stem_for_grm(grm), query=query)
     return _full_type_href(grm, query)
@@ -159,6 +170,7 @@ def _inject_static_mirror_helpers():
 
     return {
         "is_static_mirror": _is_mirror_request(),
+        "static_mirror_all_non_lex": STATIC_MIRROR_ALL_NON_LEX,
         "static_mirror_statuses": STATIC_MIRROR_STATUSES,
         "full_ltdb_base_url": FULL_LTDB_BASE_URL.rstrip("/"),
         "type_href": type_href,
@@ -171,7 +183,17 @@ def _inject_static_mirror_helpers():
 
 def _grm_exists(grm):
     """Return True if a .db file exists for the given grammar name."""
-    return os.path.isfile(os.path.join(current_directory, "db", grm))
+    path = os.path.join(current_directory, "db", grm)
+    if not os.path.isfile(path) or os.path.getsize(path) == 0:
+        return False
+    with sqlite3.connect(path) as conn:
+        tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+    return {"gold", "lexfreq", "meta", "sent", "types"}.issubset(tables)
 
 
 def _db_for_stem(stem):
@@ -187,7 +209,7 @@ def _stem_for_grm(grm):
 def _all_grammars():
     grammars = []
     for file in os.listdir(os.path.join(current_directory, "db")):
-        if file.endswith(".db"):
+        if file.endswith(".db") and _grm_exists(file):
             grammars.append(file)
     grammars.sort()
     return grammars
@@ -425,7 +447,7 @@ def _render_type(grm, query):
 
                 sents = get_sents(conn, list(phenomena.keys()))
 
-                gold = get_gold(conn, list(phenomena.keys()))
+                gold = get_gold(conn, list(phenomena.keys()), convert=False)
         elif status == "lex-entry":
             lexids = get_lxid(conn, query)
 
@@ -436,7 +458,7 @@ def _render_type(grm, query):
 
                 sents = get_sents(conn, list(phenomena.keys()))
 
-                gold = get_gold(conn, list(phenomena.keys()))
+                gold = get_gold(conn, list(phenomena.keys()), convert=False)
 
             lexids = []
             words = []
@@ -447,7 +469,7 @@ def _render_type(grm, query):
 
                 sents = get_sents(conn, list(phenomena.keys()))
 
-                gold = get_gold(conn, list(phenomena.keys()))
+                gold = get_gold(conn, list(phenomena.keys()), convert=False)
 
             lexids = []
             words = []
@@ -528,6 +550,16 @@ def mirror_type(grm, query):
     return _render_type(db, query)
 
 
+@app.route("/ltdb/type.html")
+def mirror_type_shell():
+    """Static mirror client-side type viewer shell."""
+    return render_template(
+        "type_shell.html",
+        title="LTDB Static Type Viewer",
+        grm=None,
+    )
+
+
 def dat_path_for(grm):
     """Return the .dat path for a grammar filename, or None if it doesn't exist."""
     dat = os.path.join(current_directory, "db", grm[:-3] + ".dat")
@@ -577,7 +609,7 @@ def parse_sentence():
     """Parse a sentence with ACE and return JSON in delphin-viz format."""
     from delphin.ace import ACEParser
     from delphin import dmrs as dmrs_module
-    from delphin.codecs import dmrsjson, mrsjson
+    from delphin.codecs import dmrsjson, mrsjson, simplemrs
 
     grm = request.form.get("grm") or session.get("grm")
     if not grm:
@@ -616,9 +648,7 @@ def parse_sentence():
 
         if want_derivation:
             try:
-                r["derivation"] = result.derivation().to_dict(
-                    fields=["id", "entity", "score", "form", "tokens"]
-                )
+                r["derivation"] = result.derivation().to_udf()
             except Exception as e:
                 r["derivation"] = None
                 errors.append(f"result {i} derivation: {e}")
@@ -627,20 +657,13 @@ def parse_sentence():
             mrs_obj = None
             try:
                 mrs_obj = result.mrs()
-                if want_mrs:
-                    r["mrs"] = json.loads(mrsjson.encode(mrs_obj))
+                # mrs_str: simplemrs string for browser-side LTDBMrs rendering
+                # mrs: mrsjson dict kept for the generate endpoint
+                r["mrs_str"] = simplemrs.encode(mrs_obj)
+                r["mrs"] = json.loads(mrsjson.encode(mrs_obj))
             except Exception as e:
                 r["mrs"] = None
                 errors.append(f"result {i} mrs: {e}")
-
-            if want_dmrs:
-                try:
-                    r["dmrs"] = json.loads(
-                        dmrsjson.encode(dmrs_module.from_mrs(mrs_obj))
-                    )
-                except Exception as e:
-                    r["dmrs"] = None
-                    errors.append(f"result {i} dmrs: {e}")
 
         results.append(r)
 
