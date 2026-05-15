@@ -164,7 +164,7 @@
   }
 
   function boxWidthForLabel(label) {
-    return Math.max(44, Math.min(140, String(label).length * 7 + 18));
+    return Math.max(44, String(label).length * 7 + 18);
   }
 
   function rootShapePoints(width, height) {
@@ -221,10 +221,20 @@
   }
 
   function layoutTree(root, options) {
-    const rowWidth = options && options.rowWidth ? options.rowWidth : 92;
     const levelHeight = options && options.levelHeight ? options.levelHeight : 64;
     const marginX = options && options.marginX ? options.marginX : 42;
     const marginY = options && options.marginY ? options.marginY : 28;
+    // Pre-scan to find the widest node so rowWidth can accommodate it
+    let maxNodeWidth = 44;
+    (function scanWidths(node) {
+      maxNodeWidth = Math.max(maxNodeWidth, boxWidthForLabel(labelForNode(node)));
+      (node.children || []).forEach(scanWidths);
+    }(root));
+    const rowWidth = Math.max(
+      options && options.rowWidth ? options.rowWidth : 92,
+      maxNodeWidth + 8
+    );
+
     const leafDepths = [];
     visibleLeafDepths(root, 0, leafDepths);
     const leafBaseline = Math.max(0, ...leafDepths) * levelHeight + marginY;
@@ -272,7 +282,7 @@
     const style = document.createElement("style");
     style.id = "ltdb-tree-style";
     style.textContent = `
-      .ltdb-tree-svg { max-width: 100%; height: auto; overflow: visible; }
+      .ltdb-tree-svg { overflow: visible; }
       .ltdb-tree-link { fill: none; stroke: #b9c0c7; stroke-width: 1.25; }
       .ltdb-tree-node text { fill: #222; font: 12px sans-serif; }
       .ltdb-tree-node rect,
@@ -422,7 +432,10 @@
       nodeLayer.appendChild(group);
     });
     svg.appendChild(nodeLayer);
-    container.appendChild(svg);
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "overflow-x:auto;max-width:100%";
+    wrap.appendChild(svg);
+    container.appendChild(wrap);
     return layout;
   }
 
