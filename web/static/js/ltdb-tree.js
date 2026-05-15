@@ -93,6 +93,21 @@
     return items.slice(start).filter(Array.isArray).map(toTree);
   }
 
+  function fromDict(node) {
+    if (!node || typeof node !== "object") {
+      return { name: String(node || ""), leaf: true };
+    }
+    if (!node.daughters) {
+      return { name: node.form || node.entity || "", form: node.form || null, leaf: true };
+    }
+    return {
+      name: node.entity || "",
+      entity: node.entity || "",
+      type: node.type || null,
+      children: node.daughters.map(fromDict),
+    };
+  }
+
   function toTree(node) {
     if (!Array.isArray(node)) {
       return { name: String(node), leaf: true };
@@ -159,8 +174,10 @@
     });
   }
 
-  function labelForNode(node) {
-    return node.form || node.name;
+  function labelForNode(node, options) {
+    if (node.form != null) return node.form;
+    if (options && options.showLabels && node.type) return node.type;
+    return node.entity || node.name;
   }
 
   function boxWidthForLabel(label) {
@@ -223,17 +240,14 @@
   function layoutTree(root, options) {
     const levelHeight = options && options.levelHeight ? options.levelHeight : 64;
     const marginY = options && options.marginY ? options.marginY : 28;
-    // Pre-scan to find the widest node so rowWidth and marginX can accommodate it
+    const nodeSep = options && options.nodeSep ? options.nodeSep : 12;
+
     let maxNodeWidth = 44;
     (function scanWidths(node) {
-      maxNodeWidth = Math.max(maxNodeWidth, boxWidthForLabel(labelForNode(node)));
+      maxNodeWidth = Math.max(maxNodeWidth, boxWidthForLabel(labelForNode(node, options)));
       (node.children || []).forEach(scanWidths);
     }(root));
-    const rowWidth = Math.max(
-      options && options.rowWidth ? options.rowWidth : 92,
-      maxNodeWidth + 8
-    );
-    // Ensure the leftmost node's box doesn't clip outside the viewBox
+
     const marginX = Math.max(
       options && options.marginX ? options.marginX : 42,
       Math.ceil(maxNodeWidth / 2) + 8
@@ -242,32 +256,86 @@
     const leafDepths = [];
     visibleLeafDepths(root, 0, leafDepths);
     const leafBaseline = Math.max(0, ...leafDepths) * levelHeight + marginY;
-    countRows(root);
-    let row = 0;
+
+    // Sequential leaf placement; interior nodes centred over outermost children.
+    // After each child is placed, sibling boxes are checked and the right subtree
+    // is shifted if it would overlap, with leafX updated so subsequent siblings
+    // start after the shifted position.
+    let leafX = 0;
+
+    function shiftSubtree(node, delta) {
+      node._x += delta;
+      visibleChildrenFor(node).forEach((child) => shiftSubtree(child, delta));
+    }
+
+    // Depth-matched contour comparison: at each row, record the rightmost right-edge
+    // of the left subtree and the leftmost left-edge of the right subtree, then take
+    // the maximum required shift across all rows where both subtrees have nodes.
+    function contourRight(node, d, acc) {
+      const cur = node._x + node._boxWidth / 2;
+      acc[d] = acc[d] !== undefined ? Math.max(acc[d], cur) : cur;
+      visibleChildrenFor(node).forEach((c) => contourRight(c, d + 1, acc));
+      return acc;
+    }
+
+    function contourLeft(node, d, acc) {
+      const cur = node._x - node._boxWidth / 2;
+      acc[d] = acc[d] !== undefined ? Math.min(acc[d], cur) : cur;
+      visibleChildrenFor(node).forEach((c) => contourLeft(c, d + 1, acc));
+      return acc;
+    }
+
+    function requiredShift(leftNode, rightNode) {
+      const rc = contourRight(leftNode, 0, {});
+      const lc = contourLeft(rightNode, 0, {});
+      let shift = 0;
+      for (const d of Object.keys(rc)) {
+        if (lc[d] !== undefined) {
+          shift = Math.max(shift, rc[d] + nodeSep - lc[d]);
+        }
+      }
+      return shift;
+    }
 
     function position(node, depth) {
-      node._boxWidth = boxWidthForLabel(labelForNode(node));
+      node._boxWidth = boxWidthForLabel(labelForNode(node, options));
       node._boxHeight = 24;
       const children = visibleChildrenFor(node);
       if (!children.length) {
-        node._x = marginX + row * rowWidth;
-        row += 1;
-      } else {
-        children.forEach((child) => position(child, depth + 1));
-        node._x =
-          children.reduce((total, child) => total + child._x, 0) / children.length;
+        node._x = leafX + node._boxWidth / 2;
+        leafX += node._boxWidth + nodeSep;
+        node._y = node.leaf ? leafBaseline : marginY + depth * levelHeight;
+        return;
       }
-      node._y = node.leaf ? leafBaseline : marginY + depth * levelHeight;
+      position(children[0], depth + 1);
+      for (let i = 1; i < children.length; i++) {
+        position(children[i], depth + 1);
+        const delta = requiredShift(children[i - 1], children[i]);
+        if (delta > 0) {
+          shiftSubtree(children[i], delta);
+          leafX += delta;
+        }
+      }
+      node._x = (children[0]._x + children[children.length - 1]._x) / 2;
+      node._y = marginY + depth * levelHeight;
     }
 
     position(root, 0);
-    const nodes = [];
-    const links = [];
-    collectVisibleNodes(root, nodes, links);
-    const width = Math.max(row * rowWidth + marginX * 2, 160);
+
+    // Shift everything right so the leftmost node sits at marginX
+    const allNodes = [];
+    const allLinks = [];
+    collectVisibleNodes(root, allNodes, allLinks);
+    const minX = Math.min(...allNodes.map((n) => n._x - n._boxWidth / 2));
+    const shift = marginX - minX;
+    allNodes.forEach((n) => { n._x += shift; });
+    const maxX = Math.max(...allNodes.map((n) => n._x + n._boxWidth / 2));
+    const width = Math.max(maxX + marginX, 160);
     const height =
-      Math.max(...nodes.map((node) => node._y), leafBaseline) +
+      Math.max(...allNodes.map((n) => n._y), leafBaseline) +
       (options && options.labelHeight ? options.labelHeight : 52);
+    const nodes = allNodes;
+    const links = allLinks;
     return { height, links, nodes, width };
   }
 
@@ -312,12 +380,11 @@
   }
 
   function linkPath(link) {
-    const sx = link.source._y + link.source._boxHeight / 2;
-    const sy = link.source._x;
-    const tx = link.target._y - link.target._boxHeight / 2;
-    const ty = link.target._x;
-    const mid = sx + (tx - sx) / 2;
-    return `M${sy},${sx} C${sy},${mid} ${ty},${mid} ${ty},${tx}`;
+    const srcX = link.source._x;
+    const srcY = link.source._y + link.source._boxHeight / 2;
+    const tgtX = link.target._x;
+    const tgtY = link.target._y - link.target._boxHeight / 2;
+    return `M${srcX},${srcY} L${tgtX},${tgtY}`;
   }
 
   function typeHrefForNode(node, options) {
@@ -426,11 +493,12 @@
         x: 0,
         y: 0,
       });
-      text.textContent = labelForNode(node);
+      text.textContent = labelForNode(node, options);
       const title = svgElement("title");
+      const entityName = node.entity || node.name;
       title.textContent = node.leaf
         ? node.name
-        : `${node.name} (${nodeClass}; click to collapse, shift-click to open type)`;
+        : `${entityName} (${nodeClass}; click to collapse, shift-click to open type)`;
       group.appendChild(title);
       group.appendChild(text);
       nodeLayer.appendChild(group);
@@ -441,12 +509,14 @@
   }
 
   function parseDerivation(input) {
-    return toTree(parseSexp(input));
+    if (typeof input === "string") return toTree(parseSexp(input));
+    return fromDict(input);
   }
 
   return {
     boxWidthForLabel,
     classifyNode,
+    fromDict,
     isHighlightedNode,
     labelForNode,
     layoutTree,

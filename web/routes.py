@@ -250,7 +250,7 @@ def _ace_error_message(exc: Exception, dat: str) -> str:
             "ACE failed: too many open files. "
             "The server may be under heavy load; try again in a moment."
         )
-    if "FileNotFoundError" in type(exc).__name__ or "No such file" in msg:
+    if "FileNotFoundError" in exc.__class__.__name__ or "No such file" in msg:
         return (
             "ACE binary not found. "
             "Run scripts/setup_ace.py to install a platform-appropriate binary, "
@@ -635,7 +635,7 @@ def parse_sentence():
 
     try:
         with ACEParser(
-            dat, executable=find_ace(), cmdargs=[f"-n{n_results}"]
+            dat, executable=find_ace(), cmdargs=[f"-n{n_results}", "-L"]
         ) as parser:
             response = parser.interact(input_text)
     except Exception as e:
@@ -648,7 +648,7 @@ def parse_sentence():
 
         if want_derivation:
             try:
-                r["derivation"] = result.derivation().to_udf()
+                r["derivation"] = result.derivation().to_dict()
             except Exception as e:
                 r["derivation"] = None
                 errors.append(f"result {i} derivation: {e}")

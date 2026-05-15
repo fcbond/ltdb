@@ -65,6 +65,12 @@
       <div class="form-check">
         <input class="form-check-input" type="checkbox" id="wantTree" checked>
         <label class="form-check-label" for="wantTree">Tree</label>
+        <small class="text-muted ms-1" title="Click a node to collapse/expand; shift-click to open its type page">(?)</small>
+      </div>
+      <div class="form-check" id="labelToggleWrap" style="display:none">
+        <input class="form-check-input" type="checkbox" id="showLabels">
+        <label class="form-check-label" for="showLabels">Labels</label>
+        <small class="text-muted ms-1" title="Show linguistic category labels (NP, VP…) instead of grammar rule names">(?)</small>
       </div>
       <div class="form-check">
         <input class="form-check-input" type="checkbox" id="wantMRS" checked>
@@ -166,7 +172,7 @@
     $.post('{{ url_for("parse_sentence") }}', formData)
       .done(function (data) {
         $('#spinner').hide();
-        renderResults(data);
+        renderResults(data, $('#grammarSelect').val());
       })
       .fail(function (xhr) {
         $('#spinner').hide();
@@ -196,7 +202,16 @@
     return btn;
   }
 
-  function renderResults(data) {
+  let _lastRenderData = null;
+  let _lastRenderGrm = null;
+
+  $('#showLabels').on('change', function () {
+    if (_lastRenderData) renderResults(_lastRenderData, _lastRenderGrm);
+  });
+
+  function renderResults(data, grm) {
+    _lastRenderData = data;
+    _lastRenderGrm = grm;
     const container = $('#results');
 
     if (data.error) {
@@ -225,8 +240,11 @@
       container.append($('<div class="alert alert-warning">').append(details));
     }
 
-    const grm = $('#grammarSelect').val();
     const grmStem = grm.replace(/\.db$/, '');
+    const showLabels = $('#showLabels').is(':checked');
+    let anyLabels = false;
+
+    $('#labelToggleWrap').toggle(false);
 
     data.results.forEach(function (result, i) {
       const card = $('<div class="card result-card">');
@@ -242,7 +260,12 @@
         body.append(viz);
         try {
           const parsed = window.LTDBTree.parseDerivation(result.derivation);
+          const hasLabels = (function checkLabels(n) {
+            return Boolean(n.type) || (n.children || []).some(checkLabels);
+          }(parsed));
+          if (hasLabels) anyLabels = true;
           window.LTDBTree.renderTree(viz[0], parsed, {
+            showLabels: showLabels && hasLabels,
             typeHref: (typ) =>
               '/type/' + encodeURIComponent(typ) + '?grm=' + encodeURIComponent(grm),
           });
@@ -350,6 +373,8 @@
         header.append(genBtn);
       }
     });
+
+    if (anyLabels) $('#labelToggleWrap').show();
   }
 </script>
 {% endblock %}
