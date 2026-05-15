@@ -188,9 +188,10 @@
     return m ? m[1].toLowerCase() : "u";
   }
 
-  // Quantifiers have RSTR and BODY arguments; they share ARG0 with their bound variable.
+  // Quantifiers have RSTR and BODY arguments (some grammars use lowercase).
   function isQuantifier(ep) {
-    return "RSTR" in (ep.args || {}) && "BODY" in (ep.args || {});
+    const keys = Object.keys(ep.args || {}).map((k) => k.toUpperCase());
+    return keys.includes("RSTR") && keys.includes("BODY");
   }
 
   // Priority rank for selecting the representative EP in a shared-label group.

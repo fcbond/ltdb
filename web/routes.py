@@ -664,6 +664,11 @@ def parse_sentence():
             except Exception as e:
                 r["mrs"] = None
                 errors.append(f"result {i} mrs: {e}")
+                # Fall back to the raw ACE MRS string so the browser can still
+                # attempt rendering even when pydelphin cannot parse it
+                raw = result.get("mrs")
+                if raw and isinstance(raw, str):
+                    r["mrs_str"] = raw
 
         results.append(r)
 
