@@ -36,13 +36,18 @@
     <li><strong>Summary</strong> — counts of types, rules, and treebank coverage</li>
     <li><strong>Rules</strong> — phrase-structure, lexical, and morphological rules with corpus frequencies</li>
     <li><strong>Lexical Types</strong> — the lexical type hierarchy with example words</li>
+    {% if not is_static_mirror %}
     <li><strong>Demo</strong> — parse a sentence interactively and view the derivation tree, MRS, and DMRS</li>
     <li><strong>Search</strong> — look up any lemma, type, or predicate using the search box in the navigation bar</li>
+    {% else %}
+    <li><strong>Search</strong> — look up any type using the search box in the navigation bar</li>
+    {% endif %}
   </ul>
   {% if is_static_mirror %}
     <div class="alert alert-info" role="alert">
-      This is a static backup mirror. Interactive parsing, generation, and full
-      search are available in the <a href="{{ full_ltdb_base_url }}">full LTDB</a>.
+      This is a static backup mirror. Interactive parsing, generation, and
+      lexical-entry and example search are available in the
+      <a href="{{ full_ltdb_base_url }}">full LTDB</a>.
     </div>
   {% endif %}
   
@@ -80,7 +85,7 @@
         <td class="text-end">{{ "{:,}".format(s.get('RULES', 0)) }}</td>
         <td class="text-end">{{ "{:,}".format(s.get('TREES', 0)) if s.get('TREES', 0) else '' }}</td>
         <td>{{ s.get('LICENSE', '') }}</td>
-        <td>{% if s.get('WEBSITE') %}<a href="{{ s.get('WEBSITE') }}" target="_blank" onclick="event.stopPropagation()">link</a>{% endif %}</td>
+        <td>{% if s.get('WEBSITE') %}<a href="{{ s.get('WEBSITE') }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">link</a>{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>

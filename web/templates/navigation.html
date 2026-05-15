@@ -25,6 +25,15 @@
 	  </div>
 	  {% endif %}
 	  {% if is_static_mirror %}
+	    {% if grm %}
+	    <form action="{{ url_for('mirror_type_shell') }}" method="get" class="form-inline my-2 my-lg-0">
+              <input type="hidden" name="grammar" value="{{ grm[:-3] if grm.endswith('.db') else grm }}">
+              <input type="text" id="search" name="type" required placeholder="type">
+	      <button type="submit" class="btn btn-outline-secondary">
+		🔍
+              </button>
+	    </form>
+	    {% endif %}
 	    <span class="navbar-text ms-2">
 	      <a href="{{ full_ltdb_base_url }}">Full LTDB</a>
 	    </span>
