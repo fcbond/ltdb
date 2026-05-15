@@ -214,10 +214,15 @@
     );
 
     if (data.errors && data.errors.length > 0) {
-      container.append(
-        '<div class="alert alert-warning"><strong>Serialisation errors:</strong><br>' +
-        data.errors.map(e => $('<span>').text(e).html()).join('<br>') + '</div>'
+      const details = $('<details>').append(
+        $('<summary style="cursor:pointer">').html(
+          '<strong>Serialisation errors</strong> (' + data.errors.length + ')'
+        ),
+        $('<div class="mt-2">').html(
+          data.errors.map(e => $('<span>').text(e).html()).join('<br>')
+        )
       );
+      container.append($('<div class="alert alert-warning">').append(details));
     }
 
     const grm = $('#grammarSelect').val();
