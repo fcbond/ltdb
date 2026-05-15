@@ -93,6 +93,7 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/ltdb-tree.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ltdb-mrs.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ltdb-latex.js') }}"></script>
 <script>
   const _allExamples = {{ examples | tojson }};
   const _MAX_HISTORY = 20;
@@ -178,13 +179,19 @@
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  function makeCopyBtn(getText) {
-    const btn = $('<button class="copy-btn" title="Copy to clipboard">&#128203;</button>');
+  function makeCopyBtn(getText, label) {
+    const icon = label
+      ? `<span style="font-size:.72rem;font-weight:700;letter-spacing:-.02em">${label}</span>`
+      : '&#128203;';
+    const title = label ? `Copy ${label}` : 'Copy to clipboard';
+    const btn = $(`<button class="copy-btn" title="${title}">${icon}</button>`);
     btn.on('click', function () {
-      navigator.clipboard.writeText(getText()).then(() => {
-        btn.addClass('copied').text('✓');
-        setTimeout(() => btn.removeClass('copied').html('&#128203;'), 1500);
-      });
+      try {
+        navigator.clipboard.writeText(getText()).then(() => {
+          btn.addClass('copied').html('<span style="font-size:.72rem">✓</span>');
+          setTimeout(() => btn.removeClass('copied').html(icon), 1500);
+        });
+      } catch (e) { /* clipboard unavailable */ }
     });
     return btn;
   }
@@ -247,6 +254,12 @@
             ? result.derivation
             : JSON.stringify(result.derivation, null, 2)
         ));
+        if (window.LTDBLatex) {
+          header.append(makeCopyBtn(() =>
+            window.LTDBLatex.derivationToForest(
+              window.LTDBTree.parseDerivation(result.derivation)
+            ), 'TeX'));
+        }
       }
 
       if (result.mrs_str && $('#wantMRS').is(':checked')) {
@@ -268,6 +281,11 @@
         });
         header.append(btn);
         header.append(makeCopyBtn(() => result.mrs_str));
+        if (window.LTDBLatex) {
+          header.append(makeCopyBtn(() =>
+            window.LTDBLatex.mrsToAvm(window.LTDBMrs.parseMrs(result.mrs_str))
+          , 'TeX'));
+        }
       }
 
       if (result.mrs_str && $('#wantDMRS').is(':checked')) {
@@ -288,6 +306,12 @@
           }
         });
         header.append(btn);
+        if (window.LTDBLatex) {
+          header.append(makeCopyBtn(() =>
+            window.LTDBLatex.dmrsToTikz(
+              window.LTDBMrs.mrsToDmrs(window.LTDBMrs.parseMrs(result.mrs_str))
+            ), 'TeX'));
+        }
       }
 
       if (result.mrs) {
