@@ -561,9 +561,9 @@ def mirror_type_shell():
 
 
 def dat_path_for(grm):
-    """Return the .dat path for a grammar filename, or None if it doesn't exist."""
+    """Return the .dat path for a grammar, or None if missing or empty."""
     dat = os.path.join(current_directory, "db", grm[:-3] + ".dat")
-    return dat if os.path.exists(dat) else None
+    return dat if os.path.isfile(dat) and os.path.getsize(dat) > 0 else None
 
 
 @app.route("/demo")
