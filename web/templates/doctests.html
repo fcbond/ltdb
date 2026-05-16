@@ -1,0 +1,78 @@
+{% extends 'layout.html' %}
+
+{% block css %}
+<link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1>Docstring Tests for {{meta['SHORT_GRAMMAR_NAME']}}</h1>
+
+  {% if rows is none %}
+  <p class="text-muted">No docstring test results found for this grammar.
+    Run <code>parse_examples.py … --db &lt;grammar.db&gt;</code> to populate them.</p>
+  {% else %}
+
+  {# ── Overall summary ── #}
+  {% set n_total = rows|length %}
+  {% set n_pass  = rows|selectattr('pass')|list|length %}
+  {% set n_fail  = n_total - n_pass %}
+  <p>
+    <strong>{{n_total}}</strong> examples &mdash;
+    <span style="color:black"><strong>{{n_pass}}</strong> pass</span>,
+    {% if n_fail > 0 %}
+    <span class="text-danger"><strong>{{n_fail}}</strong> fail</span>
+    {% else %}
+    <strong>0</strong> fail
+    {% endif %}
+  </p>
+
+  <table id="data" class="table table-hover table-borderless table-sm">
+    <caption>One row per docstring example; click a type to open its type page.</caption>
+    <thead class="thead-light">
+      <tr>
+        <th>Type</th>
+        <th>Kind</th>
+        <th>Example</th>
+        <th>Parses</th>
+        <th>Result</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for ex in rows %}
+      <tr>
+        <td><a href="{{ type_href(ex.typ) }}">{{ex.typ}}</a></td>
+        <td><code>&lt;{{ex.kind}}&gt;</code></td>
+        <td>{{ex.sent}}</td>
+        <td class="text-right">{{ ex.n_parses if ex.n_parses is not none else '—' }}</td>
+        <td>
+          {% if ex.pass %}
+            <span style="color:black">PASS</span>{% if ex.kind == 'nex' and ex.n_parses and ex.n_parses > 0 %} <small class="text-muted">(parsed-ok)</small>{% endif %}
+          {% elif ex.verdict == 'FAIL-type-in-tree' %}
+            <span class="badge bg-danger">{{ex.verdict}}</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">{{ex.verdict}}</span>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+  {% if rows %}
+  <script>
+    $(document).ready(function () {
+      $('#data').DataTable({
+        pageLength: 50,
+        lengthMenu: [[25, 50, 100, -1], [25, 50, 100, "All"]],
+        order: [[4, 'asc'], [0, 'asc']],
+        columnDefs: [{ targets: 3, className: 'dt-right' }]
+      });
+    });
+  </script>
+  {% endif %}
+{% endblock %}

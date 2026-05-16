@@ -163,3 +163,108 @@ class TestMrsRawFallback:
         assert r.status_code == 200
         assert data["errors"] == []
         assert data["results"][0]["mrs_str"] == _RAW_MRS
+
+
+# ---------------------------------------------------------------------------
+# get_doctest — DB query helper
+# ---------------------------------------------------------------------------
+
+class TestGetDoctest:
+    def _make_db_with_doctest(self, tmp_path):
+        """Create a minimal grammar DB with all tables required by _render_type."""
+        import sqlite3
+
+        # Use 'rule' status so the route doesn't try to query the lex table
+        db_dir = tmp_path / "db"
+        db_dir.mkdir(exist_ok=True)
+        db = db_dir / "test.db"
+        conn = sqlite3.connect(db)
+        conn.executescript("""
+            CREATE TABLE types (typ TEXT PRIMARY KEY, parents TEXT, children TEXT,
+                cat TEXT, val TEXT, cont TEXT, definition TEXT, status TEXT,
+                arity INTEGER, head INTEGER, lname TEXT, description TEXT,
+                criteria TEXT, reference TEXT, todo TEXT);
+            CREATE TABLE tdl (typ TEXT, src TEXT, line INTEGER, kind TEXT,
+                tdl TEXT, docstring TEXT);
+            CREATE TABLE lex (lexid TEXT PRIMARY KEY, typ TEXT, orth TEXT,
+                pred TEXT, altpred TEXT, carg TEXT, altcarg TEXT, docstring TEXT);
+            CREATE TABLE meta (att TEXT, val TEXT);
+            CREATE TABLE doctest (typ TEXT NOT NULL, sent TEXT NOT NULL,
+                kind TEXT NOT NULL, wf INTEGER NOT NULL, n_parses INTEGER,
+                type_found INTEGER, pass INTEGER NOT NULL, verdict TEXT NOT NULL);
+            CREATE TABLE lexfreq (lexid TEXT, word TEXT, freq INTEGER);
+            CREATE TABLE typfreq (typ TEXT, freq INTEGER);
+            CREATE TABLE gold (sid INTEGER, profile TEXT, sent TEXT, comment TEXT,
+                deriv TEXT, pst TEXT, mrs TEXT, flags TEXT,
+                UNIQUE(profile, sid));
+            CREATE TABLE sent (sid INTEGER, profile TEXT, wid INTEGER,
+                word TEXT, lexid TEXT, UNIQUE(profile, sid, wid));
+            CREATE TABLE typind (typ TEXT, profile TEXT, sid INTEGER,
+                kara INTEGER, made INTEGER);
+            CREATE TABLE hie (child TEXT, parent TEXT);
+            INSERT INTO meta VALUES ('GRAMMAR_NAME', 'Test Grammar');
+            INSERT INTO types VALUES ('hd-cmp_u_c', '', '', '', '', '', '',
+                'rule', 0, 0, '', 'Head-complement rule.', '', '', '');
+            INSERT INTO tdl VALUES ('hd-cmp_u_c', 'gram.tdl', 10,
+                'TypeDefinition', 'hd-cmp_u_c := headed-phrase.', '');
+            INSERT INTO doctest VALUES
+                ('hd-cmp_u_c', 'The cat sat.', 'ex', 1, 3, 1, 1, 'PASS'),
+                ('hd-cmp_u_c', 'Cat the sat.', 'nex', 0, 0, 0, 1, 'PASS'),
+                ('hd-cmp_u_c', 'Sat.', 'ex', 1, 0, 0, 0, 'FAIL-no-parse');
+        """)
+        conn.commit()
+        conn.close()
+        return tmp_path
+
+    def test_get_doctest_returns_summary_and_examples(self, app, tmp_path):
+        import sqlite3
+        from web.db import get_doctest
+        self._make_db_with_doctest(tmp_path)
+        conn = sqlite3.connect(str(tmp_path / "db" / "test.db"))
+        summary, examples = get_doctest(conn, "hd-cmp_u_c")
+        assert summary is not None
+        assert summary["ex"]["total"] == 2
+        assert summary["ex"]["pass"] == 1
+        assert summary["ex"]["fail"] == {"FAIL-no-parse": 1}
+        assert summary["nex"]["total"] == 1
+        assert summary["nex"]["pass"] == 1
+        assert len(examples) == 3
+        conn.close()
+
+    def test_get_doctest_missing_type_returns_none(self, app, tmp_path):
+        import sqlite3
+        from web.db import get_doctest
+        self._make_db_with_doctest(tmp_path)
+        conn = sqlite3.connect(str(tmp_path / "db" / "test.db"))
+        summary, examples = get_doctest(conn, "nonexistent")
+        assert summary is None
+        assert examples is None
+        conn.close()
+
+    def test_get_doctest_missing_table_returns_none(self, app, tmp_path):
+        import sqlite3
+        from web.db import get_doctest
+        db = tmp_path / "no_table.db"
+        conn = sqlite3.connect(str(db))
+        conn.execute("CREATE TABLE foo (x TEXT)")
+        conn.commit()
+        summary, examples = get_doctest(conn, "anything")
+        assert summary is None
+        assert examples is None
+        conn.close()
+
+    def test_type_page_includes_doctest_section(self, app, tmp_path, monkeypatch):
+        import web.routes as routes
+        self._make_db_with_doctest(tmp_path)
+        monkeypatch.setattr(routes, "current_directory", str(tmp_path))
+        app.config["SECRET_KEY"] = "test"
+        with app.test_client() as c:
+            with c.session_transaction() as sess:
+                sess["grm"] = "test.db"
+            r = c.get("/type/hd-cmp_u_c")
+            html = r.data.decode()
+        assert r.status_code == 200
+        assert "Docstring Tests" in html
+        assert "&lt;ex&gt;" in html
+        assert "PASS" in html
+        assert "FAIL-no-parse" in html

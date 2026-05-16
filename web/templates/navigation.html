@@ -19,6 +19,8 @@
 	    <a href="{{ ltypes_href() }}"
 	       class="nav-item nav-link{{ ' active' if request.endpoint in ('ltypes', 'mirror_ltypes') }}">Lexical Types</a>
 	    {% if not is_static_mirror %}
+	      <a href="{{ doctests_href() }}"
+		 class="nav-item nav-link{{ ' active' if request.endpoint == 'doctests' }}">Docstring Tests</a>
 	      <a href="{{ url_for('demo') }}"
 		 class="nav-item nav-link{{ ' active' if request.endpoint == 'demo' }}">Demo</a>
 	    {% endif %}

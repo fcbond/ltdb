@@ -643,17 +643,34 @@ def print_report(
 # ── Database output ──────────────────────────────────────────────────────────
 
 
+_DOCTEST_TABLE_DDL = """\
+CREATE TABLE IF NOT EXISTS doctest (
+    typ     TEXT NOT NULL,
+    sent    TEXT NOT NULL,
+    kind    TEXT NOT NULL,
+    wf      INTEGER NOT NULL,
+    n_parses   INTEGER,
+    type_found INTEGER,
+    pass    INTEGER NOT NULL,
+    verdict TEXT NOT NULL
+)"""
+
+_DOCTEST_INDEX_DDL = (
+    "CREATE INDEX IF NOT EXISTS idx_doctest_typ ON doctest(typ)"
+)
+
+
 def write_to_db(verdicts: list[Verdict], db_path: Path) -> None:
     """
-    Insert doctest results into the *doctest* table of an existing grammar DB.
+    Insert doctest results into the *doctest* table of a grammar DB.
 
-    Clears any previous doctest rows before inserting so the table always
-    reflects the most recent run.
+    Creates the table if it does not yet exist (so it works against databases
+    built before the table was added to tables.sql).  Clears any previous
+    doctest rows so the table always reflects the most recent run.
 
     Args:
         verdicts:  list of Verdict objects from run_examples()
-        db_path:   path to the SQLite grammar database (must already have the
-                   doctest table created by tables.sql)
+        db_path:   path to the SQLite grammar database
     """
     import sqlite3
 
@@ -671,6 +688,8 @@ def write_to_db(verdicts: list[Verdict], db_path: Path) -> None:
         for v in verdicts
     ]
     with sqlite3.connect(db_path) as conn:
+        conn.execute(_DOCTEST_TABLE_DDL)
+        conn.execute(_DOCTEST_INDEX_DDL)
         conn.execute("DELETE FROM doctest")
         conn.executemany(
             """INSERT INTO doctest

@@ -118,6 +118,25 @@
     </ul>
   </a>
 {% endif %}
+{% if doctest_examples %}
+<h3>Docstring Tests</h3>
+<ul class="list-unstyled mt-2">
+{% for ex in doctest_examples %}
+  <li class="mb-1">
+    <code>&lt;{{ex.kind}}&gt;</code>
+    {% if ex.pass %}
+      <span style="color:black">PASS</span>{% if ex.kind == 'nex' and ex.n_parses and ex.n_parses > 0 %} <small class="text-muted">(parsed-ok)</small>{% endif %}
+    {% elif ex.verdict == 'FAIL-type-in-tree' %}
+      <span class="badge bg-danger">{{ex.verdict}}</span>
+    {% else %}
+      <span class="badge bg-warning text-dark">{{ex.verdict}}</span>
+    {% endif %}
+    {{ ex.sent }}
+  </li>
+{% endfor %}
+</ul>
+{% endif %}
+
 <h3>TDL</h3>
   {{ tdl_html | safe }}
   <p>{{ info['src'] }}, {{ info['line'] }}

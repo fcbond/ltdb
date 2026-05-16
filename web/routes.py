@@ -18,7 +18,9 @@ from pygments import highlight
 from pygments.formatters import HtmlFormatter
 
 from .db import (
+    get_all_doctests,
     get_db,
+    get_doctest,
     get_gold,
     get_ltypes,
     get_lxid,
@@ -164,6 +166,9 @@ def _inject_static_mirror_helpers():
             return render_url_for("mirror_ltypes", grm=_mirror_grm())
         return render_url_for("ltypes")
 
+    def doctests_href():
+        return render_url_for("doctests")
+
     def example_db_href(grm=None):
         grm = _stem_for_grm(grm or _mirror_grm())
         return f"../../db/{grm}.examples.sqlite"
@@ -177,6 +182,7 @@ def _inject_static_mirror_helpers():
         "grammar_href": grammar_href,
         "rules_href": rules_href,
         "ltypes_href": ltypes_href,
+        "doctests_href": doctests_href,
         "example_db_href": example_db_href,
     }
 
@@ -397,6 +403,18 @@ def _render_ltypes(grm):
     )
 
 
+@app.route("/doctests.html")
+def doctests():
+    """Show all docstring test results for the current grammar."""
+    grm = session.get("grm")
+    if not grm:
+        return redirect(url_for("home"))
+    conn = get_db(current_directory, grm)
+    md = get_md(conn)
+    rows = get_all_doctests(conn)
+    return render_template("doctests.html", meta=md, rows=rows, grm=grm)
+
+
 @app.route("/type/<query>")
 def type(query):
     """show the type
@@ -481,6 +499,8 @@ def _render_type(grm, query):
         "mrsj": "[MRS]",
     }
 
+    doctest_summary, doctest_examples = get_doctest(conn, query)
+
     return render_template(
         "type.html",
         query=query,
@@ -496,6 +516,8 @@ def _render_type(grm, query):
         sents=sents,
         gold=gold,
         results=results,
+        doctest_summary=doctest_summary,
+        doctest_examples=doctest_examples,
     )
 
 

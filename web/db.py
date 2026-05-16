@@ -555,6 +555,89 @@ def warm_caches(current_directory):
             get_tb_summary(conn, grm)
 
 
+def get_all_doctests(conn):
+    """Return all doctest results for the grammar, grouped for a summary page.
+
+    Returns a list of dicts (one per row), sorted by typ then kind then sent,
+    or None if the doctest table does not exist or is empty.
+    """
+    c = conn.cursor()
+    try:
+        c.execute(
+            """SELECT typ, sent, kind, wf, n_parses, type_found, pass, verdict
+               FROM doctest ORDER BY typ, kind, sent"""
+        )
+    except sqlite3.OperationalError:
+        return None
+
+    rows = [
+        {
+            "typ": typ,
+            "sent": sent,
+            "kind": kind,
+            "wf": wf,
+            "n_parses": n_parses,
+            "type_found": type_found,
+            "pass": ok,
+            "verdict": verdict,
+        }
+        for typ, sent, kind, wf, n_parses, type_found, ok, verdict in c
+    ]
+    return rows or None
+
+
+def get_doctest(conn, typ):
+    """Return docstring test results for *typ*.
+
+    Returns a tuple (summary, examples) where:
+      summary  — dict mapping kind ('ex','nex','mex') →
+                 {'total': int, 'pass': int, 'fail': dict[verdict→count]}
+      examples — list of dicts with keys: sent, kind, wf, n_parses,
+                 type_found, pass, verdict
+
+    Returns (None, None) if the doctest table does not exist or has no rows
+    for this type.
+    """
+    c = conn.cursor()
+    try:
+        c.execute(
+            """SELECT sent, kind, wf, n_parses, type_found, pass, verdict
+               FROM doctest WHERE typ=? ORDER BY kind, sent""",
+            (typ,),
+        )
+    except sqlite3.OperationalError:
+        return None, None
+
+    examples = [
+        {
+            "sent": sent,
+            "kind": kind,
+            "wf": wf,
+            "n_parses": n_parses,
+            "type_found": type_found,
+            "pass": ok,
+            "verdict": verdict,
+        }
+        for sent, kind, wf, n_parses, type_found, ok, verdict in c
+    ]
+    if not examples:
+        return None, None
+
+    summary = {}
+    for ex in examples:
+        k = ex["kind"]
+        if k not in summary:
+            summary[k] = {"total": 0, "pass": 0, "fail": {}}
+        summary[k]["total"] += 1
+        if ex["pass"]:
+            summary[k]["pass"] += 1
+        else:
+            v = ex["verdict"]
+            summary[k]["fail"][v] = summary[k]["fail"].get(v, 0) + 1
+
+    return summary, examples
+
+
 def get_short_summary(current_directory, grammars):
     """
     Return a brief summary of all the grammars
