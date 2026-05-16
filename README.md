@@ -38,6 +38,9 @@ Options:
 - `--outdir`   output directory (a temporary directory is used otherwise)
 - `--ace`      also compile a `.dat` file for the parse/generate demo
 - `--ace-bin`  path to ACE binary (default: search PATH then `etc/ace-*/ace`)
+- `--doctest`  parse all TDL docstring examples through ACE and store results
+               in the `doctest` table of the grammar database (requires `--ace`
+               or a pre-existing `.dat` in the output directory)
 
 The grammars are read by a web application written using Flask.
 See [Install.md](Install.md) for deployment instructions.
@@ -98,13 +101,39 @@ TDL docstrings are rendered as Markdown. Standard Markdown formatting
 (headings, bold, italic, lists, code) is supported. The following ltdb-specific
 tags are also recognised:
 
-- `<ex>text` — grammatical example
-- `<nex>text` — ungrammatical example (prefixed ∗)
-- `<mex>text` — marginal example (prefixed ⊛)
+- `<ex>text` — grammatical example: the type should appear in the derivation tree
+- `<nex>text` — negative example (prefixed ∗): the type should be absent from all parses
+- `<mex>text` — marginal example (prefixed ⊛): handled by a mal-rule; tested like `<ex>`
 - `<name lang='xx'>Name</name>` — name of the type in language `xx`
 
 There is `more documentation <http://moin.delph-in.net/LkbLtdb>`__ at
 the DELPH-IN Wiki.
+
+## Docstring testing
+
+The `<ex>`, `<nex>`, and `<mex>` tags are testable: `parse_examples.py`
+extracts every tagged sentence, parses it through ACE, and checks whether
+the documented type appears in the derivation tree:
+
+```bash
+python scripts/parse_examples.py ace/config.tdl grammar.dat /tmp/profile \
+    --db web/db/grammar.db     # store results in the grammar database
+    --report results.txt       # also write a text summary
+    --no-profile               # skip writing the itsdb profile
+```
+
+Results are stored in the `doctest` table of the grammar database and
+surfaced in the LTDB browser:
+
+- **Type pages** show a "Docstring Tests" section with per-example pass/fail.
+- **"Docstring Tests" nav page** (`/doctests.html`) lists all examples for the
+  grammar in a sortable table, with failures sorted first.
+
+The `--doctest` flag on `grm2db.py` runs this automatically after building:
+
+```bash
+python scripts/grm2db.py --outdir web/db --ace --doctest path/to/METADATA
+```
 
 Types, instances in the same table, distinguished by status.
 
