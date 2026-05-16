@@ -640,6 +640,47 @@ def print_report(
         print(f"Report written to {report_path}", file=sys.stderr)
 
 
+# ── Database output ──────────────────────────────────────────────────────────
+
+
+def write_to_db(verdicts: list[Verdict], db_path: Path) -> None:
+    """
+    Insert doctest results into the *doctest* table of an existing grammar DB.
+
+    Clears any previous doctest rows before inserting so the table always
+    reflects the most recent run.
+
+    Args:
+        verdicts:  list of Verdict objects from run_examples()
+        db_path:   path to the SQLite grammar database (must already have the
+                   doctest table created by tables.sql)
+    """
+    import sqlite3
+
+    rows = [
+        (
+            v.example.typ,
+            v.example.text,
+            v.example.kind,
+            v.example.wf,
+            v.n_parses,
+            int(v.type_found),
+            int(verdict_label(v) == "PASS"),
+            verdict_label(v),
+        )
+        for v in verdicts
+    ]
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("DELETE FROM doctest")
+        conn.executemany(
+            """INSERT INTO doctest
+               (typ, sent, kind, wf, n_parses, type_found, pass, verdict)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            rows,
+        )
+    print(f"  {len(rows)} doctest rows written to {db_path}", file=sys.stderr)
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 
@@ -680,6 +721,12 @@ def main() -> None:
         help="Also write the report to this file",
     )
     parser.add_argument(
+        "--db",
+        type=Path,
+        metavar="FILE",
+        help="Write results into the doctest table of this grammar SQLite DB",
+    )
+    parser.add_argument(
         "--verbose", "-v", action="store_true", help="Log TDL parsing warnings"
     )
     args = parser.parse_args()
@@ -709,6 +756,9 @@ def main() -> None:
 
     if ts is not None:
         print(f"itsdb profile written to {args.output_dir}", file=sys.stderr)
+
+    if args.db is not None:
+        write_to_db(verdicts, args.db)
 
     print()
     print_report(verdicts, cfg, str(args.config), report_path=args.report)

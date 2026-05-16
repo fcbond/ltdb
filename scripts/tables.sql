@@ -70,7 +70,20 @@ CREATE TABLE hie (child TEXT,
 -- Metadata (from METADATA
 CREATE TABLE meta (att TEXT,
                    val TEXT);
+-- Docstring example test results (populated by parse_examples.py)
+-- One row per (type, sentence) pair.
+CREATE TABLE doctest (
+    typ     TEXT NOT NULL,    -- type whose docstring contains this example
+    sent    TEXT NOT NULL,    -- example sentence text
+    kind    TEXT NOT NULL,    -- 'ex' | 'nex' | 'mex'
+    wf      INTEGER NOT NULL, -- 1=grammatical/marginal, 0=ungrammatical (i-wf)
+    n_parses   INTEGER,       -- number of ACE parse results (NULL = not yet run)
+    type_found INTEGER,       -- 1=type appeared in any derivation, 0=did not
+    pass    INTEGER NOT NULL, -- 1=PASS, 0=FAIL
+    verdict TEXT NOT NULL     -- 'PASS' | 'FAIL-no-parse' | 'FAIL-type-absent' | 'FAIL-type-in-tree'
+);
 CREATE INDEX idx_lex_typ ON lex(typ);
 CREATE INDEX idx_sent_lexid ON sent(lexid);
 CREATE INDEX idx_typind_typ ON typind(typ);
 CREATE INDEX idx_lexind_lexid ON lexind(lexid);
+CREATE INDEX idx_doctest_typ ON doctest(typ);
