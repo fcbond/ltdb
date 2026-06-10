@@ -1,4 +1,5 @@
 pydelphin
+orjson
 docutils
 lxml
 appdirs

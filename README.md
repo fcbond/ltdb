@@ -32,6 +32,20 @@ You can also install it as a normal flask application.
 There is `more documentation <http://moin.delph-in.net/LkbLtdb>`__ at
 the DELPH-IN Wiki.
 
+## Searching with grew-match
+
+The trees and DMRS in a compiled database can be searched by structure
+with [grew-match](https://grew.fr/grew_match/).  Export them with:
+
+```
+$ python scripts/db2grew.py web/db/GRAMMAR.db
+```
+
+then serve the exported corpora with a local grew-match instance and
+set `LTDB_GREW_MATCH_URL` to add a link to it in the LTDB navigation
+bar.  See [doc/grew-match.md](doc/grew-match.md) for setup and example
+queries.
+
 
 ## IGNORE BELOW HERE
 

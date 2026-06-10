@@ -22,6 +22,10 @@
 		  class="nav-item nav-link">Lexical Types</a>
 	  </div>
 	  {% endif %}
+	    {% if config.GREW_MATCH_URL %}
+	    <a href="{{ config.GREW_MATCH_URL }}"
+	       class="nav-item nav-link" target="_blank">Grew-match</a>
+	    {% endif %}
 	    <form action="/search" method="post" class="form-inline my-2 my-lg-0">
               <input type="text" id="search" name="search" required placeholder="lemma/type/predicate">
 	      <button type="submit" class="btn btn-outline-secondary">
