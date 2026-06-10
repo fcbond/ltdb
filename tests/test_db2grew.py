@@ -83,12 +83,15 @@ def assert_valid_graph(graph):
 
 
 def test_deriv_to_grew():
+    # internal nodes are numbered in pre-order:
+    # n0 sb-hd_mc_c, n1 sp-hd_n_c, n2 the_1, n3 n_sg_ilr,
+    # n4 dog_n1, n5 v_pst_olr, n6 bark_v1
     graph = db2grew.deriv_to_grew(deriv_json(), LEXTYPES, META)
     assert_valid_graph(graph)
     assert graph["meta"] == META
-    assert graph["nodes"]["n731"] == {"rule": "sb-hd_mc_c"}
-    assert graph["nodes"]["n728"] == {"rule": "n_sg_ilr"}
-    assert graph["nodes"]["n727"] == {
+    assert graph["nodes"]["n0"] == {"cat": "sb-hd_mc_c"}
+    assert graph["nodes"]["n3"] == {"cat": "n_sg_ilr"}
+    assert graph["nodes"]["n4"] == {
         "lexid": "dog_n1",
         "lextype": "n_-_c_le",
         "form": "dog",
@@ -96,18 +99,29 @@ def test_deriv_to_grew():
     assert graph["order"] == ["t0", "t1", "t2"]
     forms = [graph["nodes"][tid]["form"] for tid in graph["order"]]
     assert forms == ["the", "dog", "barked."]
-    assert {"src": "n731", "label": "2", "tar": "n730"} in graph["edges"]
-    assert {"src": "n727", "label": "1", "tar": "t1"} in graph["edges"]
+    assert {"src": "n0", "label": "2", "tar": "n5"} in graph["edges"]
+    assert {"src": "n4", "label": "1", "tar": "t1"} in graph["edges"]
 
 
-def test_deriv_root_without_id():
-    data = {"entity": "root_strict", "daughters": [json.loads(deriv_json())]}
+def test_deriv_unusable_ids():
+    """ACE leaves derivation ids 0 and root nodes have none at all."""
+
+    def zero_ids(node):
+        node["id"] = 0
+        for daughter in node.get("daughters", []):
+            zero_ids(daughter)
+
+    inner = json.loads(deriv_json())
+    zero_ids(inner)
+    data = {"entity": "root_strict", "daughters": [inner]}
     graph = db2grew.deriv_to_grew(json.dumps(data), {}, META)
     assert_valid_graph(graph)
-    assert graph["nodes"]["x0"] == {"rule": "root_strict"}
-    assert {"src": "x0", "label": "1", "tar": "n731"} in graph["edges"]
+    # 8 derivation nodes plus 3 tokens, no id collisions
+    assert len(graph["nodes"]) == 11
+    assert graph["nodes"]["n0"] == {"cat": "root_strict"}
+    assert {"src": "n0", "label": "1", "tar": "n1"} in graph["edges"]
     # unknown lexids still convert, just without a lextype feature
-    assert graph["nodes"]["n727"] == {"lexid": "dog_n1", "form": "dog"}
+    assert graph["nodes"]["n5"] == {"lexid": "dog_n1", "form": "dog"}
 
 
 def test_dmrs_to_grew():

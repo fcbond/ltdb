@@ -99,12 +99,13 @@ def _convert_deriv_node(node, graph, lextypes, ids):
         node: a pydelphin UDFNode
         graph: the grew graph dict being built (nodes/edges/order)
         lextypes: mapping from lexid to lexical type
-        ids: counter generating ids for nodes without a derivation id
+        ids: counter assigning node ids in pre-order
+             (derivation ids cannot be used: ACE leaves them all 0)
 
     Returns:
         The grew node id assigned to node
     """
-    nid = f"n{node.id}" if node.id is not None else f"x{next(ids)}"
+    nid = f"n{next(ids)}"
     daughters = node.daughters or []
     if daughters and isinstance(daughters[0], derivation.UDFTerminal):
         # preterminal: a lexical entry over surface token(s)
@@ -119,7 +120,9 @@ def _convert_deriv_node(node, graph, lextypes, ids):
             graph["order"].append(tid)
             graph["edges"].append({"src": nid, "label": str(i), "tar": tid})
     else:
-        graph["nodes"][nid] = {"rule": node.entity}
+        # 'cat' follows grew constituency convention
+        # ('rule' is a reserved word in grew requests)
+        graph["nodes"][nid] = {"cat": node.entity}
         for i, daughter in enumerate(daughters, 1):
             did = _convert_deriv_node(daughter, graph, lextypes, ids)
             graph["edges"].append({"src": nid, "label": str(i), "tar": did})
@@ -239,7 +242,13 @@ def export(conn, out_dir, grm, args):
     tree_files = []
     dmrs_files = []
     for profile, sid, sent, deriv_json, dmrs_json in iter_gold(conn, args.profiles):
-        meta = {"sid": str(sid), "profile": profile, "text": sent or ""}
+        # sent_id is the conventional grew key, shown in match results
+        meta = {
+            "sent_id": f"{profile}/{sid}",
+            "sid": str(sid),
+            "profile": profile,
+            "text": sent or "",
+        }
         fname = f"{sanitize(profile)}__{sid}.json"
         if do_trees:
             graph = deriv_to_grew(deriv_json, lextypes, meta)

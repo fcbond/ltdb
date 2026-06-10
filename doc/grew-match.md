@@ -36,7 +36,8 @@ the `corpora.json` lists into one file.
 
 - surface tokens are ordered leaf nodes with a `form` feature
 - lexical entries have `lexid`, `lextype` and `form` features
-- internal nodes have a `rule` feature
+- internal nodes carry the rule name in a `cat` feature
+  (`rule` is a reserved word in grew requests)
 - parent→child edges are labelled with the daughter position
   (`1`, `2`, ...)
 
@@ -86,19 +87,21 @@ Without the web UI, you can also search from the command line:
 
 ```bash
 echo 'pattern { N [lemma="dog"] }' > q.req
-grew grep -request q.req -i "ERG_(2020)-grew/ERG_2020_dmrs/"*.json
+grew grep -request q.req -i "ERG_(2020)-grew/ERG_2020_dmrs"
 ```
+
+(`-i` takes a single file or a directory.)
 
 ## 4. Example requests
 
 On the trees corpus:
 
 ```
-pattern { N [rule="sb-hd_mc_c"] }              % a rule
+pattern { N [cat="sb-hd_mc_c"] }              % a rule
 pattern { L [lextype="d_-_the_le"] }           % a lexical type
 pattern { T [form="dog"] }                     % a surface token
-pattern { P [rule="sp-hd_n_c"]; P -[2]-> C;
-          C [rule="n_sg_ilr"] }                % second daughter of a rule
+pattern { P [cat="sp-hd_n_c"]; P -[2]-> C;
+          C [cat="n_sg_ilr"] }                % second daughter of a rule
 ```
 
 On the DMRS corpus:
