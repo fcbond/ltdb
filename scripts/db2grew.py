@@ -186,7 +186,9 @@ def dmrs_to_grew(dmrs_json, meta):
                     feats[att] = val
         if node.type:
             feats["cvarsort"] = node.type
-        feats.update(node.properties)
+        # grammars may use property names like PNG.PERNUM or COG-ST,
+        # but '.' and '-' clash with grew request syntax
+        feats.update((sanitize(att), val) for att, val in node.properties.items())
         if node.carg:
             feats["carg"] = node.carg
         if node.cfrom is not None and node.cfrom >= 0:

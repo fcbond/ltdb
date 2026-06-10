@@ -136,6 +136,18 @@ def test_dmrs_to_grew():
     assert {"1": "ARG1", "post": "NEQ"} in labels
 
 
+def test_dmrs_property_names_are_sanitized():
+    data = json.loads(dmrs_json())
+    node = next(n for n in data["nodes"] if n["predicate"] == "_dog_n_1")
+    node["sortinfo"]["PNG.PERNUM"] = "3rd"
+    node["sortinfo"]["COG-ST"] = "cog-st"
+    graph = db2grew.dmrs_to_grew(json.dumps(data), META)
+    dog = next(n for n in graph["nodes"].values() if n["pred"] == "_dog_n_1")
+    assert dog["PNG_PERNUM"] == "3rd"
+    assert dog["COG_ST"] == "cog-st"
+    assert "PNG.PERNUM" not in dog
+
+
 def test_dmrs_undirected_link_becomes_mod():
     data = json.loads(dmrs_json())
     data["links"].append({"from": 10001, "to": 10002, "post": "EQ"})

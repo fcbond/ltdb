@@ -45,7 +45,9 @@ the `corpora.json` lists into one file.
 - one node per predicate, ordered by surface position, with features
   `pred`, `lemma`/`pos`/`sense` (surface predicates only), `cvarsort`,
   the morphosemantic properties (`NUM`, `PERS`, `TENSE`, ...),
-  `carg`, `cfrom`/`cto`, and `top`/`index` flags
+  `carg`, `cfrom`/`cto`, and `top`/`index` flags; characters that
+  clash with grew syntax in property names are replaced by `_`
+  (e.g. `PNG.PERNUM` becomes `PNG_PERNUM`)
 - links become edges with two label features: `1` (the role, e.g.
   `ARG1`) and `post` (e.g. `NEQ`); undirected `/EQ` links get the
   conventional role `MOD`
