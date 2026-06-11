@@ -77,10 +77,21 @@ python3 grew_match_quick/grew_match_quick.py "ERG_(2020)-grew/corpora.json"
 (The `mkdir` works around the script assuming an `instances/`
 directory that newer `grew_match` checkouts no longer ship.)
 
-Once it reports ready, type `r` at its prompt the first time (and
-after re-exporting) to compile the corpora — JSON corpora are not
-compiled automatically on startup.  Then open <http://localhost:8000>
-(ports configurable with `--frontend_port`/`--backend_port`).
+JSON corpora are not compiled automatically on startup, so the first
+time (and after re-exporting) compile them and make the backend
+re-read the corpus descriptions — otherwise the web page shows
+"Corpus not compiled":
+
+```bash
+grew compile -CORPUSBANK grew_match_quick/local_files/corpusbank
+curl -X POST http://localhost:8899/reload
+```
+
+(Typing `r` at the grew_match_quick prompt also compiles, but it does
+not refresh the compiled status; the `reload` call above does.)
+
+Then open <http://localhost:8000> (ports configurable with
+`--frontend_port`/`--backend_port`).
 
 To show a **Grew-match** link in the LTDB navigation bar, set the
 environment variable before starting the Flask app:
