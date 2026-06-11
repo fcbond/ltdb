@@ -250,8 +250,8 @@ def export(conn, out_dir, grm, args):
         if args.ltdb_url:
             # grew-match shows a link button for the url meta
             meta["url"] = (
-                f"{args.ltdb_url.rstrip('/')}/sent/{quote(profile)}/{sid}"
-                f"?grm={quote(args.db.name)}"
+                f"{args.ltdb_url.rstrip('/')}/sent/{quote(profile, safe='')}/{sid}"
+                f"?grm={quote(args.db.name, safe='')}"
             )
         fname = f"{sanitize(profile)}__{sid}.json"
         if do_trees:
