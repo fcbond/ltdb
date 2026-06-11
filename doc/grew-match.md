@@ -159,7 +159,14 @@ command line:
 grew grep -request q.req -i OUT/<corpus> > matches.json
 ```
 
-Note: the link button on dependency-rendered matches needs a
-grew_match_dream backend newer than 2026-06-11 (older versions only
-pass the `url` meta through for dot-rendered corpora; the fix is a
-two-line patch to `save_dep` in `src/gmd_utils.ml`).
+Note (2026-06-11): the grew_match_dream backend on GitHub lags
+behind the grew_match frontend and needs two patches to
+`src/gmd_utils.ml` (then `dune build` and restart):
+
+- `save_dep`/`save_dot` must encode each item's `meta` as a list of
+  `{"key": ..., "value": ..., "sub": {}}` objects, not a plain map —
+  otherwise the frontend's result list silently fails to render
+  (a `meta.find is not a function` error in the browser console);
+- `save_dep` must pass the `url` and `code` metas through (only
+  `save_dot` does), or the link button never appears for
+  dependency-rendered corpora.
