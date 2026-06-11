@@ -129,19 +129,11 @@ class TestParseRoute:
         assert resp.status_code == 400
         assert b"input" in resp.data.lower()
 
-    def test_invalid_results_param_defaults_gracefully(self, grm_client, monkeypatch):
-        import delphin.ace as ace_mod
-
-        class _FakeResponse:
-            def results(self):
-                return []
-
-        monkeypatch.setattr(ace_mod, "parse", lambda *a, **kw: _FakeResponse())
+    def test_invalid_results_param_returns_400(self, grm_client, monkeypatch):
         monkeypatch.setattr("web.routes.dat_path_for", lambda grm: "/fake/path.dat")
         resp = grm_client.post("/parse", data={"input": "test", "results": "notanint"})
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert data["readings"] == 0
+        assert resp.status_code == 400
+        assert "Results must be" in resp.get_json()["error"]
 
     def test_successful_parse_returns_json(self, grm_client, monkeypatch):
         import delphin.ace as ace_mod

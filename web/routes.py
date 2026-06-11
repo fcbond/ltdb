@@ -7,6 +7,7 @@ import re as _re
 import shutil
 import sqlite3
 import sys
+import threading
 import traceback
 from functools import lru_cache
 from urllib.parse import quote
@@ -188,6 +189,11 @@ def _inject_static_mirror_helpers():
 
 _summ_cache: tuple[frozenset, list, dict] | None = None
 
+MAX_PARSE_CHARS = 1000
+MAX_GENERATE_MRS_CHARS = 10_000
+ACE_CONCURRENCY = 4
+_ace_slots = threading.Semaphore(ACE_CONCURRENCY)
+
 def _db_fingerprint(db_dir: str) -> frozenset:
     """Return a frozenset of (name, mtime, size) for every .db file in db_dir."""
     result = set()
@@ -317,7 +323,9 @@ def home():
     grammars, summ = _summ_cache[1], _summ_cache[2]
     if "grm" in request.form:
         grm = sanitize_grm(request.form["grm"])
-        if grm and _grm_exists(grm):
+        if grm is None:
+            return jsonify({"error": "Invalid grammar name"}), 400
+        if _grm_exists(grm):
             session["grm"] = grm
         return redirect(url_for("grammar"))
     if request.args.get("grm") and session.get("grm"):
@@ -634,9 +642,11 @@ def demo():
 @app.route("/parse", methods=["POST"])
 def parse_sentence():
     """Parse a sentence with ACE and return JSON in delphin-viz format."""
-    grm = request.form.get("grm") or session.get("grm")
+    grm = sanitize_grm(request.form.get("grm", "")) or session.get("grm")
     if not grm:
         return jsonify({"error": "No grammar selected"}), 400
+    if sanitize_grm(grm) is None:
+        return jsonify({"error": "Invalid grammar name"}), 400
 
     dat = dat_path_for(grm)
     if not dat:
@@ -650,14 +660,23 @@ def parse_sentence():
     input_text = request.form.get("input", "").strip()
     if not input_text:
         return jsonify({"error": "No input provided"}), 400
+    if len(input_text) > MAX_PARSE_CHARS:
+        return jsonify({"error": f"Input is too long (max {MAX_PARSE_CHARS} characters)"}), 400
 
+    results_raw = request.form.get("results", "5")
     try:
-        n_results = min(int(request.form.get("results", 5)), 10)
+        n_results = int(results_raw)
+        if n_results < 1 or n_results > 10:
+            raise ValueError
     except (ValueError, TypeError):
-        n_results = 5
+        return jsonify({"error": f"Results must be an integer between 1 and 10"}), 400
+    n_results = min(n_results, 10)
     want_derivation = request.form.get("derivation") == "json"
     want_mrs = request.form.get("mrs") == "json"
     want_dmrs = request.form.get("dmrs") == "json"
+
+    if not _ace_slots.acquire(blocking=False):
+        return jsonify({"error": "ACE is busy; please try again in a moment."}), 503
 
     try:
         response = _ace.parse(
@@ -665,6 +684,8 @@ def parse_sentence():
         )
     except Exception as e:
         return jsonify({"error": _ace_error_message(e, dat)}), 500
+    finally:
+        _ace_slots.release()
 
     results = []
     errors = []
@@ -721,9 +742,11 @@ def parse_sentence():
 @app.route("/generate", methods=["POST"])
 def generate_sentence():
     """Generate surface strings from an MRS using ACE."""
-    grm = request.form.get("grm") or session.get("grm")
+    grm = sanitize_grm(request.form.get("grm", "")) or session.get("grm")
     if not grm:
         return jsonify({"error": "No grammar selected"}), 400
+    if sanitize_grm(grm) is None:
+        return jsonify({"error": "Invalid grammar name"}), 400
 
     dat = dat_path_for(grm)
     if not dat:
@@ -732,6 +755,11 @@ def generate_sentence():
     mrs_json_str = request.form.get("mrs")
     if not mrs_json_str:
         return jsonify({"error": "No MRS provided"}), 400
+    if len(mrs_json_str) > MAX_GENERATE_MRS_CHARS:
+        return jsonify({"error": f"MRS is too large (max {MAX_GENERATE_MRS_CHARS} characters)"}), 400
+
+    if not _ace_slots.acquire(blocking=False):
+        return jsonify({"error": "ACE is busy; please try again in a moment."}), 503
 
     try:
         mrs_obj = _mrsjson.decode(mrs_json_str)
@@ -743,6 +771,8 @@ def generate_sentence():
     except Exception as e:
         traceback.print_exc(file=sys.stderr)
         return jsonify({"error": _ace_error_message(e, dat)}), 500
+    finally:
+        _ace_slots.release()
 
     if not surfaces:
         notes = response.get("NOTES", [])

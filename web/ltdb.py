@@ -8,16 +8,22 @@ from delphin import dmrs as _dmrs
 from delphin.codecs import dmrsjson, mrsjson, simplemrs
 from markdown_it import MarkdownIt
 
-_safe_grm_re = re.compile(r'^[\w\-.][\w\-.]*$')
-
-
 def sanitize_grm(grm: str) -> str | None:
     """Return a safe grammar filename, or None if the name is invalid.
 
-    Accepts only filenames consisting of word characters, hyphens, and dots
-    — no path separators or traversal sequences.  Appends '.db' if absent.
+    Rejects path traversal (``/``, ``\\``, ``..``), null bytes, and
+    whitespace-only names.  Any other character the OS permits in a filename
+    is allowed so that grammar names with parentheses, colons, or timestamps
+    are not rejected.  Appends '.db' if absent.
     """
-    if not grm or not _safe_grm_re.match(grm):
+    if not grm or not grm.strip():
+        return None
+    grm = grm.strip()
+    # Block path separators and null bytes
+    if "/" in grm or "\\" in grm or "\x00" in grm:
+        return None
+    # Block traversal components
+    if grm.startswith(".") or ".." in grm:
         return None
     if not grm.endswith(".db"):
         grm += ".db"

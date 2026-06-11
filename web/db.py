@@ -533,6 +533,11 @@ def _valid_grammar_files(db_dir):
     )
 
 
+def get_grammar_names(root):
+    """Return sorted list of valid grammar .db filenames found in root/db/."""
+    return _valid_grammar_files(os.path.join(root, "db"))
+
+
 def warm_caches(current_directory):
     """Pre-populate all summary caches at server startup.
 

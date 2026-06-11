@@ -4,23 +4,34 @@ import os
 
 import pytest
 
-from web import create_app
 from web.db import get_grammar_names
 from web.ltdb import docstring2html
 
+_REAL_WEB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web")
+
 
 @pytest.fixture(scope="module")
-def client():
-    os.environ["SECRET_KEY"] = "test-secret-not-for-production"
-    app = create_app()
-    app.config.update(TESTING=True)
-    return app.test_client()
+def client(flask_app):
+    """Test client with current_directory pointed at the real web/ directory.
+
+    Routes are registered on the first Flask app created (module-level
+    @app.route decorators bind once).  We reuse that app here and temporarily
+    redirect current_directory so the routes see real grammar DBs.
+    """
+    import web.routes as routes_mod
+
+    original_dir = routes_mod.current_directory
+    original_cache = routes_mod._summ_cache
+    routes_mod.current_directory = _REAL_WEB_DIR
+    routes_mod._summ_cache = None
+    yield flask_app.test_client()
+    routes_mod.current_directory = original_dir
+    routes_mod._summ_cache = original_cache
 
 
 @pytest.fixture
 def grammar():
-    root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web")
-    grammars = get_grammar_names(root)
+    grammars = get_grammar_names(_REAL_WEB_DIR)
     if not grammars:
         pytest.skip("No grammar DBs available for route validation tests")
     return grammars[0]
