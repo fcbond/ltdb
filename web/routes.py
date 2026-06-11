@@ -189,7 +189,7 @@ def _inject_static_mirror_helpers():
 
 _summ_cache: tuple[frozenset, list, dict] | None = None
 
-MAX_PARSE_CHARS = 1000
+MAX_PARSE_CHARS = 500
 MAX_GENERATE_MRS_CHARS = 10_000
 ACE_CONCURRENCY = 4
 _ace_slots = threading.Semaphore(ACE_CONCURRENCY)
@@ -635,6 +635,7 @@ def demo():
         title="LTDB Demo",
         grm=grm,
         grammars=grammars_with_dat,
+        max_parse_chars=MAX_PARSE_CHARS,
         examples=examples,
     )
 

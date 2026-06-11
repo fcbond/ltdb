@@ -127,6 +127,18 @@ a {
     padding-right: 2rem;
 }
 
+.demo-char-count {
+    font-size: 0.75rem;
+    color: #9aa5b4;
+    text-align: right;
+    margin-top: 0.15rem;
+}
+
+.demo-char-near-limit {
+    color: #c05621;
+    font-weight: 600;
+}
+
 .input-clear {
     position: absolute;
     right: 0.5rem;

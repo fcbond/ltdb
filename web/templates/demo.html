@@ -31,9 +31,12 @@
         <div class="demo-input-wrap">
           <input type="text" id="inputText" name="input" class="form-control"
                  list="exampleList" placeholder="Type or choose an example…"
-                 required>
+                 maxlength="{{ max_parse_chars }}" required>
           <button type="button" id="clearInput" tabindex="-1" title="Clear to browse history"
                   class="input-clear">&#215;</button>
+        </div>
+        <div class="demo-char-count">
+          <span id="charCount">0</span> / {{ max_parse_chars }}
         </div>
         <datalist id="exampleList"></datalist>
       </div>
@@ -135,10 +138,18 @@
     }
   }
 
+  function _updateCharCount() {
+    const n = $('#inputText').val().length;
+    $('#charCount').text(n).toggleClass('demo-char-near-limit', n > {{ max_parse_chars }} * 0.85);
+  }
+
   _initGrammar($('#grammarSelect').val());
+  _updateCharCount();
 
   $('#inputText').on('input', function () {
-    $('#clearInput').toggle($(this).val().length > 0);
+    const n = $(this).val().length;
+    $('#clearInput').toggle(n > 0);
+    _updateCharCount();
   });
 
   $('#clearInput').on('click', function () {
