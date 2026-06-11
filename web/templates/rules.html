@@ -19,8 +19,8 @@
     <tbody>
       {%- for (rule, type, name, status, freq, arity, head) in data %}
       <tr class="{{status}}">
-	<td><a href="{{url_for('type', query=rule)}}">{{rule}}</a></td>
-	<td><a href="{{url_for('type', query=type)}}">{{type}}</a></td>
+	<td><a href="{{type_href(rule)}}">{{rule}}</a></td>
+	<td><a href="{{type_href(type)}}">{{type}}</a></td>
 	<td>{{name}}</td>
 	<td>{{status}}</td>
 	<td>{{freq}}</td>

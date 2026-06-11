@@ -8,6 +8,7 @@ dependencies = [
     "markdown-it-py",
     "lxml",
     "Flask",
+    "Frozen-Flask",
     "Werkzeug",
     "Jinja2",
     "MarkupSafe",
@@ -30,6 +31,7 @@ testpaths = ["tests"]
 pythonpath = ["."]
 markers = [
     "integration: requires ACE binary and compiled grammar .dat file",
+    "slow: marks tests as slow",
 ]
 
 [tool.ruff]

@@ -24,6 +24,7 @@ from pygments import highlight
 from pygments.formatters import HtmlFormatter
 
 from .db import (
+    get_all_doctests,
     get_db,
     get_doctest,
     get_gold,
@@ -171,6 +172,9 @@ def _inject_static_mirror_helpers():
             return render_url_for("mirror_ltypes", grm=_mirror_grm())
         return render_url_for("ltypes")
 
+    def doctests_href():
+        return render_url_for("doctests")
+
     def example_db_href(grm=None):
         grm = _stem_for_grm(grm or _mirror_grm())
         return f"../../db/{grm}.examples.sqlite"
@@ -184,8 +188,10 @@ def _inject_static_mirror_helpers():
         "grammar_href": grammar_href,
         "rules_href": rules_href,
         "ltypes_href": ltypes_href,
+        "doctests_href": doctests_href,
         "example_db_href": example_db_href,
     }
+
 
 _summ_cache: tuple[frozenset, list, dict] | None = None
 
@@ -193,6 +199,7 @@ MAX_PARSE_CHARS = 500
 MAX_GENERATE_MRS_CHARS = 10_000
 ACE_CONCURRENCY = 4
 _ace_slots = threading.Semaphore(ACE_CONCURRENCY)
+
 
 def _db_fingerprint(db_dir: str) -> frozenset:
     """Return a frozenset of (name, mtime, size) for every .db file in db_dir."""
@@ -428,6 +435,19 @@ def _render_ltypes(grm):
         words=words,
         grm=grm,
     )
+
+
+@app.route("/doctests.html")
+def doctests():
+    """Show all docstring test results for the current grammar."""
+    grm = session.get("grm")
+    if not grm:
+        return redirect(url_for("home"))
+    conn = get_db(current_directory, grm)
+    md = get_md(conn)
+    rows = get_all_doctests(conn)
+    return render_template("doctests.html", meta=md, rows=rows, grm=grm)
+
 
 
 @app.route("/type/<query>")

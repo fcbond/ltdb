@@ -185,6 +185,12 @@ if __name__ == "__main__":
         metavar="PATH",
         help="Path to ACE binary (default: PATH then etc/ace-*/ace)",
     )
+    parser.add_argument(
+        "--doctest",
+        action="store_true",
+        help="Parse TDL docstring examples and store results in the doctest table "
+             "(requires --ace or a pre-existing .dat next to the db)",
+    )
     parser.add_argument("metadata", type=Path, help="METADATA file for the grammar")
 
     args = parser.parse_args()
@@ -246,3 +252,38 @@ if __name__ == "__main__":
         cfg_path = os.path.join(os.path.dirname(args.metadata), md["ACE_CONFIG_FILE"])
         compile_ace(cfg_path, dat_path, ace_log_path, ace_bin=args.ace_bin)
         print(f"Made {dat_path} for {nam}")
+
+    if args.doctest:
+        from parse_examples import (
+            extract_examples,
+            run_examples,
+            write_to_db,
+        )
+        stem = dbname[:-3]
+        dat_path = os.path.join(out_dir, stem + ".dat")
+        db_path = Path(os.path.join(out_dir, dbname))
+        if not os.path.isfile(dat_path):
+            print(
+                f"--doctest skipped: no compiled grammar at {dat_path} "
+                f"(run with --ace first)",
+                file=sys.stderr,
+            )
+        else:
+            ace_bin_path = str(args.ace_bin) if args.ace_bin else None
+            try:
+                ace_bin_resolved = find_ace(ace_bin_path)
+            except FileNotFoundError as exc:
+                print(f"--doctest skipped: {exc}", file=sys.stderr)
+            else:
+                print(f"Running docstring tests for {nam} …")
+                cfg_path = os.path.join(
+                    os.path.dirname(args.metadata), md["ACE_CONFIG_FILE"]
+                )
+                doctest_cfg = read_cfg(cfg_path)
+                with open(log_path, "a") as log:
+                    examples, ex_types, lex_ids = extract_examples(doctest_cfg, log)
+                verdicts = run_examples(
+                    examples, dat_path, ace_bin_resolved, ex_types, lex_ids
+                )
+                write_to_db(verdicts, db_path)
+                print(f"Docstring tests done for {nam}")

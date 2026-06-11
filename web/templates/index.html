@@ -35,11 +35,22 @@
     <li><strong>Summary</strong> — counts of types, rules, and treebank coverage</li>
     <li><strong>Rules</strong> — phrase-structure, lexical, and morphological rules with corpus frequencies</li>
     <li><strong>Lexical Types</strong> — the lexical type hierarchy with example words</li>
+    {% if not is_static_mirror %}
     <li><strong>Demo</strong> — parse a sentence interactively and view the derivation tree, MRS, and DMRS</li>
     <li><strong>Search</strong> — look up any lemma, type, or predicate using the search box in the navigation bar</li>
+    {% else %}
+    <li><strong>Search</strong> — look up any type using the search box in the navigation bar</li>
+    {% endif %}
   </ul>
+  {% if is_static_mirror %}
+    <div class="alert alert-info" role="alert">
+      This is a static backup mirror. Interactive parsing, generation, and
+      lexical-entry and example search are available in the
+      <a href="{{ full_ltdb_base_url }}">full LTDB</a>.
+    </div>
+  {% endif %}
   
-  {% if grm == None %}
+  {% if grm == None and not is_static_mirror %}
     <div class="alert alert-danger" role="alert">
       <strong>Please Select a Grammar</strong> - Choose from the available grammars below to get started.
     </div>
@@ -66,6 +77,7 @@
       {% for grammar in grammars %}
       {% set s = summ[grammar] %}
       <tr data-grm="{{ grammar }}" data-name="{{ s.get('GRAMMAR_NAME', grammar) }}"
+          {% if is_static_mirror %}data-href="{{ grammar_href(grammar) }}"{% endif %}
           {% if grammar == grm %}class="selected"{% endif %}>
         <td>{{ s.get('GRAMMAR_NAME', grammar.split('_')[0]) }}</td>
         <td class="text-muted font-monospace small">{{ grammar }}</td>
@@ -73,7 +85,7 @@
         <td class="text-end">{{ "{:,}".format(s.get('RULES', 0)) }}</td>
         <td class="text-end">{{ "{:,}".format(s.get('TREES', 0)) if s.get('TREES', 0) else '' }}</td>
         <td>{{ s.get('LICENSE', '') }}</td>
-        <td>{% if s.get('WEBSITE') %}<a href="{{ s.get('WEBSITE') }}" target="_blank" onclick="event.stopPropagation()">link</a>{% endif %}</td>
+        <td>{% if s.get('WEBSITE') %}<a href="{{ s.get('WEBSITE') }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">link</a>{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -114,10 +126,14 @@
   $('#grammarTable tbody').on('click', 'tr', function () {
     const grm = this.dataset.grm;
     const name = this.dataset.name;
+    {% if is_static_mirror %}
+    window.location.href = this.dataset.href;
+    {% else %}
     document.getElementById('loadingMsg').textContent = 'Loading ' + name + '\u2026';
     document.getElementById('loadingOverlay').classList.add('active');
     document.getElementById('grmInput').value = grm;
     document.getElementById('grammarForm').submit();
+    {% endif %}
   });
 </script>
 {% endblock %}

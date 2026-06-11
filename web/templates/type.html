@@ -121,13 +121,12 @@
 {% if doctest_summary %}
 <h3>Docstring Tests</h3>
 
-{# ── Summary table ────────────────────────────────────────────────── #}
 <table class="table table-sm table-borderless" style="max-width:36em">
   <thead class="thead-light">
     <tr>
       <th>Kind</th>
-      <th class="text-right">Total</th>
-      <th class="text-right">Pass</th>
+      <th class="text-end">Total</th>
+      <th class="text-end">Pass</th>
       <th>Failures</th>
     </tr>
   </thead>
@@ -137,17 +136,17 @@
     {% set s = doctest_summary[kind] %}
     <tr>
       <td><code>&lt;{{kind}}&gt;</code></td>
-      <td class="text-right">{{ s.total }}</td>
-      <td class="text-right">
+      <td class="text-end">{{ s.total }}</td>
+      <td class="text-end">
         {% if s.pass == s.total %}
-          <span class="text-success font-weight-bold">{{ s.pass }}</span>
+          <span class="text-success fw-bold">{{ s.pass }}</span>
         {% else %}
           <span class="text-warning">{{ s.pass }}</span>
         {% endif %}
       </td>
       <td>
         {% for verdict, n in s.fail.items() %}
-          <span class="badge badge-{% if verdict == 'FAIL-type-in-tree' %}danger{% else %}warning{% endif %}">
+          <span class="badge {% if verdict == 'FAIL-type-in-tree' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
             {{verdict}}: {{n}}
           </span>
         {% endfor %}
@@ -158,20 +157,19 @@
   </tbody>
 </table>
 
-{# ── Per-example list ─────────────────────────────────────────────── #}
 <ul class="list-unstyled mt-2">
 {% for ex in doctest_examples %}
   <li class="mb-1">
-    <span class="badge badge-secondary"><code>&lt;{{ex.kind}}&gt;</code></span>
+    <span class="badge bg-secondary"><code>&lt;{{ex.kind}}&gt;</code></span>
     {% if ex.pass %}
-      <span class="badge badge-success">PASS</span>
+      <span class="badge bg-success">PASS</span>
+      {% if ex.kind == 'nex' and ex.n_parses and ex.n_parses > 0 %}
+        <span class="badge bg-info" title="Sentence parsed, but type correctly absent">parsed-ok</span>
+      {% endif %}
     {% elif ex.verdict == 'FAIL-type-in-tree' %}
-      <span class="badge badge-danger">{{ex.verdict}}</span>
+      <span class="badge bg-danger">{{ex.verdict}}</span>
     {% else %}
-      <span class="badge badge-warning">{{ex.verdict}}</span>
-    {% endif %}
-    {% if ex.kind == 'nex' and ex.pass and ex.n_parses and ex.n_parses > 0 %}
-      <span class="badge badge-info" title="Sentence parsed, but type correctly absent">parsed-ok</span>
+      <span class="badge bg-warning text-dark">{{ex.verdict}}</span>
     {% endif %}
     <span>{{ ex.sent }}</span>
     {% if ex.n_parses is not none %}

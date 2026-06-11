@@ -555,6 +555,37 @@ def warm_caches(current_directory):
             get_tb_summary(conn, grm)
 
 
+def get_all_doctests(conn):
+    """Return all doctest results for the grammar, grouped for a summary page.
+
+    Returns a list of dicts (one per row), sorted by typ then kind then sent,
+    or None if the doctest table does not exist or is empty.
+    """
+    c = conn.cursor()
+    try:
+        c.execute(
+            """SELECT typ, sent, kind, wf, n_parses, type_found, pass, verdict
+               FROM doctest ORDER BY typ, kind, sent"""
+        )
+    except sqlite3.OperationalError:
+        return None
+
+    rows = [
+        {
+            "typ": typ,
+            "sent": sent,
+            "kind": kind,
+            "wf": wf,
+            "n_parses": n_parses,
+            "type_found": type_found,
+            "pass": ok,
+            "verdict": verdict,
+        }
+        for typ, sent, kind, wf, n_parses, type_found, ok, verdict in c
+    ]
+    return rows or None
+
+
 def get_doctest(conn, typ):
     """Return docstring test results for *typ*.
 
