@@ -180,7 +180,12 @@ def dmrs_to_grew(mrs_str, meta):
     try:
         d = from_mrs(simplemrs.decode(cleaned))
     except Exception as err:
-        log.error("DMRS %s:%s unconvertible: %s", meta["profile"], meta["sid"], err)
+        log.error(
+            "DMRS %s:%s unconvertible: %s",
+            meta["profile"],
+            meta["sid"],
+            err,
+        )
         return None
     nodes = {}
     for node in d.nodes:
