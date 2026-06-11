@@ -20,6 +20,16 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "ruff>=0.9",
+    "pytest>=9",
+    "pytest-playwright>=0.7",
+    "requests>=2.32",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "integration: requires ACE binary and compiled grammar .dat file",
 ]
 
 [tool.ruff]
@@ -31,13 +41,3 @@ select = ["E", "F", "I"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["web"]
-
-[dependency-groups]
-dev = [
-    "pytest>=9.0.2",
-    "pytest-playwright>=0.7.2",
-    "requests>=2.32",
-]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]

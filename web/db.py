@@ -14,26 +14,20 @@ sentlim = 8
 
 
 def get_db(root, db):
-    if "db" in g and g.get("db_name") != db:
-        g.db.close()
-        g.pop("db", None)
-        g.pop("db_name", None)
-    if "db" not in g:
-        g.db = sqlite3.connect(
-            os.path.join(root, f"db/{db}")
-            # detect_types=sqlite3.PARSE_DECLTYPES
-        )
-        g.db_name = db
-    #        g.db.row_factory = sqlite3.Row
-    return g.db
+    key = f"db_{root}_{db}"
+    conn = g.get(key)
+    if conn is None:
+        conn = sqlite3.connect(os.path.join(root, f"db/{db}"))
+        setattr(g, key, conn)
+    return conn
 
 
 def close_db(e=None):
-    db = g.pop("db", None)
-
-    if db is not None:
-        db.close()
-    g.pop("db_name", None)
+    for attr in list(vars(g)):
+        if attr.startswith("db_"):
+            conn = g.pop(attr, None)
+            if conn is not None:
+                conn.close()
 
 
 ############################################################
@@ -127,27 +121,26 @@ def search_for(conn, query):
 
 
 def get_type(conn, typ):
-    """
-    ToDo: also get the status of the children so we can link them better.
-    """
+    """Return a dict of type info, or {} if the type does not exist."""
+    prev_factory = conn.row_factory
     conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute(
-        """SELECT  parents,  children,  cat,  val,
-    cont, definition,  status, arity, head, 
-    lname, tdl.docstring,
-    criteria, reference, todo,
-    src, line, kind, tdl 
-    FROM types LEFT JOIN tdl 
-    ON types.typ = tdl.typ
-    WHERE types.typ=? limit 1""",
-        (typ,),
-    )
-    row = c.fetchone()
-    if row:
-        return dict(zip(row.keys(), row))
-    else:
-        return dict()
+    try:
+        c = conn.cursor()
+        c.execute(
+            """SELECT  parents,  children,  cat,  val,
+        cont, definition,  status, arity, head,
+        lname, tdl.docstring,
+        criteria, reference, todo,
+        src, line, kind, tdl
+        FROM types LEFT JOIN tdl
+        ON types.typ = tdl.typ
+        WHERE types.typ=? limit 1""",
+            (typ,),
+        )
+        row = c.fetchone()
+        return dict(zip(row.keys(), row)) if row else {}
+    finally:
+        conn.row_factory = prev_factory
 
 
 def get_lxids(conn, typ):
@@ -262,6 +255,8 @@ def get_wrds_by_lexids(conn, lexids):
     return a dictionary with words and frequencies for each lexid
     words[lexid][word] = freq
     """
+    if not lexids:
+        return dd(lambda: dd(int))
     c = conn.cursor()
     words = dd(lambda: dd(int))
     c.execute(

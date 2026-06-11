@@ -8,6 +8,21 @@ from delphin import dmrs as _dmrs
 from delphin.codecs import dmrsjson, mrsjson, simplemrs
 from markdown_it import MarkdownIt
 
+_safe_grm_re = re.compile(r'^[\w\-.][\w\-.]*$')
+
+
+def sanitize_grm(grm: str) -> str | None:
+    """Return a safe grammar filename, or None if the name is invalid.
+
+    Accepts only filenames consisting of word characters, hyphens, and dots
+    — no path separators or traversal sequences.  Appends '.db' if absent.
+    """
+    if not grm or not _safe_grm_re.match(grm):
+        return None
+    if not grm.endswith(".db"):
+        grm += ".db"
+    return grm
+
 _log = logging.getLogger(__name__)
 
 _md = MarkdownIt("commonmark", {"html": False})

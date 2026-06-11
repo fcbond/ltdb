@@ -29,6 +29,12 @@ def read_cfg(ace_config):
             match = re.findall(r'\*grammar-version\*\s+"([^"]+)"', line.strip())
             if match:
                 cfg["ver"] = match[0]
+                break
+    if "ver" not in cfg:
+        sys.exit(
+            f"Could not find *grammar-version* in {cfg['version']}; "
+            "check your ACE config file"
+        )
     return cfg
 
 
@@ -85,9 +91,10 @@ def _safe_format(obj, path, log):
 
 
 def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
-    if "root" in path:
+    filename = os.path.basename(path)
+    if "root" in filename:
         status = "root"
-    elif "parse-nodes" in path:
+    elif "parse-nodes" in filename:
         status = "labels"
 
     print(f"Processing types in {path} as {status}")

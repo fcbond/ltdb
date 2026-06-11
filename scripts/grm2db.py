@@ -203,7 +203,10 @@ if __name__ == "__main__":
 
     print(f"Making the db for {nam} in {out_dir}")
 
-    cfg = read_cfg(os.path.join(os.path.dirname(args.metadata), md["ACE_CONFIG_FILE"]))
+    ace_config = md.get("ACE_CONFIG_FILE")
+    if not ace_config:
+        sys.exit("METADATA is missing ACE_CONFIG_FILE — cannot build grammar database")
+    cfg = read_cfg(os.path.join(os.path.dirname(args.metadata), ace_config))
 
     md["Version"] = cfg["ver"]
 

@@ -9,10 +9,44 @@ documentation in the grammar, a kind of literate programming.
 ## Development setup
 
 ```bash
-uv sync --extra dev   # installs app + ruff
-uv run ruff check .   # lint
-uv run ruff format .  # format
+uv sync --extra dev        # installs app + dev dependencies (ruff, pytest, playwright)
+uv run ruff check .        # lint
+uv run ruff format .       # format
+uv run pytest              # unit + integration tests (no browser required)
+playwright install         # download browser binaries (first time only)
+uv run pytest tests/test_ui.py  # Playwright UI tests
 ```
+
+## Architecture notes
+
+**Grammar databases** — each grammar is a single SQLite file in `web/db/`.
+The app discovers available grammars at runtime by listing that directory, so
+dropping in or removing a `.db` file takes effect immediately without a
+restart.
+
+**Home page summary cache** — loading the home page would normally open every
+`.db` file to read its name, rule count, lexicon size, and tree count (one
+query per grammar).  Instead, `home()` computes a fingerprint of the `db/`
+directory — a frozenset of `(filename, mtime, size)` for every `.db` file —
+and caches the query results alongside it.  The cache is invalidated
+automatically whenever a grammar is added, removed, or replaced (size or
+modification time changes).  Each gunicorn worker maintains its own in-process
+cache; a fresh worker recomputes on its first request.
+
+**Grammar selection** — the active grammar is stored in the Flask session
+(`session["grm"]`).  A `@before_request` hook also accepts a `?grm=` query
+parameter on any URL, which updates the session and is transparent to all
+routes.
+
+**Parse demo** — only grammars that have a compiled `.dat` file alongside
+their `.db` appear in the demo page.  Generate (`/generate`) additionally
+requires generation roots in the ACE config; grammars without them return a
+friendly error rather than failing silently.
+
+**TDL rendering** — `web/ltdb.py` handles docstring parsing (`munge_desc`)
+and Markdown-to-HTML conversion (`docstring2html`).  `web/routes.py` handles
+TDL syntax highlighting with clickable type links (`tdl2html`) using
+`pygments` and `pydelphin`'s TDL lexer.
 
 ## Quick Start
 

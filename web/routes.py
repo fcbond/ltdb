@@ -11,6 +11,11 @@ import traceback
 from functools import lru_cache
 from urllib.parse import quote
 
+from delphin import ace as _ace
+from delphin import dmrs as _dmrs
+from delphin.codecs import dmrsjson as _dmrsjson
+from delphin.codecs import mrsjson as _mrsjson
+from delphin.codecs import simplemrs as _simplemrs
 from delphin.highlight import TDLLexer
 from flask import current_app as app
 from flask import jsonify, redirect, render_template, request, session, url_for
@@ -37,7 +42,7 @@ from .db import (
     get_wrds_by_ltypes,
     search_for,
 )
-from .ltdb import docstring2html
+from .ltdb import docstring2html, sanitize_grm
 
 _tdl_formatter = HtmlFormatter(style="friendly")
 PYGMENTS_CSS = _tdl_formatter.get_style_defs(".highlight")
@@ -181,9 +186,20 @@ def _inject_static_mirror_helpers():
         "example_db_href": example_db_href,
     }
 
+_summ_cache: tuple[frozenset, list, dict] | None = None
 
-def _grm_exists(grm):
-    """Return True if a .db file exists for the given grammar name."""
+def _db_fingerprint(db_dir: str) -> frozenset:
+    """Return a frozenset of (name, mtime, size) for every .db file in db_dir."""
+    result = set()
+    for f in os.listdir(db_dir):
+        if f.endswith(".db"):
+            st = os.stat(os.path.join(db_dir, f))
+            result.add((f, st.st_mtime, st.st_size))
+    return frozenset(result)
+
+
+def _grm_exists(grm: str) -> bool:
+    """Return True if a valid ltdb .db file exists for the given grammar name."""
     path = os.path.join(current_directory, "db", grm)
     if not os.path.isfile(path) or os.path.getsize(path) == 0:
         return False
@@ -219,12 +235,8 @@ def _all_grammars():
 @app.before_request
 def _apply_grm_param():
     """Store ?grm= in the session when the requested grammar exists."""
-    grm = request.args.get("grm")
-    if not grm:
-        return
-    if not grm.endswith(".db"):
-        grm += ".db"
-    if _grm_exists(grm):
+    grm = sanitize_grm(request.args.get("grm", ""))
+    if grm and _grm_exists(grm):
         session["grm"] = grm
 
 
@@ -290,11 +302,23 @@ def find_ace():
 
 @app.route("/", methods=["GET", "POST"])
 def home():
-    """show the home page"""
-    grammars = _all_grammars()
-    summ = get_short_summary(current_directory, grammars)
+    """Render the home page with a grammar selector.
+
+    Grammar summaries are cached by a directory fingerprint (filename, mtime,
+    size) and recomputed only when the db/ directory changes.
+    """
+    global _summ_cache
+    db_dir = os.path.join(current_directory, "db")
+    fingerprint = _db_fingerprint(db_dir)
+    if _summ_cache is None or _summ_cache[0] != fingerprint:
+        grammars = _all_grammars()
+        summ = get_short_summary(current_directory, grammars)
+        _summ_cache = (fingerprint, grammars, summ)
+    grammars, summ = _summ_cache[1], _summ_cache[2]
     if "grm" in request.form:
-        session["grm"] = request.form["grm"]
+        grm = sanitize_grm(request.form["grm"])
+        if grm and _grm_exists(grm):
+            session["grm"] = grm
         return redirect(url_for("grammar"))
     if request.args.get("grm") and session.get("grm"):
         return redirect(url_for("grammar"))
@@ -574,8 +598,6 @@ def dat_path_for(grm):
 @app.route("/demo")
 def demo():
     """Show the interactive parsing demo page."""
-    import sqlite3
-
     grammars_with_dat = sorted(
         f
         for f in os.listdir(os.path.join(current_directory, "db"))
@@ -612,10 +634,6 @@ def demo():
 @app.route("/parse", methods=["POST"])
 def parse_sentence():
     """Parse a sentence with ACE and return JSON in delphin-viz format."""
-    from delphin.ace import ACEParser
-    from delphin import dmrs as dmrs_module
-    from delphin.codecs import dmrsjson, mrsjson, simplemrs
-
     grm = request.form.get("grm") or session.get("grm")
     if not grm:
         return jsonify({"error": "No grammar selected"}), 400
@@ -633,16 +651,18 @@ def parse_sentence():
     if not input_text:
         return jsonify({"error": "No input provided"}), 400
 
-    n_results = min(int(request.form.get("results", 5)), 10)
+    try:
+        n_results = min(int(request.form.get("results", 5)), 10)
+    except (ValueError, TypeError):
+        n_results = 5
     want_derivation = request.form.get("derivation") == "json"
     want_mrs = request.form.get("mrs") == "json"
     want_dmrs = request.form.get("dmrs") == "json"
 
     try:
-        with ACEParser(
-            dat, executable=find_ace(), cmdargs=[f"-n{n_results}", "-L"]
-        ) as parser:
-            response = parser.interact(input_text)
+        response = _ace.parse(
+            dat, input_text, executable=find_ace(), cmdargs=[f"-n{n_results}"]
+        )
     except Exception as e:
         return jsonify({"error": _ace_error_message(e, dat)}), 500
 
@@ -662,18 +682,29 @@ def parse_sentence():
             mrs_obj = None
             try:
                 mrs_obj = result.mrs()
-                # mrs_str: simplemrs string for browser-side LTDBMrs rendering
-                # mrs: mrsjson dict kept for the generate endpoint
-                r["mrs_str"] = simplemrs.encode(mrs_obj)
-                r["mrs"] = json.loads(mrsjson.encode(mrs_obj))
+                if want_mrs:
+                    # mrs_str: simplemrs string for browser-side LTDBMrs rendering
+                    # mrs: mrsjson dict kept for the generate endpoint
+                    r["mrs_str"] = _simplemrs.encode(mrs_obj)
+                    r["mrs"] = json.loads(_mrsjson.encode(mrs_obj))
             except Exception as e:
                 r["mrs"] = None
                 errors.append(f"result {i} mrs: {e}")
                 # Fall back to the raw ACE MRS string so the browser can still
                 # attempt rendering even when pydelphin cannot parse it
-                raw = result.get("mrs")
-                if raw and isinstance(raw, str):
-                    r["mrs_str"] = raw
+                if want_mrs:
+                    raw = result.get("mrs")
+                    if raw and isinstance(raw, str):
+                        r["mrs_str"] = raw
+
+            if want_dmrs:
+                try:
+                    r["dmrs"] = json.loads(
+                        _dmrsjson.encode(_dmrs.from_mrs(mrs_obj))
+                    )
+                except Exception as e:
+                    r["dmrs"] = None
+                    errors.append(f"result {i} dmrs: {e}")
 
         results.append(r)
 
@@ -690,9 +721,6 @@ def parse_sentence():
 @app.route("/generate", methods=["POST"])
 def generate_sentence():
     """Generate surface strings from an MRS using ACE."""
-    from delphin import ace
-    from delphin.codecs import mrsjson, simplemrs
-
     grm = request.form.get("grm") or session.get("grm")
     if not grm:
         return jsonify({"error": "No grammar selected"}), 400
@@ -706,10 +734,9 @@ def generate_sentence():
         return jsonify({"error": "No MRS provided"}), 400
 
     try:
-        mrs_obj = mrsjson.decode(mrs_json_str)
-        mrs_str = simplemrs.encode(mrs_obj)
-        with ace.ACEGenerator(dat, executable=find_ace()) as gen:
-            response = gen.interact(mrs_str)
+        mrs_obj = _mrsjson.decode(mrs_json_str)
+        mrs_str = _simplemrs.encode(mrs_obj)
+        response = _ace.generate(dat, mrs_str, executable=find_ace())
         surfaces = [
             r.get("surface", "") for r in response.results() if r.get("surface")
         ]
@@ -746,7 +773,9 @@ def submit_fsearch():
         return redirect(url_for("home"))
     conn = get_db(current_directory, grm)
 
-    searched = request.form["search"]
+    searched = request.form.get("search", "").strip()
+    if not searched:
+        return redirect(url_for("home"))
 
     results = search_for(conn, query=searched)
 

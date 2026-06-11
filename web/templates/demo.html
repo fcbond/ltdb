@@ -188,7 +188,7 @@
     const container = $('#results');
 
     if (data.error) {
-      container.empty().append($('<div class="alert alert-danger">').text(data.error));
+      container.html($('<div class="alert alert-danger">').text(data.error));
       return;
     }
     if (data.readings === 0) {
@@ -279,7 +279,7 @@
           }).done(function (data) {
             genBtn.prop('disabled', false).text('Generate');
             if (data.error) {
-              genOut.empty().append($('<div class="alert alert-danger">').text(data.error));
+              genOut.html($('<div class="alert alert-danger">').text(data.error));
             } else if (data.results.length === 0) {
               genOut.html('<p class="text-muted">No realisations found.</p>');
             } else {
@@ -291,7 +291,7 @@
           }).fail(function (xhr) {
             genBtn.prop('disabled', false).text('Generate');
             const msg = xhr.responseJSON ? xhr.responseJSON.error : xhr.statusText;
-            genOut.empty().append($('<div class="alert alert-danger">').text(msg)).show();
+            genOut.html($('<div class="alert alert-danger">').text(msg)).show();
           });
         });
         header.append(genBtn);
