@@ -24,11 +24,6 @@ CREATE TABLE lex (lexid TEXT primary key,
 		  carg TEXT,
 		  altcarg TEXT,
 		  docstring TEXT);
--- preprocess this
-CREATE TABLE ltypes (typ TEXT primary key,
-		     words TEXT,
-		     lfreq INTEGER default 0,
-		     cfreq INTEGER DEFAULT 0);
 -- words in the database (assumes unique profile+sid+wid)
 -- each sentence has words and their lexical ids, ordered by wid
 CREATE TABLE sent (sid INTEGER,
@@ -37,19 +32,14 @@ CREATE TABLE sent (sid INTEGER,
 		   word TEXT,
 		   lexid TEXT,
 		   UNIQUE(profile, sid, wid) );
--- Information from the gold profiles
--- The json could be built on the fly,
--- but it is useful to have a log of when conversion fails
+-- Information from the gold profiles; JSON is built on the fly from deriv/mrs
 CREATE TABLE gold (sid INTEGER,
-       	     	   profile TEXT,				
+       	     	   profile TEXT,
        	     	   sent TEXT,
 		   comment TEXT,
 		   deriv TEXT,
-		   deriv_json TEXT,
 		   pst TEXT,
 		   mrs TEXT,
-		   mrs_json TEXT,
-		   dmrs_json TEXT,
 		   flags TEXT,
 		   UNIQUE(profile, sid) );
 CREATE TABLE typind (typ TEXT,
@@ -77,6 +67,25 @@ CREATE TABLE tdl (typ TEXT,
 -- Hierarchy extracted by PyDelphin		 
 CREATE TABLE hie (child TEXT,
                   parent TEXT);
--- Metadata (from METADATA		 
+-- Metadata (from METADATA
 CREATE TABLE meta (att TEXT,
                    val TEXT);
+-- Docstring example test results (populated by parse_examples.py)
+-- One row per (type, sentence) pair.
+CREATE TABLE doctest (
+    typ     TEXT NOT NULL,    -- type whose docstring contains this example
+    sent    TEXT NOT NULL,    -- example sentence text
+    kind    TEXT NOT NULL,    -- 'ex' | 'nex' | 'mex'
+    wf      INTEGER NOT NULL, -- 1=grammatical/marginal, 0=ungrammatical (i-wf)
+    n_parses   INTEGER,       -- number of ACE parse results (NULL = not yet run)
+    type_found INTEGER,       -- 1=type appeared in any derivation, 0=did not
+    pass    INTEGER NOT NULL, -- 1=PASS, 0=FAIL
+    verdict TEXT NOT NULL     -- 'PASS' | 'FAIL-no-parse' | 'FAIL-type-absent' | 'FAIL-type-in-tree'
+);
+CREATE INDEX idx_lex_typ ON lex(typ);
+CREATE INDEX idx_sent_lexid ON sent(lexid);
+CREATE INDEX idx_sent_profile_sid ON sent(profile, sid);
+CREATE INDEX idx_gold_profile_sid ON gold(profile, sid);
+CREATE INDEX idx_typind_typ ON typind(typ);
+CREATE INDEX idx_lexind_lexid ON lexind(lexid);
+CREATE INDEX idx_doctest_typ ON doctest(typ);

@@ -1,20 +1,22 @@
 ###
 ### Make a database for a grammar, based on the METADATA file
 ###
-import sys, os
 import argparse
-import tempfile
-import sqlite3
-import toml
 import json
+import os
+import re
+import shutil
+import sqlite3
+import sys
+import tempfile
 from pathlib import Path
 
-from tdl2db import read_cfg, read_grm, intodb
+import toml
 from gold2db import process_tsdb
+from tdl2db import intodb, read_cfg, read_grm
 
-### check we have a new enough version
-if not sys.version_info > (3, 8):
-    print(f"you must use Python newer than 3.7 not {sys.version}")
+if sys.version_info < (3, 8):
+    sys.exit(f"Python 3.8+ required, got {sys.version}")
 
 
 def read_metadata(metadata_path):
@@ -26,19 +28,21 @@ def read_metadata(metadata_path):
         print(f"METADATA not found at {metadata_path}", file=sys.stderr)
     return md
 
-def make_db (dbdir, db):
-    conn = sqlite3.connect(os.path.join(dbdir, db))    # loads dbfile as con
+
+def make_db(dbdir, db):
+    conn = sqlite3.connect(os.path.join(dbdir, db))  # loads dbfile as con
     c = conn.cursor()
-    
+
     # Get the script directory to find tables.sql
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    sql_path = os.path.join(script_dir, 'tables.sql')
-    
-    with open(sql_path, 'r') as sql_file:
+    sql_path = os.path.join(script_dir, "tables.sql")
+
+    with open(sql_path, "r") as sql_file:
         sql_script = sql_file.read()
     c.executescript(sql_script)
     conn.commit()
     return conn
+
 
 def meta_to_db(conn, md):
     c = conn.cursor()
@@ -48,10 +52,13 @@ def meta_to_db(conn, md):
             # as TOML requires key-value pairs at the top level
             val = json.dumps(val)
         if att and val:
-            c.execute("""
+            c.execute(
+                """
             INSERT INTO meta (att, val)
-            VALUES (?, ?)""", (att, val)) 
-    conn.commit()     
+            VALUES (?, ?)""",
+                (att, val),
+            )
+    conn.commit()
 
 
 def post_process_corpus(conn):
@@ -76,87 +83,207 @@ INSERT INTO typfreq (typ, freq)
   SELECT typ, count(typ)     
   FROM typind GROUP BY typ""")
 
-    
     conn.commit()
 
 
+def find_ace(ace_bin=None):
+    """Locate the ACE binary.
+
+    Checks, in order: the supplied path, the system PATH, then any
+    ace-* subdirectory inside the 'etc/' folder next to this script.
+
+    Args:
+        ace_bin: Explicit path supplied by the user, or None.
+
+    Returns:
+        Path to a usable ACE binary.
+
+    Raises:
+        FileNotFoundError: If no ACE binary can be found.
+    """
+    if ace_bin:
+        p = Path(ace_bin)
+        if p.is_file() and os.access(p, os.X_OK):
+            return str(p)
+        raise FileNotFoundError(f"ACE binary not found or not executable: {ace_bin}")
+
+    # Try system PATH first
+    found = shutil.which("ace")
+    if found:
+        return found
+
+    # Fall back to etc/ace-*/ beside the scripts directory
+    etc_dir = Path(__file__).parent.parent / "etc"
+    for candidate in sorted(etc_dir.glob("ace-*/ace"), reverse=True):
+        if os.access(candidate, os.X_OK):
+            return str(candidate)
+
+    raise FileNotFoundError(
+        "ACE binary not found. Install it and put it on PATH, or pass --ace-bin."
+    )
 
 
-if __name__ == '__main__':
+_ANSI_ESCAPE = re.compile(r"\x1B\[[0-9;]*m")
 
+
+def compile_ace(cfg_path, out_path, log_path, ace_bin=None):
+    """Compile a grammar with ACE, writing output to a .dat file.
+
+    Args:
+        cfg_path: Path to the ACE config (.tdl) file.
+        out_path: Destination path for the compiled grammar (.dat).
+        log_path: Path for the compilation log.
+        ace_bin: Path to the ACE binary, or None to auto-discover.
+    """
+    from delphin import ace
+
+    binary = find_ace(ace_bin)
+    print(f"Compiling ACE grammar: {cfg_path} -> {out_path}", file=sys.stderr)
+    print(f"Using ACE binary: {binary}", file=sys.stderr)
+
+    with open(log_path, "w") as log:
+        log.write(f"# ace -g {cfg_path} -G {out_path}\n\n")
+
+    try:
+        # stderr must be a real file with a fileno(); strip ANSI codes after
+        with open(log_path, "ab") as raw:
+            ace.compile(cfg_path, out_path, executable=binary, stderr=raw)
+
+        # Post-process: strip ANSI escape codes in place
+        text = Path(log_path).read_text(errors="replace")
+        Path(log_path).write_text(_ANSI_ESCAPE.sub("", text))
+
+        with open(log_path, "a") as log:
+            log.write("\n# Compilation successful\n")
+        print(f"ACE compilation succeeded: {out_path}", file=sys.stderr)
+    except Exception as e:
+        with open(log_path, "a") as log:
+            log.write(f"\n# Compilation failed: {e}\n")
+        print(f"ACE compilation failed: {e}", file=sys.stderr)
+        raise
+
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-                    prog = 'grm2db',
-                    description = 'Take a delphin grammar and make a db from it and its corpora',
-                    epilog = 'Text at the bottom of help')
-    parser.add_argument('--checkgrm',  action='store_true',
-                        help='Check the grammar version in the treebank')
-    parser.add_argument('--outdir', type=Path,
-                        help="Output directory for the database")
-    parser.add_argument('metadata', type=Path,
-                        help="METADATA file for the grammar")
+        prog="grm2db",
+        description="Take a delphin grammar and make a db from it and its corpora",
+    )
+    parser.add_argument(
+        "--checkgrm",
+        action="store_true",
+        help="Check the grammar version in the treebank",
+    )
+    parser.add_argument("--outdir", type=Path, help="Output directory for the database")
+    parser.add_argument(
+        "--ace",
+        action="store_true",
+        help="Compile the grammar with ACE, producing a .dat file",
+    )
+    parser.add_argument(
+        "--ace-bin",
+        type=Path,
+        metavar="PATH",
+        help="Path to ACE binary (default: PATH then etc/ace-*/ace)",
+    )
+    parser.add_argument(
+        "--doctest",
+        action="store_true",
+        help="Parse TDL docstring examples and store results in the doctest table "
+             "(requires --ace or a pre-existing .dat next to the db)",
+    )
+    parser.add_argument("metadata", type=Path, help="METADATA file for the grammar")
 
     args = parser.parse_args()
 
-    
     ###
     ### Read Metadata
     ###
     md = read_metadata(args.metadata)
-    print(md)
     if not md:
-        sys.exit("No usable metadata, giving up"),
+        sys.exit("No usable metadata, giving up")
 
     out_dir = args.outdir or tempfile.mkdtemp()
     os.makedirs(out_dir, exist_ok=True)
 
-    nam = md['SHORT_GRAMMAR_NAME'] or 'unknown'
-    
+    nam = md.get("SHORT_GRAMMAR_NAME") or md.get("GRAMMAR_NAME", "unknown")
+
     print(f"Making the db for {nam} in {out_dir}")
-    
-    cfg = read_cfg(os.path.join(os.path.dirname(args.metadata),
-                                md['ACE_CONFIG_FILE']))
 
-    md['Version'] = cfg['ver'] 
+    ace_config = md.get("ACE_CONFIG_FILE")
+    if not ace_config:
+        sys.exit("METADATA is missing ACE_CONFIG_FILE — cannot build grammar database")
+    cfg = read_cfg(os.path.join(os.path.dirname(args.metadata), ace_config))
 
-    log = open(os.path.join(out_dir, f"{md['Version']}-tdl.log"), 'w')
-    ###
-    ### read the info from the tdl
-    ###
-    tdls, types, hierarchy, les = read_grm(cfg, log)
+    md["Version"] = cfg["ver"]
 
-    #print(tdls, types, hierarchy, les)
-    ###
-    ### make the db
-    ###
-    dbname=f"{cfg['ver'].replace(' ', '_')}.db"
+    raw_ver = cfg["ver"].replace(" ", "_")
+    m = re.search(r'\(([^)]+)\)$', raw_ver)
+    ver = m.group(1) if m else raw_ver
+    dbname = f"{nam}_{ver}.db"
     conn = make_db(out_dir, dbname)
-
-    ## add the information to the database
-    
     meta_to_db(conn, md)
-   
-    intodb(conn, tdls, types, hierarchy, les)
 
-    ###
-    ### add the info from gold
-    ###
+    log_path = os.path.join(out_dir, f"{nam}_{ver}.log")
+    with open(log_path, "w") as log:
+        tdls, types, hierarchy, les = read_grm(cfg, log)
+        intodb(conn, tdls, types, hierarchy, les)
 
-
-    tsdb_roots = md.get('TSDB_ROOTS',  [ 'tsdb/gold/' ])
-    profiles = md.get('PROFILES',  None)
-    for root in tsdb_roots:
-        golddir =  os.path.normpath(os.path.join(os.path.dirname(args.metadata),
-                                                 root))
-        print(f'Processing profiles under {golddir}')
-        if profiles is not None:
-            print(f'If they are in {profiles}')
-        if os.path.isdir(golddir):
-            process_tsdb(conn, cfg['ver'], args.checkgrm,
-                         golddir, log, profiles)
-
+        tsdb_roots = md.get("TSDB_ROOTS", ["tsdb/gold/"])
+        profiles = md.get("PROFILES", None)
+        for root in tsdb_roots:
+            golddir = os.path.normpath(
+                os.path.join(os.path.dirname(args.metadata), root)
+            )
+            print(f"Processing profiles under {golddir}")
+            if profiles is not None:
+                print(f"If they are in {profiles}")
+            if os.path.isdir(golddir):
+                process_tsdb(conn, cfg["ver"], args.checkgrm, golddir, log, profiles)
 
     post_process_corpus(conn)
+    conn.close()
 
-    log.close()
+    print(f"Made {out_dir}/{dbname} for {nam}")
 
-    print(f"Made {out_dir}/{dbname} for {md['SHORT_GRAMMAR_NAME']}")
+    if args.ace:
+        stem = dbname[:-3]
+        dat_path = os.path.join(out_dir, stem + ".dat")
+        ace_log_path = os.path.join(out_dir, stem + "-ace.log")
+        cfg_path = os.path.join(os.path.dirname(args.metadata), md["ACE_CONFIG_FILE"])
+        compile_ace(cfg_path, dat_path, ace_log_path, ace_bin=args.ace_bin)
+        print(f"Made {dat_path} for {nam}")
+
+    if args.doctest:
+        from parse_examples import (
+            extract_examples,
+            run_examples,
+            write_to_db,
+        )
+        stem = dbname[:-3]
+        dat_path = os.path.join(out_dir, stem + ".dat")
+        db_path = Path(os.path.join(out_dir, dbname))
+        if not os.path.isfile(dat_path):
+            print(
+                f"--doctest skipped: no compiled grammar at {dat_path} "
+                f"(run with --ace first)",
+                file=sys.stderr,
+            )
+        else:
+            ace_bin_path = str(args.ace_bin) if args.ace_bin else None
+            try:
+                ace_bin_resolved = find_ace(ace_bin_path)
+            except FileNotFoundError as exc:
+                print(f"--doctest skipped: {exc}", file=sys.stderr)
+            else:
+                print(f"Running docstring tests for {nam} …")
+                cfg_path = os.path.join(
+                    os.path.dirname(args.metadata), md["ACE_CONFIG_FILE"]
+                )
+                doctest_cfg = read_cfg(cfg_path)
+                with open(log_path, "a") as log:
+                    examples, ex_types, lex_ids = extract_examples(doctest_cfg, log)
+                verdicts = run_examples(
+                    examples, dat_path, ace_bin_resolved, ex_types, lex_ids
+                )
+                write_to_db(verdicts, db_path)
+                print(f"Docstring tests done for {nam}")

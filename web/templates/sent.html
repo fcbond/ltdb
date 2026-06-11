@@ -1,121 +1,38 @@
 {% extends 'layout.html' %}
 
-{% block css %}
-  <link href="{{ url_for('static', filename='css/home.css') }}"
-	rel="stylesheet">
-  <link href="{{ url_for('static', filename='css/delphin-viz.css') }}"
-	      rel="stylesheet">
-
-<script src="{{ url_for('static', filename='js/tree.js') }}"
-	language='javascript'></script>
-<script src="{{ url_for('static', filename='js/dmrs.js') }}"
-	language='javascript'></script>
-<script src="{{ url_for('static', filename='js/mrs.js') }}"
-	language='javascript'></script>
-<script src="{{ url_for('static', filename='js/svg.js') }}"
-	language='javascript'></script>
-<script src="https://d3js.org/d3.v3.js"></script>
-
-{% endblock %}
-
 {% block content %}
-
-{%- set p = profile %}
-{%- set s = sid %}
 
 <div class="container">
 
-  {% if (p,s) not in gold %}
-  <h1>Sentence {{p}} #{{s}} not found in this grammar</h1>
+  {% if (profile, sid) not in gold %}
+  <h1>Sentence {{profile}} #{{sid}} not found in this grammar</h1>
   {% else %}
-  <h1>
-    {% if sents[(p,s)] %}
-      {% for wid in sents[(p,s)] %}{{sents[(p,s)][wid]}} {% endfor %}
-    {% else %}
-      {{gold[(p,s)]['item']}}
-    {% endif %}
-  </h1>
-  <p><small>{{p}} #{{s}}</small></p>
+  {% set g = gold[(profile, sid)] %}
+  <h1>{{ g['item'] }}</h1>
+  <p class="text-muted">{{profile}} #{{sid}}</p>
 
-  <div>
-    {% for result in results %}
-      <button id="toggle{{result}}{{p}}{{s}}"
-	      class="btn btn-outline-primary
-	      btn-sm">{{results[result]}}</button>
-    {% endfor %}
-  </div>
-
-  <div id='derivj{{p}}{{s}}'><br></div>
-  <div id="tooltip" class="tooltip"></div>
-  <div id='dmrsj{{p}}{{s}}'></div>
-  <div id='mrs{{p}}{{s}}' class = 'card card-body'>
-<pre>
-{{gold[(p,s)]['mrs']}}
-</pre></div>
-  <div id='mrsj{{p}}{{s}}'><br>
-    <div id="text-input" style="font-size: 150%%;">{{gold[(p,s)]['item']}}</div><br>
-  </div>
-
+  {% if g['deriv'] %}
+  <details class="mt-2 ltdb-tree-details" open>
+    <summary>Tree</summary>
+    <div class="ltdb-tree" data-deriv="{{ g['deriv']|e }}"></div>
+  </details>
+  {% endif %}
+  {% if g['mrs'] %}
+  <details class="mt-1 ltdb-dmrs-details" open>
+    <summary>DMRS</summary>
+    <div class="ltdb-dmrs-view" data-mrs="{{ g['mrs']|e }}"></div>
+  </details>
+  <details class="mt-2 ltdb-mrs-details">
+    <summary>MRS</summary>
+    <div class="ltdb-mrs-view" data-mrs="{{ g['mrs']|e }}"></div>
+  </details>
+  {% endif %}
   {% endif %}
 
 </div>
 {% endblock %}
 
 {% block scripts %}
-
-  <script>
-    {%- set p = profile %}
-    {%- set s = sid %}
-    {% if (p,s) in gold %}
-    {# PRINT DERIVATION TREE FROM JSON #}
-    $( document ).ready(function() {
-       elem = document.getElementById('derivj{{p}}{{s}}');
-      deriv_json_string = '{{gold[(p,s)]['derivj'] | safe}}';
-      deriv_json = JSON.parse(deriv_json_string);
-      drawTree(elem, deriv_json);
-
-      elemChild = document.createElement('span');
-      elemChild.innerHTML = '<br><br>';
-      elem.appendChild(elemChild);
-      });
-
-      {# PRINT DMRS FROM JSON #}
-      $( document ).ready(function() {
-      elem = document.getElementById('dmrsj{{p}}{{s}}');
-      dmrs_json_string = '{{gold[(p,s)]['dmrsj'] | safe}}';
-      dmrs_json = JSON.parse(dmrs_json_string);
-      DMRS(elem, dmrs_json);
-      });
-
-  {# PRINT MRS FROM JSON #}
-      $( document ).ready(function() {
-      elem = document.getElementById('mrsj{{p}}{{s}}');
-      mrs_json_string = '{{gold[(p,s)]['mrsj'] | safe}}';
-      mrs_json = JSON.parse(mrs_json_string);
-      MRS(elem, mrs_json);
-      });
-
-    {# Toggle Things: tree and DMRS start visible, MRS hidden #}
-    $(document).ready(function(){
-    {% for result in results %}
-      $("#toggle{{result}}{{p}}{{s}}").click(function(){
-        $("#{{result}}{{p}}{{s}}").toggle();
-      });
-      {% if result in ('mrs', 'mrsj') %}
-      $("#{{result}}{{p}}{{s}}").toggle();
-      {% endif %}
-    {% endfor %}
-    });
-
-    {# Make tree nodes clickable #}
-    $(document).ready(function(){
-          $(".ltdb").click(function(event){
-  	    var elem = event.target;
-	    var title = elem.getAttribute("title");
-            window.open("../../type/" + title);
-        });
-        });
-    {% endif %}
-  </script>
-
+  <script src="{{ url_for('static', filename='js/ltdb-tree.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/ltdb-mrs.js') }}"></script>
 {% endblock %}

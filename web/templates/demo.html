@@ -1,0 +1,387 @@
+{% extends 'layout.html' %}
+
+{% block css %}
+<link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
+<style>
+  #spinner { display: none; }
+  #inputText::-webkit-calendar-picker-indicator { display: none !important; }
+  .copy-btn { border:none;background:none;color:#6c757d;padding:0 .25rem;font-size:.85rem;
+              line-height:1;cursor:pointer;transition:color .15s; }
+  .copy-btn:hover { color:#0d6efd; }
+  .copy-btn.copied { color:#198754; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section>
+  <h1>Parse Demo</h1>
+
+  {% if not grammars %}
+  <div class="alert alert-warning">
+    No compiled grammars (.dat files) found in <code>web/db/</code>.
+    Run <code>python scripts/grm2db.py --ace --outdir web/db path/to/METADATA</code> to build one.
+  </div>
+  {% else %}
+
+  <form id="parseForm" class="mb-4">
+    <div class="row g-2 align-items-end mb-3">
+      <div class="col-md-6">
+        <label for="inputText" class="form-label">Input sentence</label>
+        <div class="demo-input-wrap">
+          <input type="text" id="inputText" name="input" class="form-control"
+                 list="exampleList" placeholder="Type or choose an example…"
+                 maxlength="{{ max_parse_chars }}" required>
+          <button type="button" id="clearInput" tabindex="-1" title="Clear to browse history"
+                  class="input-clear">&#215;</button>
+        </div>
+        <div class="demo-char-count">
+          <span id="charCount">0</span> / {{ max_parse_chars }}
+        </div>
+        <datalist id="exampleList"></datalist>
+      </div>
+      <div class="col-md-3">
+        <label for="grammarSelect" class="form-label">Grammar</label>
+        <select id="grammarSelect" name="grm" class="form-select">
+          {% for g in grammars %}
+          <option value="{{ g }}" {% if g == grm %}selected{% endif %}>{{ g[:-3] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-1">
+        <label for="numResults" class="form-label">Results</label>
+        <select id="numResults" name="results" class="form-select">
+          {% for n in [1, 2, 5, 10] %}
+          <option value="{{ n }}" {% if n == 5 %}selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary w-100">Parse</button>
+      </div>
+    </div>
+
+    <div class="d-flex gap-3">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="wantTree" checked>
+        <label class="form-check-label" for="wantTree">Tree</label>
+        <small class="text-muted ms-1" title="Click a node to collapse/expand; shift-click to open its type page">(?)</small>
+      </div>
+      <div class="form-check" id="labelToggleWrap" style="display:none">
+        <input class="form-check-input" type="checkbox" id="showLabels">
+        <label class="form-check-label" for="showLabels">Labels</label>
+        <small class="text-muted ms-1" title="Show linguistic category labels (NP, VP…) instead of grammar rule names">(?)</small>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="wantMRS" checked>
+        <label class="form-check-label" for="wantMRS">MRS</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="wantDMRS" checked>
+        <label class="form-check-label" for="wantDMRS">DMRS</label>
+      </div>
+    </div>
+  </form>
+
+  <div id="spinner" class="text-center my-4">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Parsing…</span>
+    </div>
+    <p class="text-muted mt-2">Parsing…</p>
+  </div>
+
+  <div id="results"></div>
+
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/ltdb-tree.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ltdb-mrs.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ltdb-latex.js') }}"></script>
+<script>
+  const _allExamples = {{ examples | tojson }};
+  const _MAX_HISTORY = 20;
+
+  function _historyKey(grm) { return 'ltdb-demo-history-' + grm; }
+
+  function _getHistory(grm) {
+    const stored = localStorage.getItem(_historyKey(grm));
+    if (stored) return JSON.parse(stored);
+    const defaults = _allExamples[grm] || [];
+    localStorage.setItem(_historyKey(grm), JSON.stringify(defaults));
+    return defaults;
+  }
+
+  function _addToHistory(grm, sentence) {
+    const history = [sentence, ..._getHistory(grm).filter(s => s !== sentence)]
+      .slice(0, _MAX_HISTORY);
+    localStorage.setItem(_historyKey(grm), JSON.stringify(history));
+    _updateDatalist(history);
+  }
+
+  function _updateDatalist(items) {
+    const dl = document.getElementById('exampleList');
+    dl.innerHTML = items.map(s => `<option value="${s.replace(/"/g, '&quot;')}">`).join('');
+  }
+
+  function _initGrammar(grm) {
+    const history = _getHistory(grm);
+    _updateDatalist(history);
+    if (!$('#inputText').val() && history.length > 0) {
+      $('#inputText').val(history[0]);
+      $('#clearInput').show();
+    }
+  }
+
+  function _updateCharCount() {
+    const n = $('#inputText').val().length;
+    $('#charCount').text(n).toggleClass('demo-char-near-limit', n > {{ max_parse_chars }} * 0.85);
+  }
+
+  _initGrammar($('#grammarSelect').val());
+  _updateCharCount();
+
+  $('#inputText').on('input', function () {
+    const n = $(this).val().length;
+    $('#clearInput').toggle(n > 0);
+    _updateCharCount();
+  });
+
+  $('#clearInput').on('click', function () {
+    $('#inputText').val('').focus();
+    $(this).hide();
+  });
+
+  $('#grammarSelect').on('change', function () {
+    $('#inputText').val('');
+    _initGrammar($(this).val());
+  });
+
+  $('#parseForm').submit(function (e) {
+    e.preventDefault();
+    const sentence = $('#inputText').val().trim();
+    if (sentence) _addToHistory($('#grammarSelect').val(), sentence);
+
+    const wantMrs = $('#wantMRS').is(':checked') || $('#wantDMRS').is(':checked');
+    const formData = {
+      input:      $('#inputText').val(),
+      grm:        $('#grammarSelect').val(),
+      results:    $('#numResults').val(),
+      derivation: $('#wantTree').is(':checked') ? 'json' : 'null',
+      mrs:        wantMrs ? 'json' : 'null',
+      dmrs:       'null',
+    };
+
+    $('#results').empty();
+    $('#spinner').show();
+
+    $.post('{{ url_for("parse_sentence") }}', formData)
+      .done(function (data) {
+        $('#spinner').hide();
+        renderResults(data, $('#grammarSelect').val());
+      })
+      .fail(function (xhr) {
+        $('#spinner').hide();
+        const msg = xhr.responseJSON ? xhr.responseJSON.error : xhr.statusText;
+        $('#results').empty().append($('<div class="alert alert-danger">').text(msg));
+      });
+  });
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function makeCopyBtn(getText, label) {
+    const icon = label
+      ? `<span style="font-size:.72rem;font-weight:700;letter-spacing:-.02em">${label}</span>`
+      : '&#128203;';
+    const title = label ? `Copy ${label}` : 'Copy to clipboard';
+    const btn = $(`<button class="copy-btn" title="${title}">${icon}</button>`);
+    btn.on('click', function () {
+      try {
+        navigator.clipboard.writeText(getText()).then(() => {
+          btn.addClass('copied').html('<span style="font-size:.72rem">✓</span>');
+          setTimeout(() => btn.removeClass('copied').html(icon), 1500);
+        });
+      } catch (e) { /* clipboard unavailable */ }
+    });
+    return btn;
+  }
+
+  let _lastRenderData = null;
+  let _lastRenderGrm = null;
+
+  $('#showLabels').on('change', function () {
+    if (_lastRenderData) renderResults(_lastRenderData, _lastRenderGrm);
+  });
+
+  function renderResults(data, grm) {
+    _lastRenderData = data;
+    _lastRenderGrm = grm;
+    const container = $('#results');
+
+    if (data.error) {
+      container.html($('<div class="alert alert-danger">').text(data.error));
+      return;
+    }
+    if (data.readings === 0) {
+      container.html('<div class="alert alert-warning">No parses found.</div>');
+      return;
+    }
+
+    container.append(
+      '<p>' + data.readings + ' result(s) for: <em>' +
+      $('<span>').text(data.input).html() + '</em></p>'
+    );
+
+    if (data.errors && data.errors.length > 0) {
+      const details = $('<details>').append(
+        $('<summary style="cursor:pointer">').html(
+          '<strong>Serialisation errors</strong> (' + data.errors.length + ')'
+        ),
+        $('<div class="mt-2">').html(
+          data.errors.map(e => $('<span>').text(e).html()).join('<br>')
+        )
+      );
+      container.append($('<div class="alert alert-warning">').append(details));
+    }
+
+    const grmStem = grm.replace(/\.db$/, '');
+    const showLabels = $('#showLabels').is(':checked');
+    let anyLabels = false;
+
+    $('#labelToggleWrap').toggle(false);
+
+    data.results.forEach(function (result, i) {
+      const card = $('<div class="card result-card">');
+      const header = $('<div class="card-header d-flex gap-2 align-items-center">');
+      header.append('<strong>Result ' + (i + 1) + '</strong>');
+      const body = $('<div class="card-body p-2">');
+      card.append(header).append(body);
+      container.append(card);
+
+      if (result.derivation) {
+        const btn = $('<button class="btn btn-primary btn-sm">Tree</button>');
+        const viz = $('<div class="result-viz">');
+        body.append(viz);
+        try {
+          const parsed = window.LTDBTree.parseDerivation(result.derivation);
+          const hasLabels = (function checkLabels(n) {
+            return Boolean(n.type) || (n.children || []).some(checkLabels);
+          }(parsed));
+          if (hasLabels) anyLabels = true;
+          window.LTDBTree.renderTree(viz[0], parsed, {
+            showLabels: showLabels && hasLabels,
+            typeHref: (typ) =>
+              '/type/' + encodeURIComponent(typ) + '?grm=' + encodeURIComponent(grm),
+          });
+        } catch (e) {
+          viz.html('<p class="text-muted small">Tree unavailable: ' + escHtml(e.message) + '</p>');
+        }
+        btn.on('click', function () {
+          viz.toggle();
+          $(this).toggleClass('btn-primary btn-outline-primary');
+        });
+        header.append(btn);
+        header.append(makeCopyBtn(() =>
+          typeof result.derivation === 'string'
+            ? result.derivation
+            : JSON.stringify(result.derivation, null, 2)
+        ));
+        if (window.LTDBLatex) {
+          header.append(makeCopyBtn(() =>
+            window.LTDBLatex.derivationToForest(
+              window.LTDBTree.parseDerivation(result.derivation)
+            ), 'TeX'));
+        }
+      }
+
+      if (result.mrs_str && $('#wantMRS').is(':checked')) {
+        const btn = $('<button class="btn btn-outline-primary btn-sm">MRS</button>');
+        const viz = $('<div class="result-viz" style="display:none">');
+        body.append(viz);
+        let rendered = false;
+        btn.on('click', function () {
+          viz.toggle();
+          $(this).toggleClass('btn-primary btn-outline-primary');
+          if (!rendered) {
+            try {
+              window.LTDBMrs.renderMrs(viz[0], window.LTDBMrs.parseMrs(result.mrs_str));
+            } catch (e) {
+              viz.html('<pre>' + escHtml(result.mrs_str) + '</pre>');
+            }
+            rendered = true;
+          }
+        });
+        header.append(btn);
+        header.append(makeCopyBtn(() => result.mrs_str));
+        if (window.LTDBLatex) {
+          header.append(makeCopyBtn(() =>
+            window.LTDBLatex.mrsToAvm(window.LTDBMrs.parseMrs(result.mrs_str))
+          , 'TeX'));
+        }
+      }
+
+      if (result.mrs_str && $('#wantDMRS').is(':checked')) {
+        const btn = $('<button class="btn btn-outline-primary btn-sm">DMRS</button>');
+        const viz = $('<div class="result-viz" style="display:none">');
+        body.append(viz);
+        let rendered = false;
+        btn.on('click', function () {
+          viz.toggle();
+          $(this).toggleClass('btn-primary btn-outline-primary');
+          if (!rendered) {
+            try {
+              window.LTDBMrs.renderDmrs(viz[0], window.LTDBMrs.parseMrs(result.mrs_str));
+            } catch (e) {
+              viz.html('<p class="text-muted small">DMRS unavailable: ' + escHtml(e.message) + '</p>');
+            }
+            rendered = true;
+          }
+        });
+        header.append(btn);
+        if (window.LTDBLatex) {
+          header.append(makeCopyBtn(() =>
+            window.LTDBLatex.dmrsToTikz(
+              window.LTDBMrs.mrsToDmrs(window.LTDBMrs.parseMrs(result.mrs_str))
+            ), 'TeX'));
+        }
+      }
+
+      if (result.mrs) {
+        const genBtn = $('<button class="btn btn-outline-success btn-sm ms-2">Generate</button>');
+        const genOut = $('<div class="mt-2" style="display:none">');
+        body.append(genOut);
+        genBtn.on('click', function () {
+          if (genOut.children().length > 0) { genOut.toggle(); return; }
+          genBtn.prop('disabled', true).text('Generating…');
+          $.post('{{ url_for("generate_sentence") }}', {
+            grm: grm,
+            mrs: JSON.stringify(result.mrs)
+          }).done(function (data) {
+            genBtn.prop('disabled', false).text('Generate');
+            if (data.error) {
+              genOut.html($('<div class="alert alert-danger">').text(data.error));
+            } else if (data.results.length === 0) {
+              genOut.html('<p class="text-muted">No realisations found.</p>');
+            } else {
+              const ul = $('<ul class="mb-0">');
+              data.results.forEach(s => ul.append($('<li>').text(s)));
+              genOut.append('<strong>Realisations:</strong>').append(ul);
+            }
+            genOut.show();
+          }).fail(function (xhr) {
+            genBtn.prop('disabled', false).text('Generate');
+            const msg = xhr.responseJSON ? xhr.responseJSON.error : xhr.statusText;
+            genOut.html($('<div class="alert alert-danger">').text(msg)).show();
+          });
+        });
+        header.append(genBtn);
+      }
+    });
+
+    if (anyLabels) $('#labelToggleWrap').show();
+  }
+</script>
+{% endblock %}

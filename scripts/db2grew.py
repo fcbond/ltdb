@@ -14,9 +14,17 @@ from urllib.parse import quote
 
 import orjson
 from delphin import derivation, predicate
-from delphin.codecs import dmrsjson
+from delphin.codecs import simplemrs
+from delphin.dmrs import from_mrs
 
 log = logging.getLogger("db2grew")
+
+# pydelphin's simplemrs encoder writes unknown spans as <-1:-1>,
+# which its own decoder rejects; strip them before decoding
+NULL_LNK = re.compile(r"<-1:-1>")
+# its lexer also rejects unquoted surface predicates that do not fit
+# the _lemma_pos(_sense) shape (e.g. INDRA's _and_coord); quote them
+SURFACE_PRED = re.compile(r'(\[\s+)(_[^\s"<]+)')
 
 
 def sanitize(name):
@@ -60,7 +68,10 @@ def get_lextypes(conn):
 
 
 def iter_gold(conn, profiles=None):
-    """Yield gold rows: (profile, sid, sent, deriv_json, dmrs_json).
+    """Yield gold rows: (profile, sid, sent, deriv, mrs).
+
+    The deriv column holds the raw UDF derivation string and the mrs
+    column the SimpleMRS string, as stored by gold2db.py.
 
     Args:
         conn: Connection to an LTDB SQLite database
@@ -70,27 +81,13 @@ def iter_gold(conn, profiles=None):
         One tuple per sentence, ordered by profile then sid
     """
     c = conn.cursor()
-    query = "SELECT profile, sid, sent, deriv_json, dmrs_json FROM gold"
+    query = "SELECT profile, sid, sent, deriv, mrs FROM gold"
     params = []
     if profiles:
         query += f" WHERE profile IN ({','.join(['?'] * len(profiles))})"
         params = list(profiles)
     query += " ORDER BY profile, sid"
     yield from c.execute(query, params)
-
-
-def _payload(json_str):
-    """Parse a JSON payload from the gold table, or return None.
-
-    Empty payloads ('{}', '', NULL) and malformed JSON give None.
-    """
-    if not json_str:
-        return None
-    try:
-        data = orjson.loads(json_str)
-    except orjson.JSONDecodeError:
-        return None
-    return data or None
 
 
 def _convert_deriv_node(node, graph, lextypes, ids):
@@ -130,26 +127,25 @@ def _convert_deriv_node(node, graph, lextypes, ids):
     return nid
 
 
-def deriv_to_grew(deriv_json, lextypes, meta):
-    """Convert a derivation tree to a constituency-style grew graph.
+def deriv_to_grew(deriv_str, lextypes, meta):
+    """Convert a UDF derivation string to a constituency-style grew graph.
 
     Surface tokens become ordered leaf nodes (t0, t1, ...); rule and
     lexical-entry nodes are unordered; parent->child edges are labelled
     with the daughter position ("1", "2", ...).
 
     Args:
-        deriv_json: JSON string from gold.deriv_json
+        deriv_str: raw UDF derivation from gold.deriv
         lextypes: mapping from lexid to lexical type
         meta: graph-level metadata (sid, profile, text)
 
     Returns:
         A grew graph dictionary, or None if conversion fails
     """
-    data = _payload(deriv_json)
-    if data is None:
+    if not deriv_str:
         return None
     try:
-        root = derivation.from_dict(data)
+        root = derivation.from_string(deriv_str)
     except Exception as err:
         log.error("derivation %s:%s unreadable: %s", meta["profile"], meta["sid"], err)
         return None
@@ -158,8 +154,8 @@ def deriv_to_grew(deriv_json, lextypes, meta):
     return graph
 
 
-def dmrs_to_grew(dmrs_json, meta):
-    """Convert a DMRS to a dependency-style grew graph.
+def dmrs_to_grew(mrs_str, meta):
+    """Convert a SimpleMRS string to a dependency-style grew DMRS graph.
 
     Predicate nodes are ordered by surface position (cfrom) so that
     grew-match renders the links as dependency arcs.  Edge labels are
@@ -167,18 +163,19 @@ def dmrs_to_grew(dmrs_json, meta):
     (no role) get the conventional role "MOD".
 
     Args:
-        dmrs_json: JSON string from gold.dmrs_json
+        mrs_str: raw SimpleMRS from gold.mrs
         meta: graph-level metadata (sid, profile, text)
 
     Returns:
         A grew graph dictionary, or None if conversion fails
     """
-    if _payload(dmrs_json) is None:
+    if not mrs_str:
         return None
+    cleaned = SURFACE_PRED.sub(r'\1"\2"', NULL_LNK.sub("", mrs_str))
     try:
-        d = dmrsjson.decode(dmrs_json)
+        d = from_mrs(simplemrs.decode(cleaned))
     except Exception as err:
-        log.error("DMRS %s:%s unreadable: %s", meta["profile"], meta["sid"], err)
+        log.error("DMRS %s:%s unconvertible: %s", meta["profile"], meta["sid"], err)
         return None
     nodes = {}
     for node in d.nodes:
@@ -242,7 +239,7 @@ def export(conn, out_dir, grm, args):
     dmrs_dir = out_dir / f"{grm}_dmrs"
     tree_files = []
     dmrs_files = []
-    for profile, sid, sent, deriv_json, dmrs_json in iter_gold(conn, args.profiles):
+    for profile, sid, sent, deriv_str, mrs_str in iter_gold(conn, args.profiles):
         # sent_id is the conventional grew key, shown in match results
         meta = {
             "sent_id": f"{profile}/{sid}",
@@ -258,12 +255,12 @@ def export(conn, out_dir, grm, args):
             )
         fname = f"{sanitize(profile)}__{sid}.json"
         if do_trees:
-            graph = deriv_to_grew(deriv_json, lextypes, meta)
+            graph = deriv_to_grew(deriv_str, lextypes, meta)
             if graph:
                 write_graph(trees_dir, fname, graph)
                 tree_files.append(fname)
         if do_dmrs:
-            graph = dmrs_to_grew(dmrs_json, meta)
+            graph = dmrs_to_grew(mrs_str, meta)
             if graph:
                 write_graph(dmrs_dir, fname, graph)
                 dmrs_files.append(fname)

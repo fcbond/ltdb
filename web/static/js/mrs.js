@@ -1,4 +1,5 @@
-function MRS(parentElement, mrsData){
+function MRS(parentElement, mrsData, textInputSelector){
+    textInputSelector = textInputSelector || '#text-input';
     // Constant pixel sizes used
     const MAXWIDTH = 600;     // width before a list of elements is wrapped 
     const XGAP = 5;           // horizontal gap between elements
@@ -24,8 +25,8 @@ function MRS(parentElement, mrsData){
         drawFeatValPair(container, 'TOP', mrsData.top);
         drawFeatValPair(container, 'INDEX', mrsData.index);    
         drawFeatValPair(container, 'RELS', mrsData.relations); 
-        drawFeatValPair(container, 'HCONS', mrsData.constraints); 
-        drawFeatValPair(container, 'ICONS', mrsData.constraints); 
+        drawFeatValPair(container, 'HCONS', mrsData.constraints);
+        drawFeatValPair(container, 'ICONS', mrsData.icons || []);
         drawSquareBrackets(mrs, XGAP);
         
         // transform the MRS to take into account the square brackets drawn at
@@ -66,12 +67,10 @@ function MRS(parentElement, mrsData){
             if (name == 'RELS') {
                 var itemFunc = relFeatStruct;
             } else if (name == 'HCONS') {
-                // filter out ICONS values from the constraints list
-                var value = value.filter(constraint => constraint.high != null && constraint.high.match(/h(andle)?\d+/));
+                value = value.filter(constraint => constraint.high != null && constraint.high.match(/h(andle)?\d+/));
                 var itemFunc = hconsFeatStruct;
             } else if (name == 'ICONS') {
-                // filter out HCONS values from the constraints list
-                var value = value.filter(constraint => constraint.high == null || !constraint.high.match(/h(andle)?\d+/));
+                value = value.filter(constraint => constraint.high == null || !constraint.high.match(/h(andle)?\d+/));
                 var itemFunc = iconsFeatStruct;
             }
 
@@ -284,7 +283,7 @@ function MRS(parentElement, mrsData){
                     // no lnks for this variable
                     return;
 
-                var $inputElem = $('#text-input');
+                var $inputElem = $(textInputSelector);
                 var inputText = $inputElem.html();
                 
                 // create an arrary of binary values indicating which characters
@@ -323,38 +322,50 @@ function MRS(parentElement, mrsData){
                 $(node).find(dataQuery).css({fill: 'black'}); 
                 
                 // reset highlighted input string
-                var $inputElem = $('#text-input');
+                var $inputElem = $(textInputSelector);
                 $inputElem.html($inputElem.html().replace(/<\/?span[^>]*>/g,""));
             }
         ).filter(function (){
-            // only draw tooltip for variables of type e and x probably should
-            // be doing the test against whether corresponding mrs variable
-            // object has "properties" field or not.
             var varName = $(this).data('var');
-            return mrsData.variables[varName].hasOwnProperty("properties");
-        }).tooltip({
-            track: true,
-            tooltipClass: 'mrs-variable-info',
-            content: function(){
-                var varName = $(this).data('var');
-                var variable = mrsData.variables[varName];
-                var func = variable.type == 'e' ? eArgKey : xArgKey;
-                var features = keySort(Object.keys(variable.properties), func);
+            return mrsData.variables &&
+                   mrsData.variables[varName] &&
+                   mrsData.variables[varName].hasOwnProperty("properties");
+        }).each(function() {
+            var varName = $(this).data('var');
+            var variable = mrsData.variables[varName];
+            var func = variable.type == 'e' ? eArgKey : xArgKey;
+            var features = keySort(Object.keys(variable.properties), func);
+            var rows = [];
+            for (var i=0; i < features.length; i++) {
+                var attr = features[i];
+                rows.push(attr + '=' + variable.properties[attr]);
+            }
+            var content = rows.join(', ');
 
-                var rows = [];
-                for (var i=0; i < features.length; i++) {        
-                    var attr = features[i];
-                    rows.push('<tr><td class="variable-feat-name">'+attr+'</td><td class="variable-feat-val">'+variable.properties[attr]+'</td></tr>');
-                }
-                return '<table>' + rows.join('') + '</table>';
+            if (typeof $.fn.tooltip === 'function' && $.fn.tooltip.reflow === undefined) {
+                // jQuery UI
+                $(this).tooltip({
+                    track: true,
+                    tooltipClass: 'mrs-variable-info',
+                    content: '<table>' + rows.map(function(r){
+                        var parts = r.split('=');
+                        return '<tr><td class="variable-feat-name">'+parts[0]+'</td><td class="variable-feat-val">'+parts[1]+'</td></tr>';
+                    }).join('') + '</table>'
+                });
+            } else if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+                // Bootstrap 5
+                this.setAttribute('data-bs-toggle', 'tooltip');
+                this.setAttribute('data-bs-placement', 'top');
+                this.setAttribute('data-bs-title', content);
+                new bootstrap.Tooltip(this);
             }
         });
     }
 
     function getArgZeroLinks(){
-        argZeroLinks = {};
-        
-        for (var i=0; i < mrsData.relations.length; i++) {        
+        const argZeroLinks = {};
+
+        for (var i=0; i < mrsData.relations.length; i++) {
             var rel = mrsData.relations[i];
             if (argZeroLinks.hasOwnProperty(rel.arguments.ARG0))
                 argZeroLinks[rel.arguments.ARG0].push(rel.lnk);

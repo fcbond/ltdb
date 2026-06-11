@@ -4,12 +4,8 @@ import json
 import sqlite3
 from pathlib import Path
 
-import pytest
-from delphin import derivation
-from delphin.codecs import dmrsjson, simplemrs
-from delphin.dmrs import from_mrs
-
 import db2grew
+import pytest
 
 TABLES_SQL = Path(__file__).resolve().parent.parent / "scripts" / "tables.sql"
 
@@ -23,8 +19,9 @@ UDF = (
     '  (724 bark_v1 0.0 2 3 ("barked."))))'
 )
 
-MRS = """[ TOP: h0 INDEX: e2 [ e SF: prop TENSE: past MOOD: indicative PROG: - PERF: - ]
-  RELS: < [ _the_q<0:3> LBL: h4 ARG0: x3 [ x PERS: 3 NUM: sg IND: + ] RSTR: h5 BODY: h6 ]
+MRS = """[ TOP: h0 INDEX: e2 [ e SF: prop TENSE: past MOOD: indicative ]
+  RELS: < [ _the_q<0:3> LBL: h4 ARG0: x3 [ x PERS: 3 NUM: sg IND: + ]
+            RSTR: h5 BODY: h6 ]
           [ _dog_n_1<4:7> LBL: h7 ARG0: x3 ]
           [ _bark_v_1<8:15> LBL: h1 ARG0: e2 ARG1: x3 ] >
   HCONS: < h0 qeq h1 h5 qeq h7 > ]"""
@@ -34,20 +31,9 @@ LEXTYPES = {"the_1": "d_-_the_le", "dog_n1": "n_-_c_le", "bark_v1": "v_-_le"}
 META = {"sid": "1", "profile": "mrs", "text": "The dog barked."}
 
 
-def deriv_json():
-    """Return deriv_json exactly as gold2db.py stores it."""
-    deriv = derivation.from_string(UDF)
-    return json.dumps(deriv.to_dict(fields=["id", "entity", "score", "form", "tokens"]))
-
-
-def dmrs_json():
-    """Return dmrs_json exactly as gold2db.py stores it."""
-    return dmrsjson.encode(from_mrs(simplemrs.decode(MRS)))
-
-
 @pytest.fixture
 def gold_db(tmp_path):
-    """Create a minimal LTDB database with one parsed sentence."""
+    """Create a minimal LTDB database with parsed sentences."""
     db_path = tmp_path / "toy.db"
     conn = sqlite3.connect(db_path)
     conn.executescript(TABLES_SQL.read_text())
@@ -59,12 +45,12 @@ def gold_db(tmp_path):
         "INSERT INTO lex (lexid, typ) VALUES (?, ?)", sorted(LEXTYPES.items())
     )
     rows = [
-        ("mrs", 1, "The dog barked.", deriv_json(), dmrs_json()),
-        ("mrs", 2, "Broken.", "{}", "{}"),
-        ("other", 3, "The dog barked.", deriv_json(), dmrs_json()),
+        ("mrs", 1, "The dog barked.", UDF, MRS),
+        ("mrs", 2, "Broken.", "", None),
+        ("other", 3, "The dog barked.", UDF, MRS),
     ]
     conn.executemany(
-        """INSERT INTO gold (profile, sid, sent, deriv_json, dmrs_json)
+        """INSERT INTO gold (profile, sid, sent, deriv, mrs)
            VALUES (?, ?, ?, ?, ?)""",
         rows,
     )
@@ -86,7 +72,7 @@ def test_deriv_to_grew():
     # internal nodes are numbered in pre-order:
     # n0 sb-hd_mc_c, n1 sp-hd_n_c, n2 the_1, n3 n_sg_ilr,
     # n4 dog_n1, n5 v_pst_olr, n6 bark_v1
-    graph = db2grew.deriv_to_grew(deriv_json(), LEXTYPES, META)
+    graph = db2grew.deriv_to_grew(UDF, LEXTYPES, META)
     assert_valid_graph(graph)
     assert graph["meta"] == META
     assert graph["nodes"]["n0"] == {"cat": "sb-hd_mc_c"}
@@ -103,18 +89,20 @@ def test_deriv_to_grew():
     assert {"src": "n4", "label": "1", "tar": "t1"} in graph["edges"]
 
 
-def test_deriv_unusable_ids():
-    """ACE leaves derivation ids 0 and root nodes have none at all."""
-
-    def zero_ids(node):
-        node["id"] = 0
-        for daughter in node.get("daughters", []):
-            zero_ids(daughter)
-
-    inner = json.loads(deriv_json())
-    zero_ids(inner)
-    data = {"entity": "root_strict", "daughters": [inner]}
-    graph = db2grew.deriv_to_grew(json.dumps(data), {}, META)
+def test_deriv_with_root_and_zero_ids():
+    """ACE writes id 0 on every node and may add an id-less root."""
+    udf = (
+        "(root_strict "
+        + UDF.replace("(731 ", "(0 ")
+        .replace("(729 ", "(0 ")
+        .replace("(726 ", "(0 ")
+        .replace("(728 ", "(0 ")
+        .replace("(727 ", "(0 ")
+        .replace("(730 ", "(0 ")
+        .replace("(724 ", "(0 ")
+        + ")"
+    )
+    graph = db2grew.deriv_to_grew(udf, {}, META)
     assert_valid_graph(graph)
     # 8 derivation nodes plus 3 tokens, no id collisions
     assert len(graph["nodes"]) == 11
@@ -125,7 +113,7 @@ def test_deriv_unusable_ids():
 
 
 def test_dmrs_to_grew():
-    graph = db2grew.dmrs_to_grew(dmrs_json(), META)
+    graph = db2grew.dmrs_to_grew(MRS, META)
     assert_valid_graph(graph)
     assert graph["meta"] == META
     nodes = list(graph["nodes"].values())
@@ -151,26 +139,41 @@ def test_dmrs_to_grew():
 
 
 def test_dmrs_property_names_are_sanitized():
-    data = json.loads(dmrs_json())
-    node = next(n for n in data["nodes"] if n["predicate"] == "_dog_n_1")
-    node["sortinfo"]["PNG.PERNUM"] = "3rd"
-    node["sortinfo"]["COG-ST"] = "cog-st"
-    graph = db2grew.dmrs_to_grew(json.dumps(data), META)
+    mrs = MRS.replace("PERS: 3", "PERS: 3 PNG.PERNUM: 3rd COG-ST: cog-st")
+    graph = db2grew.dmrs_to_grew(mrs, META)
     dog = next(n for n in graph["nodes"].values() if n["pred"] == "_dog_n_1")
     assert dog["PNG_PERNUM"] == "3rd"
     assert dog["COG_ST"] == "cog-st"
     assert "PNG.PERNUM" not in dog
 
 
+def test_dmrs_null_lnk_is_tolerated():
+    """simplemrs.encode writes <-1:-1> spans that decode rejects."""
+    mrs = MRS.replace("_bark_v_1<8:15>", "_bark_v_1<-1:-1>")
+    graph = db2grew.dmrs_to_grew(mrs, META)
+    bark = next(n for n in graph["nodes"].values() if n["pred"] == "_bark_v_1")
+    assert "cfrom" not in bark
+
+
+def test_dmrs_nonstandard_predicate_is_tolerated():
+    """Predicates like INDRA's _and_coord break pydelphin's lexer."""
+    mrs = MRS.replace("_bark_v_1<8:15>", "_bark_coord<8:15>")
+    graph = db2grew.dmrs_to_grew(mrs, META)
+    assert any(n["pred"] == "_bark_coord" for n in graph["nodes"].values())
+
+
 def test_dmrs_undirected_link_becomes_mod():
-    data = json.loads(dmrs_json())
-    data["links"].append({"from": 10001, "to": 10002, "post": "EQ"})
-    graph = db2grew.dmrs_to_grew(json.dumps(data), META)
+    # _loud_a shares the verb's label without an argument link to it
+    mrs = """[ TOP: h0 INDEX: e2
+  RELS: < [ _bark_v_1<0:6> LBL: h1 ARG0: e2 ]
+          [ _loud_a_1<7:13> LBL: h1 ARG0: e3 ] >
+  HCONS: < h0 qeq h1 > ]"""
+    graph = db2grew.dmrs_to_grew(mrs, META)
     assert {"1": "MOD", "post": "EQ"} in [e["label"] for e in graph["edges"]]
 
 
-@pytest.mark.parametrize("payload", [None, "", "{}", "not json"])
-def test_empty_payloads_are_skipped(payload):
+@pytest.mark.parametrize("payload", [None, "", "not a derivation"])
+def test_bad_payloads_are_skipped(payload):
     assert db2grew.deriv_to_grew(payload, {}, META) is None
     assert db2grew.dmrs_to_grew(payload, META) is None
 
@@ -184,7 +187,7 @@ def test_main_end_to_end(gold_db, tmp_path):
         assert corpus["kind"] == "json"
         directory = Path(corpus["directory"])
         assert directory.is_dir()
-        # the '{}' row is skipped: 2 of the 3 gold rows convert
+        # the empty row is skipped: 2 of the 3 gold rows convert
         assert corpus["files"] == ["mrs__1.json", "other__3.json"]
         assert sorted(p.name for p in directory.iterdir()) == corpus["files"]
         for fname in corpus["files"]:

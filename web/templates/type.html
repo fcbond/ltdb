@@ -5,16 +5,7 @@
 	rel="stylesheet">
   <link href="{{ url_for('static', filename='css/delphin-viz.css') }}"
 	      rel="stylesheet">
-
-<script src="{{ url_for('static', filename='js/tree.js') }}"        
-	language='javascript'></script>
-<script src="{{ url_for('static', filename='js/dmrs.js') }}"        
-	language='javascript'></script>	
-<script src="{{ url_for('static', filename='js/mrs.js') }}"        
-	language='javascript'></script>
-<script src="{{ url_for('static', filename='js/svg.js') }}"        
-	language='javascript'></script>
-<script src="https://d3js.org/d3.v3.js"></script>
+  <style>{{ pygments_css }}</style>
 
 {% endblock %}
 
@@ -38,14 +29,14 @@
 	{% if info['parents'] %}
       <li>Parents:
 	{% for p in info['parents'].split() %}
-	<a href="{{url_for('type', query=p)}}">{{p}}</a>{{ ", " if not loop.last else "" }}
+	<a href="{{type_href(p)}}">{{p}}</a>{{ ", " if not loop.last else "" }}
 	{% endfor %}
 	{% endif %}
       	{%- if info['children'] %}
 	{%- set kids = info['children'].split() %}
       <li>Children:
        	{% for p in kids[:limit] %} 
-       	<a href="{{url_for('type', query=p)}}">{{p}}</a> {{ ", " if not loop.last else "" }} 
+       	<a href="{{type_href(p)}}">{{p}}</a> {{ ", " if not loop.last else "" }} 
        	{% endfor %}
 	{% if kids|length > limit %}
 	(and {{kids|length - limit}} more)
@@ -76,11 +67,23 @@
       </tbody>
     </table>
     {% endif %}
+    {% if is_static_mirror and (static_mirror_all_non_lex or info['status'] in static_mirror_statuses) %}
+    <section id="examples"
+	     class="ltdb-examples"
+	     data-grammar="{{ grm[:-3] if grm.endswith('.db') else grm }}"
+	     data-type="{{ query }}"
+	     data-db="{{ example_db_href(grm) }}">
+      <h3>Sentences</h3>
+      <p class="text-muted">Loading examples...</p>
+    </section>
+    {% endif %}
     {%if sents %}
     <h3>Sentences <small>({{phenomena|length}} of {{maxp}})</small></h3>
 
     
-    <ul> 
+    <div id="tooltip" class="tooltip" style="opacity:0; position:absolute; background:#fff;
+         border:1px solid #ccc; padding:4px; pointer-events:none;"></div>
+    <ul>
       {% for p, s in phenomena %}
 	{% for (kara, made) in phenomena[p,s] %}
 	  <li><div><a title='{{p}}, {{s}}'>🗩</a>
@@ -91,32 +94,23 @@
 		{{sents[(p,s)][wid]}}
 	      {% endif %}
 	    {% endfor %}
-	    <div class="float-end">
-	      {% for result in results %}
-		<button id="toggle{{result}}{{p}}{{s}}"
-			class="btn btn-outline-primary
-			btn-sm">{{results[result]}}</button>
-	      {% endfor %}
+	    {% if gold[(p,s)]['mrs'] %}
+	    <details class="mt-2 ltdb-mrs-details">
+	      <summary>MRS</summary>
+	      <div class="ltdb-mrs-view" data-mrs="{{ gold[(p,s)]['mrs']|e }}"></div>
+	    </details>
+	    <details class="mt-1 ltdb-dmrs-details">
+	      <summary>DMRS</summary>
+	      <div class="ltdb-dmrs-view" data-mrs="{{ gold[(p,s)]['mrs']|e }}"></div>
+	    </details>
+	    {% endif %}
+	    {% if gold[(p,s)]['deriv'] %}
+	    <details class="mt-2 ltdb-tree-details">
+	      <summary>Tree</summary>
+	      <div class="ltdb-tree" data-deriv="{{ gold[(p,s)]['deriv']|e }}"></div>
+	    </details>
+	    {% endif %}
 	    </div>
-              {# <button id="toggleTree{{p}}{{s}}" #}
-	      {# 	      class="btn btn-outline-primary btn-sm">Tree</button> #}
-              {# <button id="toggleDMRS{{p}}{{s}}" #}
-	      {# 	      class="btn btn-outline-primary btn-sm">DMRS</button> #}
-              {# <button id="toggleTextMRS{{p}}{{s}}" #}
-	      {# 	      class="btn btn-outline-primary btn-sm">MRS</button> #}
-
-
-	    <div id='derivj{{p}}{{s}}'><br></div>
-	    <div id="tooltip" class="tooltip"></div>
-            <div id='dmrsj{{p}}{{s}}'></div>
-	    <div id='mrs{{p}}{{s}}' class = 'card card-body'>
-<pre>
-{{gold[(p,s)]['mrs']}}
-</pre></div>
-	    </div>
-	    <div id='mrsj{{p}}{{s}}'><br>
-              <div id="text-input" style="font-size: 150%%;">{{gold[(p,s)]['item']}}</div><br>
-	    </div>  
 
 	  </li><br>
 	  {% endfor %}
@@ -124,8 +118,70 @@
     </ul>
   </a>
 {% endif %}
-<h3>TDL</h3> 
-  <pre class='code'>{{info['tdl']}}</pre> 
+{% if doctest_summary %}
+<h3>Docstring Tests</h3>
+
+<table class="table table-sm table-borderless" style="max-width:36em">
+  <thead class="thead-light">
+    <tr>
+      <th>Kind</th>
+      <th class="text-end">Total</th>
+      <th class="text-end">Pass</th>
+      <th>Failures</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for kind in ['ex', 'nex', 'mex'] %}
+    {% if kind in doctest_summary %}
+    {% set s = doctest_summary[kind] %}
+    <tr>
+      <td><code>&lt;{{kind}}&gt;</code></td>
+      <td class="text-end">{{ s.total }}</td>
+      <td class="text-end">
+        {% if s.pass == s.total %}
+          <span class="text-success fw-bold">{{ s.pass }}</span>
+        {% else %}
+          <span class="text-warning">{{ s.pass }}</span>
+        {% endif %}
+      </td>
+      <td>
+        {% for verdict, n in s.fail.items() %}
+          <span class="badge {% if verdict == 'FAIL-type-in-tree' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+            {{verdict}}: {{n}}
+          </span>
+        {% endfor %}
+      </td>
+    </tr>
+    {% endif %}
+  {% endfor %}
+  </tbody>
+</table>
+
+<ul class="list-unstyled mt-2">
+{% for ex in doctest_examples %}
+  <li class="mb-1">
+    <span class="badge bg-secondary"><code>&lt;{{ex.kind}}&gt;</code></span>
+    {% if ex.pass %}
+      <span class="badge bg-success">PASS</span>
+      {% if ex.kind == 'nex' and ex.n_parses and ex.n_parses > 0 %}
+        <span class="badge bg-info" title="Sentence parsed, but type correctly absent">parsed-ok</span>
+      {% endif %}
+    {% elif ex.verdict == 'FAIL-type-in-tree' %}
+      <span class="badge bg-danger">{{ex.verdict}}</span>
+    {% else %}
+      <span class="badge bg-warning text-dark">{{ex.verdict}}</span>
+    {% endif %}
+    <span>{{ ex.sent }}</span>
+    {% if ex.n_parses is not none %}
+      <small class="text-muted">({{ex.n_parses}} parse{{'' if ex.n_parses == 1 else 's'}})</small>
+    {% endif %}
+  </li>
+{% endfor %}
+</ul>
+{% endif %}
+
+<h3>TDL</h3>
+  {{ tdl_html | safe }}
   <p>{{ info['src'] }}, {{ info['line'] }}
 {% endif %}
     
@@ -134,6 +190,16 @@
 
 {% block scripts %}
 
+  {% if is_static_mirror %}
+  <script src="../../assets/ltdb-tree.js"></script>
+  <script src="../../assets/ltdb-mrs.js"></script>
+  <script src="../../assets/sql-wasm.js"></script>
+  <script src="../../assets/ltdb-examples.js"></script>
+  {% else %}
+  <script src="{{ url_for('static', filename='js/ltdb-tree.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/ltdb-mrs.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/ltdb-examples.js') }}"></script>
+  {% endif %}
 
 
   <script>
@@ -150,62 +216,6 @@
       });
     {% endif %}
     });
-
-
-    {% for p, s in phenomena %} 
-    {# PRINT DERIVATION TREE FROM JSON #}
-    $( document ).ready(function() {
-       elem = document.getElementById('derivj{{p}}{{s}}');
-      deriv_json_string = '{{gold[(p,s)]['derivj'] | safe}}';
-      deriv_json = JSON.parse(deriv_json_string);
-      drawTree(elem, deriv_json);
-    
-      elemChild = document.createElement('span');
-      elemChild.innerHTML = '<br><br>';
-      elem.appendChild(elemChild);
-      });
-
-      {# PRINT DMRS FROM JSON #}
-      $( document ).ready(function() {
-      elem = document.getElementById('dmrsj{{p}}{{s}}');
-      dmrs_json_string = '{{gold[(p,s)]['dmrsj'] | safe}}';
-      dmrs_json = JSON.parse(dmrs_json_string);
-      DMRS(elem, dmrs_json);
-      });
-
-  {# PRINT MRS FROM JSON #}
-      $( document ).ready(function() {
-      elem = document.getElementById('mrsj{{p}}{{s}}');
-      mrs_json_string = '{{gold[(p,s)]['mrsj'] | safe}}';
-      mrs_json = JSON.parse(mrs_json_string);
-      MRS(elem, mrs_json);
-      });
-
-      
-
-{% endfor %}
-    
-    {# Toggle Things #}
-    $(document).ready(function(){
-    {% for result in results %}
-      {% for p, s in phenomena %} 
-	$("#toggle{{result}}{{p}}{{s}}").click(function(){
-          $("#{{result}}{{p}}{{s}}").toggle(); 
-        });  
-	{# TOGGLE OFF ALL VISUALS  #}
-	$("#{{result}}{{p}}{{s}}").toggle(); 
-      {% endfor %}
-    {% endfor %}
-    }); 
-
-    {# Make tree nodes clickable #}
-    $(document).ready(function(){
-          $(".ltdb").click(function(event){
-  	    var elem = event.target;
-	    var title = elem.getAttribute("title");
-            window.open("../type/" + title);
-        });
-        });
 
   </script>
 

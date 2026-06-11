@@ -1,0 +1,48 @@
+name lang='xyz'>supe ruleEOL  UNIQUE
+
+Description (no tag)
+<ref></ref>???? 
+
+<ex>,* <nex>*, <mex>*
+
+???
+ToDo
+
+Notes
+?includes citations
+
+History
+
+Treebanker
+
+Links/External
+src
+
+Supercedes
+
+### types are cross-linked by ltdb
+
+features
+
+
+Maybe mark citations with <ref></ref>?
+
+
+------------------------------------------------------------------------
+<name lang='xyz'>supe ruleEOL
+
+Description (no tag)
+
+
+<ex>,* <nex>*, <mex>*
+
+<features>
+FEATURE: description of Feature
+
+ATTRIBUTE: description of attribute
+
+<notes>
+
+<supercedes>
+
+old names for this type

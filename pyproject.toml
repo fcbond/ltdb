@@ -1,0 +1,46 @@
+[project]
+name = "ltdb"
+version = "0.1.0"
+description = "Linguistic Type Database — Flask web app for DELPH-IN grammars"
+requires-python = ">=3.12"
+dependencies = [
+    "pydelphin",
+    "orjson",
+    "markdown-it-py",
+    "lxml",
+    "Flask",
+    "Frozen-Flask",
+    "Werkzeug",
+    "Jinja2",
+    "MarkupSafe",
+    "itsdangerous",
+    "click",
+    "toml",
+    "gunicorn",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.9",
+    "pytest>=9",
+    "pytest-playwright>=0.7",
+    "requests>=2.32",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "integration: requires ACE binary and compiled grammar .dat file",
+    "slow: marks tests as slow",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["web"]

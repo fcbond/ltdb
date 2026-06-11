@@ -1,40 +1,64 @@
 <header>
-  <nav class="navbar fixed-top navbar-expand-sm navbar-light bg-light">
+  <nav class="navbar fixed-top navbar-expand-md navbar-light bg-white border-bottom app-nav">
       <div class="container-fluid">
-        <a href="/" class="navbar-brand"><img width=50
-					   src="{{ url_for('static',
-					   filename='img/ltdb.png')
-					   }}"/>{{grm}}</a>
-        <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarCollapse">
+        <a href="{{ url_for('mirror_home') if is_static_mirror else url_for('home') }}" class="navbar-brand">
+          <img class="brand-mark" width="40" height="40"
+               src="{{ url_for('static', filename='img/ltdb.png') }}"
+               alt="">LTDB
+        </a>
+        <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarCollapse">
-	  {% if grm %}
-
-          <div class="navbar-nav">
-	    <!-- Add overview of all grammars -->
-	    <a href="{{ url_for('grammar') }}"
-	       class="nav-item nav-link">Grammar</a>
-		      <!-- {% if page == pg %} active{% endif %}" -->
-	       <a href="{{ url_for('rules') }}"
-		  class="nav-item nav-link">Rules</a>
-	       <a href="{{ url_for('ltypes') }}"
-		  class="nav-item nav-link">Lexical Types</a>
-	  </div>
-	  {% endif %}
-	    {% if config.GREW_MATCH_URL %}
-	    <a href="{{ config.GREW_MATCH_URL }}"
-	       class="nav-item nav-link" target="_blank">Grew-match</a>
-	    {% endif %}
-	    <form action="/search" method="post" class="form-inline my-2 my-lg-0">
-              <input type="text" id="search" name="search" required placeholder="lemma/type/predicate">
-	      <button type="submit" class="btn btn-outline-secondary">
-		🔍
-              </button>
-	    </form>
-	    
-	  
-	</div>
+          {% if grm %}
+          <div class="navbar-nav me-auto">
+            <a href="{{ grammar_href() }}"
+               class="nav-item nav-link{{ ' active' if request.endpoint in ('grammar', 'mirror_grammar') }}">{{grm}}</a>
+            <a href="{{ rules_href() }}"
+               class="nav-item nav-link{{ ' active' if request.endpoint in ('rules', 'mirror_rules') }}">Rules</a>
+            <a href="{{ ltypes_href() }}"
+               class="nav-item nav-link{{ ' active' if request.endpoint in ('ltypes', 'mirror_ltypes') }}">Lexical Types</a>
+            {% if not is_static_mirror %}
+            <a href="{{ doctests_href() }}"
+               class="nav-item nav-link{{ ' active' if request.endpoint == 'doctests' }}">Docstring Tests</a>
+            <a href="{{ url_for('demo') }}"
+               class="nav-item nav-link{{ ' active' if request.endpoint == 'demo' }}">Demo</a>
+            <form action="{{ url_for('submit_fsearch') }}" method="post" class="nav-search d-flex ms-2">
+              <input type="search" id="nav-search" name="search" class="form-control form-control-sm" required placeholder="lemma/type/predicate" aria-label="Search">
+              <button type="submit" class="btn btn-outline-secondary btn-sm" aria-label="Search">Search</button>
+            </form>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="navbar-nav me-auto">
+            {% if not is_static_mirror %}
+            <form action="{{ url_for('submit_fsearch') }}" method="post" class="nav-search d-flex">
+              <input type="search" id="nav-search" name="search" class="form-control form-control-sm" required placeholder="lemma/type/predicate" aria-label="Search">
+              <button type="submit" class="btn btn-outline-secondary btn-sm" aria-label="Search">Search</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% if is_static_mirror %}
+            {% if grm %}
+            <form action="{{ url_for('mirror_type_shell') }}" method="get" class="d-flex my-2">
+              <input type="hidden" name="grammar" value="{{ grm[:-3] if grm.endswith('.db') else grm }}">
+              <input type="text" id="search" name="type" required placeholder="type" class="form-control form-control-sm">
+              <button type="submit" class="btn btn-outline-secondary btn-sm" aria-label="Search">Search</button>
+            </form>
+            {% endif %}
+            <span class="navbar-text ms-2">
+              <a href="{{ full_ltdb_base_url }}">Full LTDB</a>
+            </span>
+          {% else %}
+          {% if config.GREW_MATCH_URL %}
+          <a href="{{ config.GREW_MATCH_URL }}"
+             class="nav-item nav-link" target="_blank">Grew-match</a>
+          {% endif %}
+          <a href="{{ url_for('help') }}"
+             class="nav-item nav-link{{ ' active' if request.endpoint == 'help' }}">Help</a>
+          {% endif %}
+        </div>
       </div>
   </nav>
 </header>
