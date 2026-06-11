@@ -147,7 +147,12 @@ def deriv_to_grew(deriv_str, lextypes, meta):
     try:
         root = derivation.from_string(deriv_str)
     except Exception as err:
-        log.error("derivation %s:%s unreadable: %s", meta["profile"], meta["sid"], err)
+        log.error(
+            "derivation %s:%s unreadable: %s",
+            meta["profile"],
+            meta["sid"],
+            err,
+        )
         return None
     graph = {"meta": meta, "nodes": {}, "edges": [], "order": []}
     _convert_deriv_node(root, graph, lextypes, count())
