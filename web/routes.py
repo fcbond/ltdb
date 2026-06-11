@@ -1,6 +1,6 @@
 """Route declaration."""
 from flask import current_app as app
-from flask import render_template, request, session
+from flask import redirect, render_template, request, session, url_for
 
 import toml
 import pathlib
@@ -198,6 +198,41 @@ def type(query):
         results=results
     )
 
+
+
+@app.route("/sent/<profile>/<int:sid>")
+def sent(profile, sid):
+    """show one treebanked sentence with its tree, MRS and DMRS
+
+    Deep links (e.g. from grew-match results) can select the grammar
+    with ?grm=<dbfile>.
+    """
+    if 'grm' in request.args:
+        session['grm'] = request.args['grm']
+    grm = session.get('grm')
+    if not grm:
+        return redirect(url_for('home'))
+    conn = get_db(current_directory, grm)
+
+    psids = [(profile, sid)]
+    sents = get_sents(conn, psids)
+    gold = get_gold(conn, psids)
+
+    results = {'derivj': 'Tree',
+               'mrs': 'MRS',
+               'dmrsj': 'DMRS',
+               'mrsj': '[MRS]',
+               }
+
+    return render_template(
+        'sent.html',
+        grm=grm,
+        profile=profile,
+        sid=sid,
+        sents=sents,
+        gold=gold,
+        results=results
+    )
 
 
 @app.route('/search', methods=['POST'])

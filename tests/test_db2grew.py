@@ -200,6 +200,16 @@ def test_main_profiles_filter(gold_db, tmp_path):
     assert all(c["files"] == ["other__3.json"] for c in corpora)
 
 
+def test_main_ltdb_url(gold_db, tmp_path):
+    out = tmp_path / "grew"
+    db2grew.main(
+        ["--outdir", str(out), "--ltdb-url", "http://localhost:5000/", str(gold_db)]
+    )
+    corpora = json.loads((out / "corpora.json").read_bytes())
+    graph = json.loads((Path(corpora[0]["directory"]) / "mrs__1.json").read_bytes())
+    assert graph["meta"]["url"] == "http://localhost:5000/sent/mrs/1?grm=toy.db"
+
+
 def test_main_trees_only(gold_db, tmp_path):
     out = tmp_path / "grew"
     db2grew.main(["--outdir", str(out), "--trees-only", str(gold_db)])

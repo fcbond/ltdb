@@ -10,6 +10,7 @@ import sqlite3
 import sys
 from itertools import count
 from pathlib import Path
+from urllib.parse import quote
 
 import orjson
 from delphin import derivation, predicate
@@ -249,6 +250,12 @@ def export(conn, out_dir, grm, args):
             "profile": profile,
             "text": sent or "",
         }
+        if args.ltdb_url:
+            # grew-match shows a link button for the url meta
+            meta["url"] = (
+                f"{args.ltdb_url.rstrip('/')}/sent/{quote(profile)}/{sid}"
+                f"?grm={quote(args.db.name)}"
+            )
         fname = f"{sanitize(profile)}__{sid}.json"
         if do_trees:
             graph = deriv_to_grew(deriv_json, lextypes, meta)
@@ -297,6 +304,11 @@ def main(argv=None):
         "--trees-only", action="store_true", help="Only export derivation trees"
     )
     group.add_argument("--dmrs-only", action="store_true", help="Only export DMRS")
+    parser.add_argument(
+        "--ltdb-url",
+        help="Base URL of an LTDB instance: grew-match results then link "
+        "to its sentence pages (e.g. http://localhost:5000)",
+    )
     parser.add_argument("db", type=Path, help="LTDB SQLite database")
     args = parser.parse_args(argv)
 

@@ -24,7 +24,14 @@ ERG_(2020)-grew/
 ```
 
 Options: `--outdir DIR`, `--profiles NAME` (repeatable),
-`--trees-only`, `--dmrs-only`.
+`--trees-only`, `--dmrs-only`, `--ltdb-url BASE`.
+
+With `--ltdb-url` (e.g. `--ltdb-url http://localhost:5000`), every
+graph gets a `url` meta pointing at the LTDB sentence page
+`/sent/<profile>/<sid>?grm=<dbfile>`, and grew-match shows a link
+button on each match that jumps back into LTDB (sentence with its
+tree, DMRS and MRS).  Re-export (and recompile) if the LTDB address
+changes.
 
 To serve several grammar databases from one grew-match instance, run
 the script once per database with the same `--outdir` parent and merge
@@ -134,3 +141,25 @@ pattern { V -[1=ARG1]-> X; V -[1=ARG2]-> X }   % reflexive-ish structure
 See the [grew request documentation](https://grew.fr/doc/request/) for
 the full pattern language (negative conditions, `without`, regular
 expressions over feature values, ...).
+
+## 5. Working with the matches
+
+In the grew-match web page, click a `sent_id` in the results list to
+see the rendered graph with the matched nodes highlighted (the SVG
+button opens the image on its own; the link button — with
+`--ltdb-url` — opens the sentence in LTDB).
+
+The web interface only exports matches as TSV or CoNLL, but the
+corpora themselves are JSON: a match `ace/100` *is* the graph file
+`<corpus>/ace__100.json` in the export directory.  For a JSON list of
+all matches (sentence ids plus the matched nodes/edges), use the
+command line:
+
+```bash
+grew grep -request q.req -i OUT/<corpus> > matches.json
+```
+
+Note: the link button on dependency-rendered matches needs a
+grew_match_dream backend newer than 2026-06-11 (older versions only
+pass the `url` meta through for dot-rendered corpora; the fix is a
+two-line patch to `save_dep` in `src/gmd_utils.ml`).
