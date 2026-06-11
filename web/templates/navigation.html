@@ -53,7 +53,7 @@
           {% else %}
           {% if config.GREW_MATCH_URL %}
           <a href="{{ config.GREW_MATCH_URL }}"
-             class="nav-item nav-link" target="_blank">Grew-match</a>
+             class="nav-item nav-link" target="_blank" rel="noopener noreferrer">Grew-match</a>
           {% endif %}
           <a href="{{ url_for('help') }}"
              class="nav-item nav-link{{ ' active' if request.endpoint == 'help' }}">Help</a>
