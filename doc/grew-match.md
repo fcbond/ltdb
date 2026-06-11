@@ -116,6 +116,11 @@ grew grep -request q.req -i "ERG_(2020)-grew/ERG_2020_dmrs"
 
 (`-i` takes a single file or a directory.)
 
+Scale: the full ERG 2025 treebank (97,650 sentences, ~195k graph
+files, 2 GB) compiles in about 100 seconds; the backend then uses
+roughly 6 GB of RAM with both ERG corpora loaded and answers
+searches in a couple of seconds.
+
 ## 4. Example requests
 
 On the trees corpus:
