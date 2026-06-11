@@ -181,6 +181,7 @@ def test_main_end_to_end(gold_db, tmp_path):
     corpora = json.loads((out / "corpora.json").read_bytes())
     assert [c["id"] for c in corpora] == ["TOY_1_0_trees", "TOY_1_0_dmrs"]
     for corpus in corpora:
+        assert corpus["kind"] == "json"
         directory = Path(corpus["directory"])
         assert directory.is_dir()
         # the '{}' row is skipped: 2 of the 3 gold rows convert

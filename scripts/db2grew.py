@@ -269,6 +269,9 @@ def export(conn, out_dir, grm, args):
             corpora.append(
                 {
                     "id": cid,
+                    # kind tells grew to read the files as grew JSON
+                    # graphs (the default reader is CoNLL)
+                    "kind": "json",
                     "directory": str(directory.resolve()),
                     "files": sorted(files),
                 }

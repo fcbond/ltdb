@@ -70,11 +70,17 @@ opam install dream dep2pictlib grew
 
 ```bash
 git clone https://github.com/grew-nlp/grew_match_quick
+mkdir -p grew_match_quick/local_files/grew_match/instances
 python3 grew_match_quick/grew_match_quick.py "ERG_(2020)-grew/corpora.json"
 ```
 
-Then open <http://localhost:8000> (ports configurable with
-`--frontend_port`/`--backend_port`).
+(The `mkdir` works around the script assuming an `instances/`
+directory that newer `grew_match` checkouts no longer ship.)
+
+Once it reports ready, type `r` at its prompt the first time (and
+after re-exporting) to compile the corpora — JSON corpora are not
+compiled automatically on startup.  Then open <http://localhost:8000>
+(ports configurable with `--frontend_port`/`--backend_port`).
 
 To show a **Grew-match** link in the LTDB navigation bar, set the
 environment variable before starting the Flask app:
