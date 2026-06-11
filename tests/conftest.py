@@ -15,7 +15,8 @@ import pytest
 from web import create_app
 
 # make the scripts directory importable (for test_db2grew etc.)
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts"))
+scripts_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts")
+sys.path.insert(0, scripts_dir)
 
 # ---------------------------------------------------------------------------
 # Minimal in-memory database schema and seed data
