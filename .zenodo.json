@@ -1,0 +1,37 @@
+{
+  "title": "Linguistic Type Database (LTDB)",
+  "description": "A web application for browsing DELPH-IN grammar types with treebank frequency information. Lexical types can be seen as detailed parts-of-speech. Information about the types is constructed from linguist documentation in the grammar (a form of literate programming) and linked to frequency data from parsed treebanks.",
+  "creators": [
+    {
+      "name": "Bond, Francis",
+      "affiliation": "Palacký University Olomouc",
+      "orcid": "0000-0003-4973-8068"
+    },
+    {
+      "name": "Goodman, Michael Wayne"
+    },
+    {
+      "name": "Morgado da Costa, Luís"
+    },
+    {
+      "name": "Hashimoto, Chikara"
+    }
+  ],
+  "license": "MIT",
+  "upload_type": "software",
+  "keywords": [
+    "DELPH-IN",
+    "HPSG",
+    "grammar engineering",
+    "linguistic type database",
+    "treebank",
+    "natural language processing"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/fcbond/ltdb",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ]
+}

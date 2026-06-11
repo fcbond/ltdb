@@ -2,6 +2,17 @@ DPF:
  * how many examples should I show?
  * can we lose backticks (use consistent formatting: italic is '')
 
+ * Docstring tag cleanup:
+   * Check all recognized tags are documented in README and DELPH-IN docs.
+   * Some legacy tags in current DBs may be errors:
+     * <ew> probably should be <ex>.
+     * <type val="..."> is probably obsolete now that docstrings attach to
+       types directly; val may no longer be needed.
+   * Decide how to render remaining tags now displayed literally/escaped:
+     <native>, <ipa/>, <math/>, <name-en>, <anti-synsem>, <eol>.
+   * Current supported section tags: <description>, <features>, <history>,
+     <notes>, <todo>.
+
 
 * look at lisp with John
   * prettier lisp

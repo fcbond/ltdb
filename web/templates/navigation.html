@@ -1,38 +1,42 @@
 <header>
-  <nav class="navbar fixed-top navbar-expand-sm navbar-light bg-light">
+  <nav class="navbar fixed-top navbar-expand-md navbar-light bg-white border-bottom app-nav">
       <div class="container-fluid">
-        <a href="{{ url_for('home') }}" class="navbar-brand"><img width=50
-					   src="{{ url_for('static',
-					   filename='img/ltdb.png')
-					   }}"/>Grammars</a>
-        <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarCollapse">
+        <a href="{{ url_for('home') }}" class="navbar-brand">
+          <img class="brand-mark" width="40" height="40"
+               src="{{ url_for('static', filename='img/ltdb.png') }}"
+               alt="">LTDB
+        </a>
+        <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarCollapse">
-	  {% if grm %}
+          {% if grm %}
 
-          <div class="navbar-nav">
-	    <a href="{{ url_for('grammar') }}"
-	       class="nav-item nav-link{{ ' active' if request.endpoint == 'grammar' }}">{{grm}}</a>
-	    <a href="{{ url_for('rules') }}"
-	       class="nav-item nav-link{{ ' active' if request.endpoint == 'rules' }}">Rules</a>
-	    <a href="{{ url_for('ltypes') }}"
-	       class="nav-item nav-link{{ ' active' if request.endpoint == 'ltypes' }}">Lexical Types</a>
-	    <a href="{{ url_for('demo') }}"
-	       class="nav-item nav-link{{ ' active' if request.endpoint == 'demo' }}">Demo</a>
-	  </div>
-	  {% endif %}
-	    <a href="{{ url_for('help') }}"
-	       class="nav-item nav-link{{ ' active' if request.endpoint == 'help' }}">Help</a>
-	    <form action="{{ url_for('submit_fsearch') }}" method="post" class="form-inline my-2 my-lg-0">
-              <input type="text" id="search" name="search" required placeholder="lemma/type/predicate">
-	      <button type="submit" class="btn btn-outline-secondary">
-		🔍
-              </button>
-	    </form>
-	    
-	  
-	</div>
+          <div class="navbar-nav me-auto">
+            <a href="{{ url_for('grammar') }}"
+               class="nav-item nav-link{{ ' active' if request.endpoint == 'grammar' }}">{{grm}}</a>
+            <a href="{{ url_for('rules') }}"
+               class="nav-item nav-link{{ ' active' if request.endpoint == 'rules' }}">Rules</a>
+            <a href="{{ url_for('ltypes') }}"
+               class="nav-item nav-link{{ ' active' if request.endpoint == 'ltypes' }}">Lexical Types</a>
+            <a href="{{ url_for('demo') }}"
+               class="nav-item nav-link{{ ' active' if request.endpoint == 'demo' }}">Demo</a>
+            <form action="{{ url_for('submit_fsearch') }}" method="post" class="nav-search d-flex">
+              <input type="search" id="nav-search" name="search" class="form-control form-control-sm" required placeholder="lemma/type/predicate" aria-label="Search">
+              <button type="submit" class="btn btn-outline-secondary btn-sm" aria-label="Search">Search</button>
+            </form>
+          </div>
+          {% else %}
+          <div class="navbar-nav me-auto">
+            <form action="{{ url_for('submit_fsearch') }}" method="post" class="nav-search d-flex">
+              <input type="search" id="nav-search" name="search" class="form-control form-control-sm" required placeholder="lemma/type/predicate" aria-label="Search">
+              <button type="submit" class="btn btn-outline-secondary btn-sm" aria-label="Search">Search</button>
+            </form>
+          </div>
+          {% endif %}
+          <a href="{{ url_for('help') }}"
+             class="nav-item nav-link{{ ' active' if request.endpoint == 'help' }}">Help</a>
+        </div>
       </div>
   </nav>
 </header>

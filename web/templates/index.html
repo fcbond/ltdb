@@ -1,7 +1,6 @@
 {% extends 'layout.html' %}
 
 {% block css %}
-<link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
 <style>
   #loadingOverlay {
     display: none;
@@ -28,7 +27,7 @@
   <p class="text-muted" id="loadingMsg">Loading grammar…</p>
 </div>
 
-<div class="container">
+<section>
   <h1>Overview</h1>
   <p>The Linguistic Type Database (LTDB) documents <a href="https://delph-in.github.io/docs/home/HomePage">DELPH-IN</a> grammars —
   large-scale precision grammars for natural language processing. Select a grammar below, then:</p>
@@ -50,7 +49,8 @@
     <input type="hidden" id="grmInput" name="grm" value="">
   </form>
 
-  <table id="grammarTable" class="table table-hover table-sm" style="width:100%">
+  <div class="table-responsive">
+  <table id="grammarTable" class="table table-hover table-sm w-100">
     <thead>
       <tr>
         <th>Grammar</th>
@@ -78,6 +78,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 
   <p>There is <a href='https://delph-in.github.io/docs/garage/LkbLtdb/'>more documentation</a> on the DELPH-IN wiki (somewhat out of date).</p>
   
@@ -96,7 +97,7 @@
     <dd><a href="https://aclanthology.org/I05-6004/">Integration of a Lexical Type Database with a Linguistically Interpreted Corpus</a>. In <i><a href="https://aclanthology.org/volumes/I05-6/">Proceedings of the Sixth International Workshop on Linguistically Interpreted Corpora (LINK-2005)</a></i>, 31–40, Cheju, Korea.</dd>
   </dl>
 
-</div>
+</section>
 {% endblock %}
 
 {% block scripts %}

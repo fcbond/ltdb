@@ -1,7 +1,6 @@
 {% extends 'layout.html' %}
 
 {% block css %}
-<link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='css/delphin-viz.css') }}" rel="stylesheet">
 <script src="{{ url_for('static', filename='js/tree.js') }}" ></script>
 <script src="{{ url_for('static', filename='js/dmrs.js') }}" ></script>
@@ -9,15 +8,13 @@
 <script src="{{ url_for('static', filename='js/svg.js') }}" ></script>
 <script src="https://d3js.org/d3.v3.js"></script>
 <style>
-  .result-card { margin-bottom: 1.5rem; }
-  .result-viz { overflow-x: auto; padding: 0.5rem 0; max-width: 100%; }
   #spinner { display: none; }
   #inputText::-webkit-calendar-picker-indicator { display: none !important; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container">
+<section>
   <h1>Parse Demo</h1>
 
   {% if not grammars %}
@@ -31,14 +28,12 @@
     <div class="row g-2 align-items-end mb-3">
       <div class="col-md-6">
         <label for="inputText" class="form-label">Input sentence</label>
-        <div style="position:relative">
+        <div class="demo-input-wrap">
           <input type="text" id="inputText" name="input" class="form-control"
                  list="exampleList" placeholder="Type or choose an example…"
-                 style="padding-right:2rem" required>
+                 required>
           <button type="button" id="clearInput" tabindex="-1" title="Clear to browse history"
-                  style="position:absolute;right:.5rem;top:50%;transform:translateY(-50%);
-                         border:none;background:none;color:#6c757d;font-size:1.1rem;
-                         line-height:1;padding:0;display:none">&#215;</button>
+                  class="input-clear">&#215;</button>
         </div>
         <datalist id="exampleList"></datalist>
       </div>
@@ -97,11 +92,10 @@
   <div id="results"></div>
 
   {# tooltip element required by dmrs.js #}
-  <div id="tooltip" class="tooltip" style="opacity:0; position:absolute; background:#fff;
-       border:1px solid #ccc; padding:4px; pointer-events:none;"></div>
+  <div id="tooltip" class="tooltip"></div>
 
   {% endif %}
-</div>
+</section>
 {% endblock %}
 
 {% block scripts %}

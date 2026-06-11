@@ -102,6 +102,14 @@ tags are also recognised:
 - `<nex>text` — ungrammatical example (prefixed ∗)
 - `<mex>text` — marginal example (prefixed ⊛)
 - `<name lang='xx'>Name</name>` — name of the type in language `xx`
+- `<description>text` — starts a Description section
+- `<features>` — starts a Features section
+- `<history>` — starts a History section
+- `<notes>` — starts a Notes section
+- `<todo>` — starts a Todo section
+
+Raw HTML in docstrings is escaped. Tags that are not listed above are displayed
+literally until they are explicitly supported.
 
 There is `more documentation <http://moin.delph-in.net/LkbLtdb>`__ at
 the DELPH-IN Wiki.

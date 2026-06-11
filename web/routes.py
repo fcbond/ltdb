@@ -5,8 +5,11 @@ import os
 import pathlib
 import re as _re
 import shutil
+import sqlite3
 import sys
 import traceback
+from functools import lru_cache
+from urllib.parse import quote
 
 from delphin.highlight import TDLLexer
 from flask import current_app as app
@@ -16,6 +19,7 @@ from pygments.formatters import HtmlFormatter
 
 from .db import (
     get_db,
+    get_doctest,
     get_gold,
     get_ltypes,
     get_lxid,
@@ -40,14 +44,22 @@ PYGMENTS_CSS = _tdl_formatter.get_style_defs(".highlight")
 _type_span_re = _re.compile(r'<span class="(nc|n)">([^<]+)</span>')
 
 
-def tdl2html(tdl_str):
+def tdl2html(tdl_str, grm=None):
     """Render a TDL string to syntax-highlighted HTML with clickable type links."""
     if not tdl_str:
         return ""
     html = highlight(tdl_str, TDLLexer(), _tdl_formatter)
+    endpoint = request.endpoint or ""
+    render_url_for = app.jinja_env.globals.get("url_for", url_for)
+
+    def href_for_type(query):
+        if endpoint.startswith("mirror_"):
+            return _mirror_type_href(grm, query, render_url_for)
+        return render_url_for("type", query=query)
+
     return _type_span_re.sub(
         lambda m: (
-            f'<a href="{url_for("type", query=m.group(2))}"'
+            f'<a href="{href_for_type(m.group(2))}"'
             f' class="{m.group(1)}">{m.group(2)}</a>'
         ),
         html,
@@ -55,16 +67,158 @@ def tdl2html(tdl_str):
 
 
 current_directory = os.path.abspath(os.path.dirname(__file__))
+FULL_LTDB_BASE_URL = os.environ.get(
+    "FULL_LTDB_BASE_URL", "https://compling.upol.cz/ltdb"
+)
+STATIC_MIRROR_STATUSES = {
+    status.strip()
+    for status in os.environ.get(
+        "STATIC_MIRROR_STATUSES", "lex-type,rule,lex-rule,root"
+    ).split(",")
+    if status.strip()
+}
+STATIC_MIRROR_ALL_NON_LEX = os.environ.get("STATIC_MIRROR_ALL_NON_LEX") == "1"
+STATIC_MIRROR_DYNAMIC_TYPES = os.environ.get("STATIC_MIRROR_DYNAMIC_TYPES") == "1"
+
+
+def _is_mirror_request():
+    endpoint = request.endpoint or ""
+    return endpoint.startswith("mirror_")
+
+
+def _mirror_grm():
+    if request.view_args and request.view_args.get("grm"):
+        return request.view_args["grm"]
+    grm = session.get("grm")
+    if grm:
+        return grm[:-3] if grm.endswith(".db") else grm
+    return None
+
+
+def _full_type_href(grm, query):
+    db = _db_for_stem(grm)
+    return f"{FULL_LTDB_BASE_URL.rstrip('/')}/type/{quote(query)}?grm={quote(db)}"
+
+
+@lru_cache(maxsize=50000)
+def _mirror_type_status(grm, query):
+    db = _db_for_stem(grm)
+    path = os.path.join(current_directory, "db", db)
+    if not os.path.isfile(path):
+        return None
+    with sqlite3.connect(path) as conn:
+        row = conn.execute(
+            "SELECT status FROM types WHERE typ = ? LIMIT 1", (query,)
+        ).fetchone()
+    return row[0] if row else None
+
+
+def _mirror_has_static_type(grm, query):
+    status = _mirror_type_status(grm, query)
+    if STATIC_MIRROR_ALL_NON_LEX:
+        return status not in (None, "lex-entry", "generic-lex-entry")
+    return status in STATIC_MIRROR_STATUSES
+
+
+def _mirror_type_href(grm, query, render_url_for):
+    if STATIC_MIRROR_DYNAMIC_TYPES:
+        return render_url_for(
+            "mirror_type_shell",
+            grammar=_stem_for_grm(grm),
+            type=query,
+        )
+    if _mirror_has_static_type(grm, query):
+        return render_url_for("mirror_type", grm=_stem_for_grm(grm), query=query)
+    return _full_type_href(grm, query)
+
+
+@app.context_processor
+def _inject_static_mirror_helpers():
+    def render_url_for(*args, **kwargs):
+        return app.jinja_env.globals.get("url_for", url_for)(*args, **kwargs)
+
+    def type_href(query):
+        if _is_mirror_request():
+            if query == "":
+                base = render_url_for("mirror_grammar", grm=_mirror_grm()).rsplit(
+                    "/", 1
+                )[0]
+                return f"{base}/type/"
+            return _mirror_type_href(_mirror_grm(), query, render_url_for)
+        if query == "":
+            return "/type/"
+        return render_url_for("type", query=query)
+
+    def grammar_href(grm=None):
+        if _is_mirror_request():
+            grm = grm or _mirror_grm()
+            return render_url_for("mirror_grammar", grm=_stem_for_grm(grm))
+        return render_url_for("grammar")
+
+    def rules_href():
+        if _is_mirror_request():
+            return render_url_for("mirror_rules", grm=_mirror_grm())
+        return render_url_for("rules")
+
+    def ltypes_href():
+        if _is_mirror_request():
+            return render_url_for("mirror_ltypes", grm=_mirror_grm())
+        return render_url_for("ltypes")
+
+    def example_db_href(grm=None):
+        grm = _stem_for_grm(grm or _mirror_grm())
+        return f"../../db/{grm}.examples.sqlite"
+
+    return {
+        "is_static_mirror": _is_mirror_request(),
+        "static_mirror_all_non_lex": STATIC_MIRROR_ALL_NON_LEX,
+        "static_mirror_statuses": STATIC_MIRROR_STATUSES,
+        "full_ltdb_base_url": FULL_LTDB_BASE_URL.rstrip("/"),
+        "type_href": type_href,
+        "grammar_href": grammar_href,
+        "rules_href": rules_href,
+        "ltypes_href": ltypes_href,
+        "example_db_href": example_db_href,
+    }
 
 
 def _grm_exists(grm):
     """Return True if a .db file exists for the given grammar name."""
-    return os.path.isfile(os.path.join(current_directory, "db", grm))
+    path = os.path.join(current_directory, "db", grm)
+    if not os.path.isfile(path) or os.path.getsize(path) == 0:
+        return False
+    with sqlite3.connect(path) as conn:
+        tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+    return {"gold", "lexfreq", "meta", "sent", "types"}.issubset(tables)
+
+
+def _db_for_stem(stem):
+    """Return the .db filename for a mirror grammar stem."""
+    return stem if stem.endswith(".db") else f"{stem}.db"
+
+
+def _stem_for_grm(grm):
+    """Return a mirror URL grammar stem for a .db filename or stem."""
+    return grm[:-3] if grm and grm.endswith(".db") else grm
+
+
+def _all_grammars():
+    grammars = []
+    for file in os.listdir(os.path.join(current_directory, "db")):
+        if file.endswith(".db") and _grm_exists(file):
+            grammars.append(file)
+    grammars.sort()
+    return grammars
 
 
 @app.before_request
 def _apply_grm_param():
-    """If ?grm= is in the query string and the grammar exists, store it in the session."""
+    """Store ?grm= in the session when the requested grammar exists."""
     grm = request.args.get("grm")
     if not grm:
         return
@@ -97,7 +251,7 @@ def _ace_error_message(exc: Exception, dat: str) -> str:
             "ACE failed: too many open files. "
             "The server may be under heavy load; try again in a moment."
         )
-    if "FileNotFoundError" in type(exc).__name__ or "No such file" in msg:
+    if "FileNotFoundError" in exc.__class__.__name__ or "No such file" in msg:
         return (
             "ACE binary not found. "
             "Run scripts/setup_ace.py to install a platform-appropriate binary, "
@@ -137,13 +291,7 @@ def find_ace():
 @app.route("/", methods=["GET", "POST"])
 def home():
     """show the home page"""
-    grammars = []
-    # Iterate directory
-    for file in os.listdir(os.path.join(current_directory, "db")):
-        # check only text files
-        if file.endswith(".db"):
-            grammars.append(file)
-    grammars.sort()
+    grammars = _all_grammars()
     summ = get_short_summary(current_directory, grammars)
     if "grm" in request.form:
         session["grm"] = request.form["grm"]
@@ -181,6 +329,21 @@ def grammar():
     )
 
 
+def _render_grammar(grm):
+    conn = get_db(current_directory, grm)
+    md = get_md(conn)
+    summ = get_summary(conn)
+    tsumm = get_tb_summary(conn)
+    return render_template(
+        "grammar.html",
+        title=md["GRAMMAR_NAME"],
+        meta=md,
+        grm=grm,
+        summ=summ,
+        tsumm=tsumm,
+    )
+
+
 @app.route("/rules.html")
 def rules():
     """show the rules"""
@@ -194,6 +357,13 @@ def rules():
     return render_template("rules.html", meta=md, data=data, grm=grm)
 
 
+def _render_rules(grm):
+    conn = get_db(current_directory, grm)
+    md = get_md(conn)
+    data = get_rules(conn)
+    return render_template("rules.html", meta=md, data=data, grm=grm)
+
+
 @app.route("/ltypes.html")
 def ltypes():
     """show the lexical types"""
@@ -202,6 +372,20 @@ def ltypes():
         return redirect(url_for("home"))
     conn = get_db(current_directory, grm)
 
+    md = get_md(conn)
+    data = get_ltypes(conn)
+    words = get_wrds_by_ltypes(conn)
+    return render_template(
+        "ltypes.html",
+        meta=md,
+        data=data,
+        words=words,
+        grm=grm,
+    )
+
+
+def _render_ltypes(grm):
+    conn = get_db(current_directory, grm)
     md = get_md(conn)
     data = get_ltypes(conn)
     words = get_wrds_by_ltypes(conn)
@@ -234,7 +418,12 @@ def type(query):
     grm = session.get("grm")
     if not grm:
         return redirect(url_for("home"))
+    return _render_type(grm, query)
+
+
+def _render_type(grm, query):
     conn = get_db(current_directory, grm)
+    include_examples = not _is_mirror_request()
 
     typeinfo = get_type(conn, query)
     lexids = []
@@ -254,31 +443,34 @@ def type(query):
 
             words = get_wrds_by_lexids(conn, list(lexids.keys()))
 
-            maxp, phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
+            if include_examples:
+                maxp, phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
 
-            sents = get_sents(conn, list(phenomena.keys()))
+                sents = get_sents(conn, list(phenomena.keys()))
 
-            gold = get_gold(conn, list(phenomena.keys()))
+                gold = get_gold(conn, list(phenomena.keys()), convert=False)
         elif status == "lex-entry":
             lexids = get_lxid(conn, query)
 
             words = get_wrds_by_lexids(conn, list(lexids.keys()))
 
-            maxp, phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
+            if include_examples:
+                maxp, phenomena = get_phenomena_by_lexids(conn, list(lexids.keys()))
 
-            sents = get_sents(conn, list(phenomena.keys()))
+                sents = get_sents(conn, list(phenomena.keys()))
 
-            gold = get_gold(conn, list(phenomena.keys()))
+                gold = get_gold(conn, list(phenomena.keys()), convert=False)
 
             lexids = []
             words = []
 
         elif status in ("root", "rule", "lex-rule"):
-            maxp, phenomena = get_phenomena_by_cx(conn, query)
+            if include_examples:
+                maxp, phenomena = get_phenomena_by_cx(conn, query)
 
-            sents = get_sents(conn, list(phenomena.keys()))
+                sents = get_sents(conn, list(phenomena.keys()))
 
-            gold = get_gold(conn, list(phenomena.keys()))
+                gold = get_gold(conn, list(phenomena.keys()), convert=False)
 
             lexids = []
             words = []
@@ -290,13 +482,15 @@ def type(query):
         "mrsj": "[MRS]",
     }
 
+    doctest_summary, doctest_examples = get_doctest(conn, query)
+
     return render_template(
         "type.html",
         query=query,
         info=typeinfo,
         grm=grm,
         desc=desc,
-        tdl_html=tdl2html(typeinfo.get("tdl") if typeinfo else None),
+        tdl_html=tdl2html(typeinfo.get("tdl") if typeinfo else None, grm),
         pygments_css=PYGMENTS_CSS,
         lexids=lexids,
         words=words,
@@ -305,13 +499,76 @@ def type(query):
         sents=sents,
         gold=gold,
         results=results,
+        doctest_summary=doctest_summary,
+        doctest_examples=doctest_examples,
+    )
+
+
+@app.route("/ltdb/")
+def mirror_home():
+    """Static mirror landing page for Frozen-Flask."""
+    grammars = _all_grammars()
+    summ = get_short_summary(current_directory, grammars)
+    return render_template(
+        "index.html",
+        page="index",
+        title="LTDB Static Mirror",
+        grammars=grammars,
+        summ=summ,
+        grm=None,
+    )
+
+
+@app.route("/ltdb/<path:grm>/grammar.html")
+def mirror_grammar(grm):
+    """Static mirror grammar summary page."""
+    db = _db_for_stem(grm)
+    if not _grm_exists(db):
+        return redirect(url_for("mirror_home"))
+    return _render_grammar(db)
+
+
+@app.route("/ltdb/<path:grm>/rules.html")
+def mirror_rules(grm):
+    """Static mirror rules page."""
+    db = _db_for_stem(grm)
+    if not _grm_exists(db):
+        return redirect(url_for("mirror_home"))
+    return _render_rules(db)
+
+
+@app.route("/ltdb/<path:grm>/ltypes.html")
+def mirror_ltypes(grm):
+    """Static mirror lexical type page."""
+    db = _db_for_stem(grm)
+    if not _grm_exists(db):
+        return redirect(url_for("mirror_home"))
+    return _render_ltypes(db)
+
+
+@app.route("/ltdb/<path:grm>/type/<query>.html")
+def mirror_type(grm, query):
+    """Static mirror type page."""
+    db = _db_for_stem(grm)
+    if not _grm_exists(db):
+        return redirect(url_for("mirror_home"))
+    return _render_type(db, query)
+
+
+@app.route("/ltdb/type.html")
+def mirror_type_shell():
+    """Static mirror client-side type viewer shell."""
+    return render_template(
+        "type_shell.html",
+        title="LTDB Static Type Viewer",
+        grm=None,
     )
 
 
 def dat_path_for(grm):
-    """Return the .dat path for a grammar filename, or None if it doesn't exist."""
+    """Return the .dat path for a grammar, or None if missing or empty."""
     dat = os.path.join(current_directory, "db", grm[:-3] + ".dat")
-    return dat if os.path.exists(dat) else None
+    return dat if os.path.isfile(dat) and os.path.getsize(dat) > 0 else None
 
 
 @app.route("/demo")
@@ -357,7 +614,7 @@ def parse_sentence():
     """Parse a sentence with ACE and return JSON in delphin-viz format."""
     from delphin.ace import ACEParser
     from delphin import dmrs as dmrs_module
-    from delphin.codecs import dmrsjson, mrsjson
+    from delphin.codecs import dmrsjson, mrsjson, simplemrs
 
     grm = request.form.get("grm") or session.get("grm")
     if not grm:
@@ -382,7 +639,9 @@ def parse_sentence():
     want_dmrs = request.form.get("dmrs") == "json"
 
     try:
-        with ACEParser(dat, executable=find_ace(), cmdargs=[f"-n{n_results}"]) as parser:
+        with ACEParser(
+            dat, executable=find_ace(), cmdargs=[f"-n{n_results}", "-L"]
+        ) as parser:
             response = parser.interact(input_text)
     except Exception as e:
         return jsonify({"error": _ace_error_message(e, dat)}), 500
@@ -394,9 +653,7 @@ def parse_sentence():
 
         if want_derivation:
             try:
-                r["derivation"] = result.derivation().to_dict(
-                    fields=["id", "entity", "score", "form", "tokens"]
-                )
+                r["derivation"] = result.derivation().to_dict()
             except Exception as e:
                 r["derivation"] = None
                 errors.append(f"result {i} derivation: {e}")
@@ -405,20 +662,18 @@ def parse_sentence():
             mrs_obj = None
             try:
                 mrs_obj = result.mrs()
-                if want_mrs:
-                    r["mrs"] = json.loads(mrsjson.encode(mrs_obj))
+                # mrs_str: simplemrs string for browser-side LTDBMrs rendering
+                # mrs: mrsjson dict kept for the generate endpoint
+                r["mrs_str"] = simplemrs.encode(mrs_obj)
+                r["mrs"] = json.loads(mrsjson.encode(mrs_obj))
             except Exception as e:
                 r["mrs"] = None
                 errors.append(f"result {i} mrs: {e}")
-
-            if want_dmrs:
-                try:
-                    r["dmrs"] = json.loads(
-                        dmrsjson.encode(dmrs_module.from_mrs(mrs_obj))
-                    )
-                except Exception as e:
-                    r["dmrs"] = None
-                    errors.append(f"result {i} dmrs: {e}")
+                # Fall back to the raw ACE MRS string so the browser can still
+                # attempt rendering even when pydelphin cannot parse it
+                raw = result.get("mrs")
+                if raw and isinstance(raw, str):
+                    r["mrs_str"] = raw
 
         results.append(r)
 

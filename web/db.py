@@ -14,11 +14,16 @@ sentlim = 8
 
 
 def get_db(root, db):
+    if "db" in g and g.get("db_name") != db:
+        g.db.close()
+        g.pop("db", None)
+        g.pop("db_name", None)
     if "db" not in g:
         g.db = sqlite3.connect(
             os.path.join(root, f"db/{db}")
             # detect_types=sqlite3.PARSE_DECLTYPES
         )
+        g.db_name = db
     #        g.db.row_factory = sqlite3.Row
     return g.db
 
@@ -28,6 +33,7 @@ def close_db(e=None):
 
     if db is not None:
         db.close()
+    g.pop("db_name", None)
 
 
 ############################################################
@@ -410,12 +416,12 @@ def get_sents(conn, psids):
     return sents
 
 
-def get_gold(conn, psids):
+def get_gold(conn, psids, convert=True):
     """Given a list of (profile, sid), return per-sentence linguistic data.
 
     Keys per (profile, sid): 'mrs', 'mrsj', 'dmrsj', 'derivj', 'deriv', 'item'.
-    'derivj'/'mrsj'/'dmrsj' are computed on the fly; 'deriv' is the raw UDF
-    string used as a fallback in templates when derivj is None.
+    If convert is true, 'derivj'/'mrsj'/'dmrsj' are computed on the fly. The
+    raw 'deriv' and 'mrs' strings are always returned for browser rendering.
     """
     if not psids:
         return dd(dict)
@@ -428,12 +434,18 @@ def get_gold(conn, psids):
         params,
     )
     for prof, sid, deriv, mrs, sent in c:
-        mrs_d, dmrs_d = mrs_to_dicts(mrs)
         data[prof, sid]["mrs"] = mrs
-        data[prof, sid]["mrsj"] = mrs_d
-        data[prof, sid]["dmrsj"] = dmrs_d
-        data[prof, sid]["derivj"] = deriv_to_dict(deriv)
-        data[prof, sid]["deriv"] = deriv  # raw UDF; shown as fallback when derivj is None
+        if convert:
+            mrs_d, dmrs_d = mrs_to_dicts(mrs)
+            data[prof, sid]["mrsj"] = mrs_d
+            data[prof, sid]["dmrsj"] = dmrs_d
+            data[prof, sid]["derivj"] = deriv_to_dict(deriv)
+        else:
+            data[prof, sid]["mrsj"] = None
+            data[prof, sid]["dmrsj"] = None
+            data[prof, sid]["derivj"] = None
+        # Raw UDF; shown as fallback when derivj is None.
+        data[prof, sid]["deriv"] = deriv
         data[prof, sid]["item"] = sent
     return data
 
@@ -502,6 +514,30 @@ _summary_cache: dict = {}
 _tb_summary_cache: dict = {}
 
 
+def _has_ltdb_summary_schema(path):
+    """Return True if a database has the tables used by summary queries."""
+    if not os.path.isfile(path) or os.path.getsize(path) == 0:
+        return False
+    with sqlite3.connect(path) as conn:
+        tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+    return {"gold", "lexfreq", "meta", "sent", "types"}.issubset(tables)
+
+
+def _valid_grammar_files(db_dir):
+    """Return grammar database filenames with the LTDB summary schema."""
+    return sorted(
+        file
+        for file in os.listdir(db_dir)
+        if file.endswith(".db")
+        and _has_ltdb_summary_schema(os.path.join(db_dir, file))
+    )
+
+
 def warm_caches(current_directory):
     """Pre-populate all summary caches at server startup.
 
@@ -511,12 +547,64 @@ def warm_caches(current_directory):
     db_dir = os.path.join(current_directory, "db")
     if not os.path.isdir(db_dir):
         return
-    grammars = sorted(f for f in os.listdir(db_dir) if f.endswith(".db"))
+    grammars = _valid_grammar_files(db_dir)
     get_short_summary(current_directory, grammars)
     for grm in grammars:
         with sqlite3.connect(os.path.join(db_dir, grm)) as conn:
             get_summary(conn, grm)
             get_tb_summary(conn, grm)
+
+
+def get_doctest(conn, typ):
+    """Return docstring test results for *typ*.
+
+    Returns a tuple (summary, examples) where:
+      summary  — dict mapping kind ('ex','nex','mex') →
+                 {'total': int, 'pass': int, 'fail': dict[verdict→count]}
+      examples — list of dicts with keys: sent, kind, wf, n_parses,
+                 type_found, pass, verdict
+
+    Returns (None, None) if the doctest table does not exist or has no rows
+    for this type.
+    """
+    c = conn.cursor()
+    try:
+        c.execute(
+            """SELECT sent, kind, wf, n_parses, type_found, pass, verdict
+               FROM doctest WHERE typ=? ORDER BY kind, sent""",
+            (typ,),
+        )
+    except sqlite3.OperationalError:
+        return None, None
+
+    examples = [
+        {
+            "sent": sent,
+            "kind": kind,
+            "wf": wf,
+            "n_parses": n_parses,
+            "type_found": type_found,
+            "pass": ok,
+            "verdict": verdict,
+        }
+        for sent, kind, wf, n_parses, type_found, ok, verdict in c
+    ]
+    if not examples:
+        return None, None
+
+    summary = {}
+    for ex in examples:
+        k = ex["kind"]
+        if k not in summary:
+            summary[k] = {"total": 0, "pass": 0, "fail": {}}
+        summary[k]["total"] += 1
+        if ex["pass"]:
+            summary[k]["pass"] += 1
+        else:
+            v = ex["verdict"]
+            summary[k]["fail"][v] = summary[k]["fail"].get(v, 0) + 1
+
+    return summary, examples
 
 
 def get_short_summary(current_directory, grammars):

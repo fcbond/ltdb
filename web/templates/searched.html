@@ -1,14 +1,10 @@
 {% extends 'layout.html' %}
 
-{% block css %}
-<link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
-{% endblock %}
-
 {% block content %}
 
 <!-- Color and sort according to type   -->
 
-<div class="container">
+<section>
   {%- if results %}
   <h1>Results for: <code>{{searched}}</code></h1>
 
@@ -30,13 +26,5 @@
     {%- else %}
  <h1>No result for:  <code>{{searched}}</code></h1>
  {%- endif %}
+</section>
   {% endblock %}
-
-{% block scripts %}
-  <script>
-    $(document).ready(function () {
-	$('#data').DataTable({"pageLength": 25,
-			      "lengthMenu": [ [25, 50, 100, -1], [25, 50, 100, "All"] ]});
-    });
-  </script>
-{% endblock %}

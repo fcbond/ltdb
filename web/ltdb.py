@@ -10,9 +10,20 @@ from markdown_it import MarkdownIt
 
 _log = logging.getLogger(__name__)
 
-_md = MarkdownIt()
+_md = MarkdownIt("commonmark", {"html": False})
 
 _namere = re.compile(r"""<name\s+lang=["'](.*)['"]>(.*)</name>""")
+_section_tags = {
+    "description": "Description",
+    "features": "Features",
+    "history": "History",
+    "notes": "Notes",
+    "todo": "Todo",
+}
+_section_tag_re = re.compile(
+    r"""^<({})>\s*(.*)$""".format("|".join(_section_tags)),
+    re.IGNORECASE,
+)
 
 
 def munge_desc(typ, description):
@@ -54,7 +65,15 @@ def munge_desc(typ, description):
             if m:
                 nams.append((typ, m.group(1), m.group(2)))
             else:
-                desc.append(line)
+                m = _section_tag_re.match(line)
+                if m:
+                    title = _section_tags[m.group(1).lower()]
+                    rest = m.group(2).strip()
+                    desc.append(f"\n### {title}\n")
+                    if rest:
+                        desc.append(rest)
+                else:
+                    desc.append(line)
     return "\n".join(desc), exes, nams
 
 

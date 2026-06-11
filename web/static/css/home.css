@@ -1,26 +1,191 @@
 body {
     margin: 0;
-    font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif
+    min-height: 100vh;
+    background: #f5f7fa;
+    color: #1f2933;
+    font-family: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+    line-height: 1.5;
 }
 
-nav {
-    margin: 0;
-    padding: 30px 50px;
-    background: #e8e8e8;
+.app-nav {
+    padding: 0.4rem 1rem;
 }
 
-nav a {
-    margin-right: 30px;
-    color: #597a96;
-    text-decoration: none;
+.brand-mark {
+    margin-right: 0.5rem;
+    vertical-align: middle;
 }
 
-.container {
-    padding: 50px;
+.app-shell {
+    width: min(100% - 2rem, 1180px);
+    margin: 0 auto;
+    padding: 5.75rem 0 2.5rem;
+}
+
+.app-footer {
+    width: min(100% - 2rem, 1180px);
+    margin: 0 auto;
+    padding: 1.5rem 0 2rem;
+    border-top: 1px solid #d9e2ec;
+    color: #52606d;
+    font-size: 0.9rem;
+}
+
+.nav-search {
+    gap: 0.4rem;
+    margin: 0.5rem 0 0;
+}
+
+.nav-search .form-control {
+    width: min(18rem, 60vw);
+    padding: 0.15rem 0.45rem;
+    line-height: 1.25;
+}
+
+.nav-search .btn {
+    padding: 0.15rem 0.5rem;
+    line-height: 1.25;
 }
 
 h1 {
     margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: clamp(1.75rem, 3vw, 2.4rem);
+    letter-spacing: 0;
+}
+
+h2, h3 {
+    margin-top: 1.75rem;
+    letter-spacing: 0;
+}
+
+a {
+    color: #1f6f8b;
+}
+
+.table {
+    background: #fff;
+}
+
+.table-responsive {
+    margin-bottom: 1.5rem;
+}
+
+.sentence-list {
+    display: grid;
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.sentence-item {
+    background: #fff;
+    border: 1px solid #d9e2ec;
+    border-radius: 6px;
+    min-width: 0;
+    padding: 1rem;
+}
+
+.sentence-head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+}
+
+.sentence-text {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.sentence-mrs-input {
+    font-size: 1.2rem;
+}
+
+.sentence-actions {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    justify-content: flex-start;
+    margin-top: 0;
+}
+
+.viz-panel {
+    margin-top: 0.75rem;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.demo-input-wrap {
+    position: relative;
+}
+
+.demo-input-wrap .form-control {
+    padding-right: 2rem;
+}
+
+.input-clear {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    border: 0;
+    background: transparent;
+    color: #6c757d;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0;
+}
+
+.result-card {
+    margin-bottom: 1.25rem;
+    border-radius: 6px;
+}
+
+.result-viz {
+    overflow-x: auto;
+    padding: 0.5rem 0;
+    max-width: 100%;
+}
+
+.result-card .card-header {
+    flex-wrap: wrap;
+}
+
+.tooltip {
+    opacity: 0;
+    position: absolute;
+    background: #fff;
+    border: 1px solid #bcccdc;
+    border-radius: 4px;
+    padding: 0.35rem 0.5rem;
+    pointer-events: none;
+}
+
+@media (min-width: 768px) {
+    .nav-search {
+        margin: 0 0 0 1rem;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .app-shell {
+        width: min(100% - 1rem, 1180px);
+        padding-top: 5rem;
+    }
+
+    .sentence-head {
+        display: block;
+    }
+
+    .sentence-actions {
+        justify-content: flex-start;
+        margin-top: 0.75rem;
+    }
 }
 
 /* check colors */
