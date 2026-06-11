@@ -1,0 +1,220 @@
+"""Tests for scripts/db2grew.py (grew JSON corpus export)."""
+
+import json
+import sqlite3
+from pathlib import Path
+
+import db2grew
+import pytest
+
+TABLES_SQL = Path(__file__).resolve().parent.parent / "scripts" / "tables.sql"
+
+UDF = (
+    "(731 sb-hd_mc_c 0.0 0 3"
+    " (729 sp-hd_n_c 0.0 0 2"
+    '  (726 the_1 0.0 0 1 ("the"))'
+    "  (728 n_sg_ilr 0.0 1 2"
+    '   (727 dog_n1 0.0 1 2 ("dog"))))'
+    " (730 v_pst_olr 0.0 2 3"
+    '  (724 bark_v1 0.0 2 3 ("barked."))))'
+)
+
+MRS = """[ TOP: h0 INDEX: e2 [ e SF: prop TENSE: past MOOD: indicative ]
+  RELS: < [ _the_q<0:3> LBL: h4 ARG0: x3 [ x PERS: 3 NUM: sg IND: + ]
+            RSTR: h5 BODY: h6 ]
+          [ _dog_n_1<4:7> LBL: h7 ARG0: x3 ]
+          [ _bark_v_1<8:15> LBL: h1 ARG0: e2 ARG1: x3 ] >
+  HCONS: < h0 qeq h1 h5 qeq h7 > ]"""
+
+LEXTYPES = {"the_1": "d_-_the_le", "dog_n1": "n_-_c_le", "bark_v1": "v_-_le"}
+
+META = {"sid": "1", "profile": "mrs", "text": "The dog barked."}
+
+
+@pytest.fixture
+def gold_db(tmp_path):
+    """Create a minimal LTDB database with parsed sentences."""
+    db_path = tmp_path / "toy.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript(TABLES_SQL.read_text())
+    conn.executemany(
+        "INSERT INTO meta (att, val) VALUES (?, ?)",
+        [("SHORT_GRAMMAR_NAME", "TOY"), ("Version", "1.0")],
+    )
+    conn.executemany(
+        "INSERT INTO lex (lexid, typ) VALUES (?, ?)", sorted(LEXTYPES.items())
+    )
+    rows = [
+        ("mrs", 1, "The dog barked.", UDF, MRS),
+        ("mrs", 2, "Broken.", "", None),
+        ("other", 3, "The dog barked.", UDF, MRS),
+    ]
+    conn.executemany(
+        """INSERT INTO gold (profile, sid, sent, deriv, mrs)
+           VALUES (?, ?, ?, ?, ?)""",
+        rows,
+    )
+    conn.commit()
+    conn.close()
+    return db_path
+
+
+def assert_valid_graph(graph):
+    """Check grew JSON structural invariants."""
+    assert set(graph["nodes"])
+    for edge in graph["edges"]:
+        assert edge["src"] in graph["nodes"]
+        assert edge["tar"] in graph["nodes"]
+    assert set(graph["order"]) <= set(graph["nodes"])
+
+
+def test_deriv_to_grew():
+    # internal nodes are numbered in pre-order:
+    # n0 sb-hd_mc_c, n1 sp-hd_n_c, n2 the_1, n3 n_sg_ilr,
+    # n4 dog_n1, n5 v_pst_olr, n6 bark_v1
+    graph = db2grew.deriv_to_grew(UDF, LEXTYPES, META)
+    assert_valid_graph(graph)
+    assert graph["meta"] == META
+    assert graph["nodes"]["n0"] == {"cat": "sb-hd_mc_c"}
+    assert graph["nodes"]["n3"] == {"cat": "n_sg_ilr"}
+    assert graph["nodes"]["n4"] == {
+        "lexid": "dog_n1",
+        "lextype": "n_-_c_le",
+        "form": "dog",
+    }
+    assert graph["order"] == ["t0", "t1", "t2"]
+    forms = [graph["nodes"][tid]["form"] for tid in graph["order"]]
+    assert forms == ["the", "dog", "barked."]
+    assert {"src": "n0", "label": "2", "tar": "n5"} in graph["edges"]
+    assert {"src": "n4", "label": "1", "tar": "t1"} in graph["edges"]
+
+
+def test_deriv_with_root_and_zero_ids():
+    """ACE writes id 0 on every node and may add an id-less root."""
+    udf = (
+        "(root_strict "
+        + UDF.replace("(731 ", "(0 ")
+        .replace("(729 ", "(0 ")
+        .replace("(726 ", "(0 ")
+        .replace("(728 ", "(0 ")
+        .replace("(727 ", "(0 ")
+        .replace("(730 ", "(0 ")
+        .replace("(724 ", "(0 ")
+        + ")"
+    )
+    graph = db2grew.deriv_to_grew(udf, {}, META)
+    assert_valid_graph(graph)
+    # 8 derivation nodes plus 3 tokens, no id collisions
+    assert len(graph["nodes"]) == 11
+    assert graph["nodes"]["n0"] == {"cat": "root_strict"}
+    assert {"src": "n0", "label": "1", "tar": "n1"} in graph["edges"]
+    # unknown lexids still convert, just without a lextype feature
+    assert graph["nodes"]["n5"] == {"lexid": "dog_n1", "form": "dog"}
+
+
+def test_dmrs_to_grew():
+    graph = db2grew.dmrs_to_grew(MRS, META)
+    assert_valid_graph(graph)
+    assert graph["meta"] == META
+    nodes = list(graph["nodes"].values())
+    dog = next(n for n in nodes if n["pred"] == "_dog_n_1")
+    assert dog["lemma"] == "dog"
+    assert dog["pos"] == "n"
+    assert dog["sense"] == "1"
+    assert dog["cvarsort"] == "x"
+    assert dog["NUM"] == "sg"
+    assert dog["cfrom"] == "4"
+    bark = next(n for n in nodes if n["pred"] == "_bark_v_1")
+    assert bark["TENSE"] == "past"
+    assert bark["top"] == "yes"
+    assert bark["index"] == "yes"
+    the = next(n for n in nodes if n["pred"] == "_the_q")
+    assert "sense" not in the
+    # ordered by cfrom: the < dog < bark
+    preds = [graph["nodes"][nid]["pred"] for nid in graph["order"]]
+    assert preds == ["_the_q", "_dog_n_1", "_bark_v_1"]
+    labels = [e["label"] for e in graph["edges"]]
+    assert {"1": "RSTR", "post": "H"} in labels
+    assert {"1": "ARG1", "post": "NEQ"} in labels
+
+
+def test_dmrs_property_names_are_sanitized():
+    mrs = MRS.replace("PERS: 3", "PERS: 3 PNG.PERNUM: 3rd COG-ST: cog-st")
+    graph = db2grew.dmrs_to_grew(mrs, META)
+    dog = next(n for n in graph["nodes"].values() if n["pred"] == "_dog_n_1")
+    assert dog["PNG_PERNUM"] == "3rd"
+    assert dog["COG_ST"] == "cog-st"
+    assert "PNG.PERNUM" not in dog
+
+
+def test_dmrs_null_lnk_is_tolerated():
+    """simplemrs.encode writes <-1:-1> spans that decode rejects."""
+    mrs = MRS.replace("_bark_v_1<8:15>", "_bark_v_1<-1:-1>")
+    graph = db2grew.dmrs_to_grew(mrs, META)
+    bark = next(n for n in graph["nodes"].values() if n["pred"] == "_bark_v_1")
+    assert "cfrom" not in bark
+
+
+def test_dmrs_nonstandard_predicate_is_tolerated():
+    """Predicates like INDRA's _and_coord break pydelphin's lexer."""
+    mrs = MRS.replace("_bark_v_1<8:15>", "_bark_coord<8:15>")
+    graph = db2grew.dmrs_to_grew(mrs, META)
+    assert any(n["pred"] == "_bark_coord" for n in graph["nodes"].values())
+
+
+def test_dmrs_undirected_link_becomes_mod():
+    # _loud_a shares the verb's label without an argument link to it
+    mrs = """[ TOP: h0 INDEX: e2
+  RELS: < [ _bark_v_1<0:6> LBL: h1 ARG0: e2 ]
+          [ _loud_a_1<7:13> LBL: h1 ARG0: e3 ] >
+  HCONS: < h0 qeq h1 > ]"""
+    graph = db2grew.dmrs_to_grew(mrs, META)
+    assert {"1": "MOD", "post": "EQ"} in [e["label"] for e in graph["edges"]]
+
+
+@pytest.mark.parametrize("payload", [None, "", "not a derivation"])
+def test_bad_payloads_are_skipped(payload):
+    assert db2grew.deriv_to_grew(payload, {}, META) is None
+    assert db2grew.dmrs_to_grew(payload, META) is None
+
+
+def test_main_end_to_end(gold_db, tmp_path):
+    out = tmp_path / "grew"
+    db2grew.main(["--outdir", str(out), str(gold_db)])
+    corpora = json.loads((out / "corpora.json").read_bytes())
+    assert [c["id"] for c in corpora] == ["TOY_1_0_trees", "TOY_1_0_dmrs"]
+    for corpus in corpora:
+        assert corpus["kind"] == "json"
+        directory = Path(corpus["directory"])
+        assert directory.is_dir()
+        # the empty row is skipped: 2 of the 3 gold rows convert
+        assert corpus["files"] == ["mrs__1.json", "other__3.json"]
+        assert sorted(p.name for p in directory.iterdir()) == corpus["files"]
+        for fname in corpus["files"]:
+            graph = json.loads((directory / fname).read_bytes())
+            assert_valid_graph(graph)
+            assert graph["meta"]["text"] == "The dog barked."
+
+
+def test_main_profiles_filter(gold_db, tmp_path):
+    out = tmp_path / "grew"
+    db2grew.main(["--outdir", str(out), "--profiles", "other", str(gold_db)])
+    corpora = json.loads((out / "corpora.json").read_bytes())
+    assert all(c["files"] == ["other__3.json"] for c in corpora)
+
+
+def test_main_ltdb_url(gold_db, tmp_path):
+    out = tmp_path / "grew"
+    db2grew.main(
+        ["--outdir", str(out), "--ltdb-url", "http://localhost:5000/", str(gold_db)]
+    )
+    corpora = json.loads((out / "corpora.json").read_bytes())
+    graph = json.loads((Path(corpora[0]["directory"]) / "mrs__1.json").read_bytes())
+    assert graph["meta"]["url"] == "http://localhost:5000/sent/mrs/1?grm=toy.db"
+
+
+def test_main_trees_only(gold_db, tmp_path):
+    out = tmp_path / "grew"
+    db2grew.main(["--outdir", str(out), "--trees-only", str(gold_db)])
+    corpora = json.loads((out / "corpora.json").read_bytes())
+    assert [c["id"] for c in corpora] == ["TOY_1_0_trees"]

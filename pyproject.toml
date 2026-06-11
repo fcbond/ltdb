@@ -5,6 +5,7 @@ description = "Linguistic Type Database — Flask web app for DELPH-IN grammars"
 requires-python = ">=3.12"
 dependencies = [
     "pydelphin",
+    "orjson",
     "markdown-it-py",
     "lxml",
     "Flask",

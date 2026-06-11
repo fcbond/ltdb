@@ -6,12 +6,17 @@ import os
 import socket
 import sqlite3
 import subprocess
+import sys
 import threading
 import time
 
 import pytest
 
 from web import create_app
+
+# make the scripts directory importable (for test_db2grew etc.)
+scripts_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts")
+sys.path.insert(0, scripts_dir)
 
 # ---------------------------------------------------------------------------
 # Minimal in-memory database schema and seed data

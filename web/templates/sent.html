@@ -1,0 +1,38 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+
+<div class="container">
+
+  {% if (profile, sid) not in gold %}
+  <h1>Sentence {{profile}} #{{sid}} not found in this grammar</h1>
+  {% else %}
+  {% set g = gold[(profile, sid)] %}
+  <h1>{{ g['item'] }}</h1>
+  <p class="text-muted">{{profile}} #{{sid}}</p>
+
+  {% if g['deriv'] %}
+  <details class="mt-2 ltdb-tree-details" open>
+    <summary>Tree</summary>
+    <div class="ltdb-tree" data-deriv="{{ g['deriv']|e }}"></div>
+  </details>
+  {% endif %}
+  {% if g['mrs'] %}
+  <details class="mt-1 ltdb-dmrs-details" open>
+    <summary>DMRS</summary>
+    <div class="ltdb-dmrs-view" data-mrs="{{ g['mrs']|e }}"></div>
+  </details>
+  <details class="mt-2 ltdb-mrs-details">
+    <summary>MRS</summary>
+    <div class="ltdb-mrs-view" data-mrs="{{ g['mrs']|e }}"></div>
+  </details>
+  {% endif %}
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/ltdb-tree.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/ltdb-mrs.js') }}"></script>
+{% endblock %}

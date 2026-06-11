@@ -571,6 +571,23 @@ def mirror_home():
     )
 
 
+@app.route("/sent/<profile>/<int:sid>")
+def sent(profile, sid):
+    """Show one treebanked sentence with its tree, MRS and DMRS.
+
+    Deep links (e.g. from grew-match results) select the grammar with
+    ?grm=<db>, which is handled by _apply_grm_param.
+    """
+    grm = session.get("grm")
+    if not grm:
+        return redirect(url_for("home"))
+    conn = get_db(current_directory, grm)
+    gold = get_gold(conn, [(profile, sid)], convert=False)
+    return render_template(
+        "sent.html", grm=grm, profile=profile, sid=sid, gold=gold
+    )
+
+
 @app.route("/ltdb/<path:grm>/grammar.html")
 def mirror_grammar(grm):
     """Static mirror grammar summary page."""
