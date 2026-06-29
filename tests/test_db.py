@@ -316,11 +316,11 @@ class TestGdexScoreSql:
         score_frag = self._score(mem_conn, "The dog barks", 12, 6)
         assert score_frag < score_full
 
-    def test_fragment_type_neutral_on_terminal(self, mem_conn):
-        # fragment=True: terminal punct should not affect score
+    def test_fragment_type_penalises_terminal(self, mem_conn):
+        # fragment=True: terminal punct is penalised (genuine fragments don't end in .!?)
         score_term = self._score(mem_conn, "On ice.", 3, 0, fragment=True)
         score_no_term = self._score(mem_conn, "On ice", 3, 0, fragment=True)
-        assert score_term == pytest.approx(score_no_term)
+        assert score_no_term > score_term
 
     def test_fragment_type_neutral_on_position(self, mem_conn):
         # fragment=True: position-0 keyword should not be penalised
@@ -333,6 +333,13 @@ class TestGdexScoreSql:
         score_short = self._score(mem_conn, "On the ice", 3, 0, fragment=True)
         score_long = self._score(mem_conn, "Long sentence.", 9, 0, fragment=True)
         assert score_short > score_long
+
+    def test_markup_text_scores_zero(self, mem_conn):
+        # Sentences containing corpus markup (⌊…⌋) should be suppressed entirely.
+        score_clean = self._score(mem_conn, "The dog barks.", 12, 6)
+        score_markup = self._score(mem_conn, "The ⌊>dog>⌋ barks.", 12, 6)
+        assert score_markup == pytest.approx(0.0)
+        assert score_clean > 0.0
 
     def test_sentence_initial_keyword_penalised(self, mem_conn):
         score_mid = self._score(mem_conn, "The dog barks.", 12, 6)

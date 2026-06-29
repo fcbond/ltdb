@@ -334,8 +334,9 @@ def _gdex_score_sql(
        words (default 6–18); linear ramp below, harmonic decay above.
        Fragment constructions use a tighter range (2–5 words ideal, 6–8
        acceptable) because their canonical examples are short phrases.
-    2. Whole sentence — prefer sentences ending in terminal punctuation (.!?).
-       Neutral (1.0) for fragment constructions.
+    2. Whole sentence — prefer sentences ending in terminal punctuation (.!?);
+       for fragment constructions the rule is inverted (penalise .!? endings,
+       as genuine fragments should not look like complete sentences).
     3. Keyword position — prefer the target not at word index 0.
        Neutral (1.0) for fragment constructions (which naturally start there).
     4. Derivation simplicity (optional) — if ``rule_count_expr`` is given,
@@ -357,14 +358,19 @@ def _gdex_score_sql(
     """
     if fragment:
         # Prefer short genuine-fragment examples (2–5 words ideal).
-        # Position and terminal criteria are neutral for fragment constructions.
+        # Fragments should NOT look like complete sentences, so terminal
+        # punctuation is penalised (inverse of the full-sentence rule).
+        # Position criterion is neutral (fragments naturally start at pos 0).
         len_score = f"""CASE
             WHEN {len_expr} < 2   THEN 0.0
             WHEN {len_expr} <= 5  THEN 1.0
             WHEN {len_expr} <= 8  THEN 0.8
             ELSE 4.0 / CAST({len_expr} AS REAL)
         END"""
-        terminal_score = "1.0"
+        terminal_score = (
+            f"CASE WHEN SUBSTR({sent_expr}, -1) IN ('.', '!', '?')"
+            f" THEN 0.7 ELSE 1.0 END"
+        )
         pos_score = "1.0"
     else:
         lo, hi = _GDEX_OPT_MIN, _GDEX_OPT_MAX
@@ -393,11 +399,29 @@ def _gdex_score_sql(
         if rule_count_expr
         else ""
     )
+    # Corpus markup (⌊…⌋ annotation) indicates problematic/edited text; exclude.
+    markup_factor = (
+        f"\n        * CASE WHEN INSTR({sent_expr}, '⌊') > 0 THEN 0.0 ELSE 1.0 END"
+    )
+    # Technical-text penalty: count atypical chars ([, {, \, |) that almost never
+    # appear in natural prose.  Score = 5 / (5 + count), so one such char gives
+    # ~0.83, six give ~0.45, driving regex/code sentences well below natural text.
+    _tc = sent_expr
+    tech_count = (
+        f"(LENGTH({_tc})"
+        f" - LENGTH(REPLACE({_tc}, '[', ''))"
+        f" + LENGTH({_tc}) - LENGTH(REPLACE({_tc}, '{{', ''))"
+        f" + LENGTH({_tc}) - LENGTH(REPLACE({_tc}, '\\', ''))"
+        f" + LENGTH({_tc}) - LENGTH(REPLACE({_tc}, '|', '')))"
+    )
+    punct_factor = f"\n        * 5.0 / (5.0 + {tech_count})"
     return (
         f"\n        {len_score}"
         f"\n        * {terminal_score}"
         f"\n        * {pos_score}"
         f"{rule_factor}"
+        f"{markup_factor}"
+        f"{punct_factor}"
     )
 
 

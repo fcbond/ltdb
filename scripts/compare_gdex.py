@@ -54,7 +54,11 @@ def gdex_score_sql(
             WHEN {len_expr} <= 8 THEN 0.8
             ELSE 4.0 / CAST({len_expr} AS REAL)
         END"""
-        terminal_score = "1.0"
+        # Fragments should not look like complete sentences: penalise terminal punct.
+        terminal_score = (
+            f"CASE WHEN SUBSTR({sent_expr}, -1) IN ('.', '!', '?')"
+            f" THEN 0.7 ELSE 1.0 END"
+        )
         pos_score = "1.0"
     else:
         lo, hi = _GDEX_OPT_MIN, _GDEX_OPT_MAX
@@ -80,11 +84,25 @@ def gdex_score_sql(
         if rule_count_expr
         else ""
     )
+    markup_factor = (
+        f"\n        * CASE WHEN INSTR({sent_expr}, '⌊') > 0 THEN 0.0 ELSE 1.0 END"
+    )
+    _tc = sent_expr
+    tech_count = (
+        f"(LENGTH({_tc})"
+        f" - LENGTH(REPLACE({_tc}, '[', ''))"
+        f" + LENGTH({_tc}) - LENGTH(REPLACE({_tc}, '{{', ''))"
+        f" + LENGTH({_tc}) - LENGTH(REPLACE({_tc}, '\\', ''))"
+        f" + LENGTH({_tc}) - LENGTH(REPLACE({_tc}, '|', '')))"
+    )
+    punct_factor = f"\n        * 5.0 / (5.0 + {tech_count})"
     return (
         f"\n        {len_score}"
         f"\n        * {terminal_score}"
         f"\n        * {pos_score}"
         f"{rule_factor}"
+        f"{markup_factor}"
+        f"{punct_factor}"
     )
 
 
@@ -227,18 +245,27 @@ def score_set(sents: list[str], fragment: bool = False) -> dict:
     gdex_scores = []
     lo, hi = _GDEX_OPT_MIN, _GDEX_OPT_MAX
     for s, wc in zip(sents, wcs):
+        if '⌊' in s:
+            gdex_scores.append(0.0)
+            continue
+        tech_count = s.count('[') + s.count('{') + s.count('\\') + s.count('|')
+        pf = 5.0 / (5.0 + tech_count)
         if fragment:
             ls = 0.0 if wc < 2 else (1.0 if wc <= 5 else (0.8 if wc <= 8 else 4.0 / wc))
+            ss = 0.7 if is_terminal(s) else 1.0  # penalise full-sentence punct in fragments
         elif wc < 3:
             ls = 0.0
+            ss = 1.0 if is_terminal(s) else 0.7
         elif wc < lo:
             ls = wc / lo
+            ss = 1.0 if is_terminal(s) else 0.7
         elif wc <= hi:
             ls = 1.0
+            ss = 1.0 if is_terminal(s) else 0.7
         else:
             ls = hi / wc
-        ss = 1.0 if fragment else (1.0 if is_terminal(s) else 0.7)
-        gdex_scores.append(ls * ss)  # position and rule_count omitted (not available here)
+            ss = 1.0 if is_terminal(s) else 0.7
+        gdex_scores.append(ls * ss * pf)  # position and rule_count omitted (not available here)
     return {
         "n": len(sents),
         "pct_terminal": 100 * terminal / len(sents),
