@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from web.db import (
+    _gdex_score_sql,
     calculate_offset_limit,
     get_gold,
     get_ltypes,
@@ -234,9 +235,10 @@ class TestGetGold:
         result = get_gold(mem_conn, [])
         assert dict(result) == {}
 
-    def test_no_gold_data_for_seed(self, mem_conn):
+    def test_gold_data_for_seed(self, mem_conn):
         result = get_gold(mem_conn, [("gold", 1)])
-        assert dict(result) == {}
+        assert ("gold", 1) in result
+        assert result["gold", 1]["item"] == "The dog barks."
 
 
 class TestGetSummary:
@@ -265,6 +267,44 @@ class TestGetTbSummary:
         assert result["Sents"] == 1
 
 
+class TestGdexScoreSql:
+    """Unit tests for the GDEX SQL expression generator."""
+
+    def _score(self, conn, sent_text, n_words, kw_pos):
+        """Evaluate the GDEX score for a synthetic sentence via SQLite."""
+        expr = _gdex_score_sql(
+            kw_pos_expr=str(kw_pos),
+            len_expr=str(n_words),
+            sent_expr=f"'{sent_text}'",
+        )
+        row = conn.execute(f"SELECT {expr}").fetchone()
+        return row[0]
+
+    def test_optimal_length_terminal_punct_mid_kw(self, mem_conn):
+        # 15-word sentence ending in '.', keyword at position 7
+        score = self._score(mem_conn, "The quick brown fox jumps.", 15, 7)
+        assert score == pytest.approx(1.0 * 1.0 * 1.0)
+
+    def test_very_short_sentence_scores_zero(self, mem_conn):
+        score = self._score(mem_conn, "Go.", 3, 1)
+        assert score == pytest.approx(0.0)
+
+    def test_long_sentence_penalised(self, mem_conn):
+        score_15 = self._score(mem_conn, "Normal.", 15, 7)
+        score_40 = self._score(mem_conn, "Very long sentence.", 40, 7)
+        assert score_40 < score_15
+
+    def test_fragment_penalised(self, mem_conn):
+        score_full = self._score(mem_conn, "The dog barks.", 15, 7)
+        score_frag = self._score(mem_conn, "The dog barks", 15, 7)
+        assert score_frag < score_full
+
+    def test_sentence_initial_keyword_penalised(self, mem_conn):
+        score_mid = self._score(mem_conn, "The dog barks.", 15, 7)
+        score_init = self._score(mem_conn, "The dog barks.", 15, 0)
+        assert score_init < score_mid
+
+
 class TestGetPhenomenaByLexids:
     def test_no_sentences_returns_zero(self, mem_conn):
         maxp, phenom = get_phenomena_by_lexids(mem_conn, ["zzz_unknown"])
@@ -289,6 +329,17 @@ class TestGetPhenomenaByLexids:
         positions = phenom["gold", 1]
         assert len(positions) >= 1
         assert all(isinstance(p, tuple) and len(p) == 2 for p in positions)
+
+    def test_gdex_prefers_whole_sentence(self, mem_conn):
+        """A well-formed sentence outranks a fragment with the same lexid."""
+        mem_conn.executescript("""
+            INSERT INTO sent VALUES (2, 'gold', 0, 'Kim', 'dog_n1');
+            INSERT INTO gold VALUES (2, 'gold', 'Kim', NULL, NULL, NULL, NULL, NULL);
+        """)
+        _, phenom = get_phenomena_by_lexids(mem_conn, ["dog_n1"])
+        first_key = next(iter(phenom))
+        # Sentence 1 ('The dog barks.') scores higher than sentence 2 ('Kim')
+        assert first_key == ("gold", 1)
 
 
 class TestGetPhenomenaByCx:
@@ -315,3 +366,15 @@ class TestGetPhenomenaByCx:
         spans = phenom["gold", 1]
         assert len(spans) >= 1
         assert all(isinstance(s, tuple) and len(s) == 2 for s in spans)
+
+    def test_gdex_prefers_whole_sentence(self, mem_conn):
+        """A well-formed sentence outranks a fragment for the same construction."""
+        mem_conn.executescript("""
+            INSERT INTO sent   VALUES (2, 'gold', 0, 'Kim', NULL);
+            INSERT INTO gold   VALUES (2, 'gold', 'Kim', NULL, NULL, NULL, NULL, NULL);
+            INSERT INTO typind VALUES ('hd-cmp_c', 'gold', 2, 0, 1);
+        """)
+        self._seed_typind(mem_conn)
+        _, phenom = get_phenomena_by_cx(mem_conn, "hd-cmp_c")
+        first_key = next(iter(phenom))
+        assert first_key == ("gold", 1)

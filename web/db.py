@@ -300,89 +300,150 @@ def calculate_offset_limit(N, L):
     return offset, limit
 
 
-def get_phenomena_by_lexids(conn, lexids):
-    """
-    return a dict of profile, sid, with the lexid in question marked
-    phenom[profile, sid = [(from, to), ....]
+def _gdex_score_sql(kw_pos_expr: str, len_expr: str, sent_expr: str) -> str:
+    """Return a SQL expression computing a GDEX-inspired quality score (0–1).
 
-    Pick short sentences, starting 20% in
+    Combines three soft ranking preferences from the lexicographic literature
+    (Kilgarriff et al. 2008; Kosem et al. 2019):
+
+    1. Sentence length — score 1.0 for 10–25 words; linear penalty outside
+       that range; 0.0 for fewer than 4 words.
+    2. Whole sentence — prefer sentences ending with terminal punctuation
+       (.!?) over fragments.
+    3. Keyword position — prefer the target not at position 0 of the sentence.
+
+    All criteria are ranking weights, not hard filters: the candidate pool is
+    already constrained by the queried construction or lexid.
+
+    Args:
+        kw_pos_expr: SQL expression for the 0-based keyword word index.
+        len_expr: SQL expression for the sentence length (max wid).
+        sent_expr: SQL expression for the full sentence string (may be NULL).
     """
-    ### get the total number
+    return f"""
+        -- (1) Length score: optimal 10-25 words
+        CASE
+            WHEN {len_expr} < 4                     THEN 0.0
+            WHEN {len_expr} BETWEEN 10 AND 25        THEN 1.0
+            WHEN {len_expr} < 10
+                THEN CAST({len_expr} AS REAL) / 10.0
+            ELSE 25.0 / CAST({len_expr} AS REAL)
+        END
+        *
+        -- (2) Whole-sentence score: ends with terminal punctuation
+        CASE WHEN SUBSTR({sent_expr}, -1) IN ('.', '!', '?') THEN 1.0
+             ELSE 0.7
+        END
+        *
+        -- (3) Keyword not at sentence-initial position
+        CASE
+            WHEN {len_expr} = 0                              THEN 0.8
+            WHEN CAST({kw_pos_expr} AS REAL) / {len_expr} > 0.1 THEN 1.0
+            ELSE 0.8
+        END"""
+
+
+def get_phenomena_by_lexids(conn, lexids):
+    """Return sentences containing any of the given lexids, ranked by GDEX score.
+
+    Args:
+        conn: SQLite connection.
+        lexids: List of lexid strings to match.
+
+    Returns:
+        Tuple of (total_count, phenomena) where phenomena maps
+        (profile, sid) → list of (from, to) highlight spans.
+    """
+    if not lexids:
+        return 0, dd(list)
+
     c = conn.cursor()
     c.execute(
-        f"""SELECT COUNT(*) 
-    FROM (
-    SELECT DISTINCT profile, sid 
-    FROM sent 
-    WHERE lexid IN ({holders(lexids)})
-    )""",
-        (lexids),
+        f"""SELECT COUNT(*)
+        FROM (
+            SELECT DISTINCT profile, sid
+            FROM sent
+            WHERE lexid IN ({holders(lexids)})
+        )""",
+        lexids,
     )
     result = c.fetchone()
-    if result:
-        maxp = result[0]
-    else:
-        maxp = 0
+    maxp = result[0] if result else 0
 
-    offset, limit = calculate_offset_limit(maxp, sentlim)
-
-    ### get a sample
+    gdex = _gdex_score_sql(
+        kw_pos_expr="MIN(a.wid)",
+        len_expr="MAX(b.wid)",
+        sent_expr="g.sent",
+    )
     phenomena = dd(list)
     c.execute(
-        f"""SELECT a.profile, a.sid, a.wid , max(b.wid)
-    FROM sent as a LEFT JOIN sent as b
-    ON a.profile=b.profile and a.sid=b.sid
-    WHERE a.lexid IN ({holders(lexids)})
-    GROUP BY b.profile, b.sid
-    ORDER BY max(b.wid) 
-    LIMIT ? OFFSET ?""",
-        (lexids + [limit, offset]),
+        f"""SELECT a.profile, a.sid, MIN(a.wid) AS kw_wid,
+               {gdex} AS gdex_score
+        FROM sent AS a
+        LEFT JOIN sent AS b
+            ON a.profile = b.profile AND a.sid = b.sid
+        LEFT JOIN gold AS g
+            ON a.profile = g.profile AND a.sid = g.sid
+        WHERE a.lexid IN ({holders(lexids)})
+        GROUP BY a.profile, a.sid
+        ORDER BY gdex_score DESC
+        LIMIT ?""",
+        lexids + [sentlim],
     )
-    for profile, sid, wid, max in c:
+    for profile, sid, wid, _score in c:
         phenomena[profile, sid].append((wid, wid + 1))
     return maxp, phenomena
 
 
 def get_phenomena_by_cx(conn, cx):
-    """
-    return a dict of profile, sid, with the cx in question marked
-    use for rules, roots, dlr, iflr,
+    """Return sentences using construction cx, ranked by GDEX score.
 
-    phenom[profile, sid = [(from, to), ....]
-    try to pick short sentences
+    Used for rules, roots, dlr, iflr.
+
+    Args:
+        conn: SQLite connection.
+        cx: Type name string (construction identifier).
+
+    Returns:
+        Tuple of (total_count, phenomena) where phenomena maps
+        (profile, sid) → list of (kara, made) highlight spans.
     """
     c = conn.cursor()
     c.execute(
         """SELECT COUNT(*)
-    FROM (
-    SELECT DISTINCT profile, sid
-    FROM typind
-    WHERE typ = ?
-    )""",
+        FROM (
+            SELECT DISTINCT profile, sid
+            FROM typind
+            WHERE typ = ?
+        )""",
         (cx,),
     )
     result = c.fetchone()
-    if result:
-        maxp = result[0]
-    else:
-        maxp = 0
+    maxp = result[0] if result else 0
 
-    offset, limit = calculate_offset_limit(maxp, sentlim)
-
-    ### get a sample
+    gdex = _gdex_score_sql(
+        kw_pos_expr="MIN(COALESCE(a.kara, 0))",
+        len_expr="MAX(b.wid)",
+        sent_expr="g.sent",
+    )
     phenomena = dd(list)
     c.execute(
-        """SELECT a.profile, a.sid, COALESCE(a.kara, 0),
-    COALESCE(a.made, max(b.wid) + 1), max(b.wid)
-    FROM typind as a LEFT JOIN sent as b
-    ON a.profile=b.profile and a.sid=b.sid
-    WHERE a.typ = ?
-    GROUP BY b.profile, b.sid
-    ORDER BY max(b.wid)
-    LIMIT ? OFFSET ?""",
-        (cx, limit, offset),
+        f"""SELECT a.profile, a.sid,
+               MIN(COALESCE(a.kara, 0)) AS kara,
+               COALESCE(MAX(a.made), MAX(b.wid) + 1) AS made,
+               {gdex} AS gdex_score
+        FROM typind AS a
+        LEFT JOIN sent AS b
+            ON a.profile = b.profile AND a.sid = b.sid
+        LEFT JOIN gold AS g
+            ON a.profile = g.profile AND a.sid = g.sid
+        WHERE a.typ = ?
+        GROUP BY a.profile, a.sid
+        ORDER BY gdex_score DESC
+        LIMIT ?""",
+        (cx, sentlim),
     )
-    for profile, sid, kara, made, maxwid in c:
+    for profile, sid, kara, made, _score in c:
         phenomena[profile, sid].append((kara, made))
 
     return maxp, phenomena

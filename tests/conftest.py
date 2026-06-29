@@ -77,6 +77,8 @@ INSERT INTO lexfreq VALUES ('bark_v1', 'bark',  7);
 INSERT INTO sent VALUES (1, 'gold', 0, 'The',  NULL);
 INSERT INTO sent VALUES (1, 'gold', 1, 'dog',  'dog_n1');
 INSERT INTO sent VALUES (1, 'gold', 2, 'barks', 'bark_v1');
+
+INSERT INTO gold VALUES (1, 'gold', 'The dog barks.', NULL, NULL, NULL, NULL, NULL);
 """
 
 
