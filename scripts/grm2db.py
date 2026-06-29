@@ -80,9 +80,16 @@ INSERT INTO lexfreq (lexid, word, freq)
 
     ### store type frequencies
     c.execute("""
-INSERT INTO typfreq (typ, freq)  
-  SELECT typ, count(typ)     
+INSERT INTO typfreq (typ, freq)
+  SELECT typ, count(typ)
   FROM typind GROUP BY typ""")
+
+    ### precompute derivation size (total typind entries per sentence)
+    c.execute("""
+UPDATE gold SET rule_count = (
+    SELECT COUNT(*) FROM typind
+    WHERE typind.profile = gold.profile AND typind.sid = gold.sid
+)""")
 
     conn.commit()
 

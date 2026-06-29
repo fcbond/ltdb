@@ -41,6 +41,7 @@ CREATE TABLE gold (sid INTEGER,
 		   pst TEXT,
 		   mrs TEXT,
 		   flags TEXT,
+		   rule_count INTEGER,  -- total typind entries for this sentence (derivation size proxy)
 		   UNIQUE(profile, sid) );
 CREATE TABLE typind (typ TEXT,
        	     	     profile TEXT,	    
@@ -87,5 +88,6 @@ CREATE INDEX idx_sent_lexid ON sent(lexid);
 CREATE INDEX idx_sent_profile_sid ON sent(profile, sid);
 CREATE INDEX idx_gold_profile_sid ON gold(profile, sid);
 CREATE INDEX idx_typind_typ ON typind(typ);
+CREATE INDEX idx_typind_profile_sid ON typind(profile, sid);
 CREATE INDEX idx_lexind_lexid ON lexind(lexid);
 CREATE INDEX idx_doctest_typ ON doctest(typ);

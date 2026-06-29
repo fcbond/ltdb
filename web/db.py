@@ -300,17 +300,47 @@ def calculate_offset_limit(N, L):
     return offset, limit
 
 
-def _gdex_score_sql(kw_pos_expr: str, len_expr: str, sent_expr: str) -> str:
+# Optimal sentence length range for GDEX scoring (easily adjusted here).
+# Shorter than the original GDEX standard (10–25) because grammar parse trees
+# grow complex quickly; 6–18 balances informativeness with readability.
+_GDEX_OPT_MIN: int = 6
+_GDEX_OPT_MAX: int = 18
+
+
+def _is_fragment_cx(cx: str) -> bool:
+    """Return True if cx is a fragment construction type.
+
+    Fragment constructions (names containing '_frg') parse sub-sentential
+    inputs such as section headings or isolated phrases.  Their examples are
+    expected to be fragments, so the whole-sentence and position criteria must
+    not be applied against them.
+    """
+    return "_frg" in cx
+
+
+def _gdex_score_sql(
+    kw_pos_expr: str,
+    len_expr: str,
+    sent_expr: str,
+    fragment: bool = False,
+    rule_count_expr: str | None = None,
+) -> str:
     """Return a SQL expression computing a GDEX-inspired quality score (0–1).
 
-    Combines three soft ranking preferences from the lexicographic literature
-    (Kilgarriff et al. 2008; Kosem et al. 2019):
+    Combines up to four soft ranking preferences adapted from Kilgarriff et al.
+    (2008) and Kosem et al. (2019) for grammar treebank corpora:
 
-    1. Sentence length — score 1.0 for 10–25 words; linear penalty outside
-       that range; 0.0 for fewer than 4 words.
-    2. Whole sentence — prefer sentences ending with terminal punctuation
-       (.!?) over fragments.
-    3. Keyword position — prefer the target not at position 0 of the sentence.
+    1. Sentence length — optimal range ``_GDEX_OPT_MIN``–``_GDEX_OPT_MAX``
+       words (default 6–18); linear ramp below, harmonic decay above.
+       Fragment constructions use a tighter range (2–5 words ideal, 6–8
+       acceptable) because their canonical examples are short phrases.
+    2. Whole sentence — prefer sentences ending in terminal punctuation (.!?).
+       Neutral (1.0) for fragment constructions.
+    3. Keyword position — prefer the target not at word index 0.
+       Neutral (1.0) for fragment constructions (which naturally start there).
+    4. Derivation simplicity (optional) — if ``rule_count_expr`` is given,
+       prefer sentences with fewer construction applications in ``typind``
+       (proxy for shallower parse trees).
 
     All criteria are ranking weights, not hard filters: the candidate pool is
     already constrained by the queried construction or lexid.
@@ -319,28 +349,56 @@ def _gdex_score_sql(kw_pos_expr: str, len_expr: str, sent_expr: str) -> str:
         kw_pos_expr: SQL expression for the 0-based keyword word index.
         len_expr: SQL expression for the sentence length (max wid).
         sent_expr: SQL expression for the full sentence string (may be NULL).
+        fragment: If True, apply fragment-type scoring (short length range,
+            neutral terminal and position criteria).
+        rule_count_expr: Optional SQL expression giving the total number of
+            construction applications for the sentence (from ``typind``).
+            When provided, adds a derivation-simplicity factor.
     """
-    return f"""
-        -- (1) Length score: optimal 10-25 words
-        CASE
-            WHEN {len_expr} < 4                     THEN 0.0
-            WHEN {len_expr} BETWEEN 10 AND 25        THEN 1.0
-            WHEN {len_expr} < 10
-                THEN CAST({len_expr} AS REAL) / 10.0
-            ELSE 25.0 / CAST({len_expr} AS REAL)
-        END
-        *
-        -- (2) Whole-sentence score: ends with terminal punctuation
-        CASE WHEN SUBSTR({sent_expr}, -1) IN ('.', '!', '?') THEN 1.0
-             ELSE 0.7
-        END
-        *
-        -- (3) Keyword not at sentence-initial position
-        CASE
-            WHEN {len_expr} = 0                              THEN 0.8
+    if fragment:
+        # Prefer short genuine-fragment examples (2–5 words ideal).
+        # Position and terminal criteria are neutral for fragment constructions.
+        len_score = f"""CASE
+            WHEN {len_expr} < 2   THEN 0.0
+            WHEN {len_expr} <= 5  THEN 1.0
+            WHEN {len_expr} <= 8  THEN 0.8
+            ELSE 4.0 / CAST({len_expr} AS REAL)
+        END"""
+        terminal_score = "1.0"
+        pos_score = "1.0"
+    else:
+        lo, hi = _GDEX_OPT_MIN, _GDEX_OPT_MAX
+        len_score = f"""CASE
+            WHEN {len_expr} < 3              THEN 0.0
+            WHEN {len_expr} < {lo}           THEN CAST({len_expr} AS REAL) / {lo}.0
+            WHEN {len_expr} <= {hi}          THEN 1.0
+            ELSE {hi}.0 / CAST({len_expr} AS REAL)
+        END"""
+        terminal_score = (
+            f"CASE WHEN SUBSTR({sent_expr}, -1) IN ('.', '!', '?')"
+            f" THEN 1.0 ELSE 0.7 END"
+        )
+        pos_score = f"""CASE
+            WHEN {len_expr} = 0                                 THEN 0.8
             WHEN CAST({kw_pos_expr} AS REAL) / {len_expr} > 0.1 THEN 1.0
             ELSE 0.8
         END"""
+
+    # Derivation density = rules / sentence_length; average ERG sentence ≈ 3.
+    # Score 1.0 for very simple trees, decays softly for denser derivations.
+    rule_factor = (
+        f"\n        * 5.0 / (5.0 + COALESCE("
+        f"CAST({rule_count_expr} AS REAL) / NULLIF(CAST({len_expr} AS REAL), 1.0)"
+        f", 3.0))"
+        if rule_count_expr
+        else ""
+    )
+    return (
+        f"\n        {len_score}"
+        f"\n        * {terminal_score}"
+        f"\n        * {pos_score}"
+        f"{rule_factor}"
+    )
 
 
 def get_phenomena_by_lexids(conn, lexids):
@@ -374,6 +432,7 @@ def get_phenomena_by_lexids(conn, lexids):
         kw_pos_expr="MIN(a.wid)",
         len_expr="MAX(b.wid)",
         sent_expr="g.sent",
+        rule_count_expr="COALESCE(g.rule_count, 10)",
     )
     phenomena = dd(list)
     c.execute(
@@ -421,10 +480,13 @@ def get_phenomena_by_cx(conn, cx):
     result = c.fetchone()
     maxp = result[0] if result else 0
 
+    is_frg = _is_fragment_cx(cx)
     gdex = _gdex_score_sql(
         kw_pos_expr="MIN(COALESCE(a.kara, 0))",
         len_expr="MAX(b.wid)",
         sent_expr="g.sent",
+        fragment=is_frg,
+        rule_count_expr="COALESCE(g.rule_count, 10)",
     )
     phenomena = dd(list)
     c.execute(

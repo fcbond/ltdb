@@ -36,6 +36,7 @@ CREATE TABLE sent   (sid INTEGER, profile TEXT, wid INTEGER,
                      word TEXT, lexid TEXT);
 CREATE TABLE gold   (sid INTEGER, profile TEXT, sent TEXT,
                      comment TEXT, deriv TEXT, pst TEXT, mrs TEXT, flags TEXT,
+                     rule_count INTEGER,
                      UNIQUE(profile, sid));
 CREATE TABLE typind (typ TEXT, profile TEXT, sid INTEGER,
                      kara INTEGER, made INTEGER);
@@ -78,7 +79,7 @@ INSERT INTO sent VALUES (1, 'gold', 0, 'The',  NULL);
 INSERT INTO sent VALUES (1, 'gold', 1, 'dog',  'dog_n1');
 INSERT INTO sent VALUES (1, 'gold', 2, 'barks', 'bark_v1');
 
-INSERT INTO gold VALUES (1, 'gold', 'The dog barks.', NULL, NULL, NULL, NULL, NULL);
+INSERT INTO gold VALUES (1, 'gold', 'The dog barks.', NULL, NULL, NULL, NULL, NULL, 5);
 """
 
 

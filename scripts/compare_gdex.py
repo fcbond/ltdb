@@ -29,26 +29,63 @@ def holders(xs: list) -> str:
     return ",".join(["?"] * len(xs))
 
 
-def gdex_score_sql(kw_pos_expr: str, len_expr: str, sent_expr: str) -> str:
-    """GDEX SQL scoring expression (product of three soft criteria)."""
-    return f"""
-        CASE
-            WHEN {len_expr} < 4                      THEN 0.0
-            WHEN {len_expr} BETWEEN 10 AND 25         THEN 1.0
-            WHEN {len_expr} < 10
-                THEN CAST({len_expr} AS REAL) / 10.0
-            ELSE 25.0 / CAST({len_expr} AS REAL)
-        END
-        *
-        CASE WHEN SUBSTR({sent_expr}, -1) IN ('.', '!', '?') THEN 1.0
-             ELSE 0.7
-        END
-        *
-        CASE
+def _is_fragment_cx(cx: str) -> bool:
+    """Fragment construction types (names containing '_frg') parse sub-sentential
+    input, so the whole-sentence criterion must not penalise their examples."""
+    return "_frg" in cx
+
+
+_GDEX_OPT_MIN = 6  # lower bound of optimal sentence length (words)
+_GDEX_OPT_MAX = 18  # upper bound
+
+
+def gdex_score_sql(
+    kw_pos_expr: str,
+    len_expr: str,
+    sent_expr: str,
+    fragment: bool = False,
+    rule_count_expr: str | None = None,
+) -> str:
+    """GDEX SQL scoring expression (product of 3–4 soft criteria)."""
+    if fragment:
+        len_score = f"""CASE
+            WHEN {len_expr} < 2  THEN 0.0
+            WHEN {len_expr} <= 5 THEN 1.0
+            WHEN {len_expr} <= 8 THEN 0.8
+            ELSE 4.0 / CAST({len_expr} AS REAL)
+        END"""
+        terminal_score = "1.0"
+        pos_score = "1.0"
+    else:
+        lo, hi = _GDEX_OPT_MIN, _GDEX_OPT_MAX
+        len_score = f"""CASE
+            WHEN {len_expr} < 3     THEN 0.0
+            WHEN {len_expr} < {lo}  THEN CAST({len_expr} AS REAL) / {lo}.0
+            WHEN {len_expr} <= {hi} THEN 1.0
+            ELSE {hi}.0 / CAST({len_expr} AS REAL)
+        END"""
+        terminal_score = (
+            f"CASE WHEN SUBSTR({sent_expr}, -1) IN ('.', '!', '?')"
+            f" THEN 1.0 ELSE 0.7 END"
+        )
+        pos_score = f"""CASE
             WHEN {len_expr} = 0 THEN 0.8
             WHEN CAST({kw_pos_expr} AS REAL) / {len_expr} > 0.1 THEN 1.0
             ELSE 0.8
         END"""
+    rule_factor = (
+        f"\n        * 5.0 / (5.0 + COALESCE("
+        f"CAST({rule_count_expr} AS REAL) / NULLIF(CAST({len_expr} AS REAL), 1.0)"
+        f", 3.0))"
+        if rule_count_expr
+        else ""
+    )
+    return (
+        f"\n        {len_score}"
+        f"\n        * {terminal_score}"
+        f"\n        * {pos_score}"
+        f"{rule_factor}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -91,10 +128,13 @@ def old_cx(conn: sqlite3.Connection, cx: str, lim: int) -> list[str]:
 
 def new_cx(conn: sqlite3.Connection, cx: str, lim: int) -> list[str]:
     """New get_phenomena_by_cx query (GDEX score)."""
+    is_frg = _is_fragment_cx(cx)
     gdex = gdex_score_sql(
         kw_pos_expr="MIN(COALESCE(a.kara, 0))",
         len_expr="MAX(b.wid)",
         sent_expr="g.sent",
+        fragment=is_frg,
+        rule_count_expr="COALESCE(g.rule_count, 10)",
     )
     c = conn.cursor()
     c.execute(
@@ -143,6 +183,7 @@ def new_lexid(conn: sqlite3.Connection, lexid: str, lim: int) -> list[str]:
         kw_pos_expr="MIN(a.wid)",
         len_expr="MAX(b.wid)",
         sent_expr="g.sent",
+        rule_count_expr="COALESCE(g.rule_count, 10)",
     )
     c = conn.cursor()
     c.execute(
@@ -172,26 +213,32 @@ def word_count(sent: str) -> int:
     return len(sent.split())
 
 
-def score_set(sents: list[str]) -> dict:
+def score_set(sents: list[str], fragment: bool = False) -> dict:
     """Compute aggregate GDEX criterion statistics for a set of sentences."""
     if not sents:
         return {"n": 0, "pct_terminal": 0.0, "pct_optimal_len": 0.0,
                 "mean_len": 0.0, "mean_gdex": 0.0}
     terminal = sum(1 for s in sents if is_terminal(s))
     wcs = [word_count(s) for s in sents]
-    optimal = sum(1 for w in wcs if 10 <= w <= 25)
+    if fragment:
+        optimal = sum(1 for w in wcs if 2 <= w <= 8)
+    else:
+        optimal = sum(1 for w in wcs if _GDEX_OPT_MIN <= w <= _GDEX_OPT_MAX)
     gdex_scores = []
+    lo, hi = _GDEX_OPT_MIN, _GDEX_OPT_MAX
     for s, wc in zip(sents, wcs):
-        if wc < 4:
+        if fragment:
+            ls = 0.0 if wc < 2 else (1.0 if wc <= 5 else (0.8 if wc <= 8 else 4.0 / wc))
+        elif wc < 3:
             ls = 0.0
-        elif 10 <= wc <= 25:
+        elif wc < lo:
+            ls = wc / lo
+        elif wc <= hi:
             ls = 1.0
-        elif wc < 10:
-            ls = wc / 10.0
         else:
-            ls = 25.0 / wc
-        ss = 1.0 if is_terminal(s) else 0.7
-        gdex_scores.append(ls * ss)  # position score omitted (no wid here)
+            ls = hi / wc
+        ss = 1.0 if fragment else (1.0 if is_terminal(s) else 0.7)
+        gdex_scores.append(ls * ss)  # position and rule_count omitted (not available here)
     return {
         "n": len(sents),
         "pct_terminal": 100 * terminal / len(sents),
@@ -215,9 +262,10 @@ def print_comparison(
     old: list[str],
     new: list[str],
     show: int = 3,
+    fragment: bool = False,
 ) -> None:
-    old_stats = score_set(old)
-    new_stats = score_set(new)
+    old_stats = score_set(old, fragment=fragment)
+    new_stats = score_set(new, fragment=fragment)
 
     print(f"\n{'=' * 72}")
     print(f"TYPE: {label}")
@@ -253,10 +301,10 @@ def print_comparison(
         print(f"    {marker}{truncate(s)}")
 
 
-def latex_table_row(typ: str, old: list[str], new: list[str]) -> str:
+def latex_table_row(typ: str, old: list[str], new: list[str], fragment: bool = False) -> str:
     """One LaTeX table row comparing old vs. new aggregate statistics."""
-    os_ = score_set(old)
-    ns_ = score_set(new)
+    os_ = score_set(old, fragment=fragment)
+    ns_ = score_set(new, fragment=fragment)
     return (
         f"\\texttt{{{typ.replace('_', r'\textunderscore ')}}}"
         f" & {os_['pct_terminal']:.0f}\\%"
@@ -331,8 +379,9 @@ def main() -> None:
         if not o and not n:
             print(f"\n[skipping {cx}: no sentences in DB]")
             continue
-        print_comparison(cx, o, n, show=args.show)
-        all_rows.append((cx, o, n))
+        frg = _is_fragment_cx(cx)
+        print_comparison(cx, o, n, show=args.show, fragment=frg)
+        all_rows.append((cx, o, n, frg))
 
     for lexid in args.lexids:
         o = old_lexid(conn, lexid, args.n)
@@ -341,7 +390,7 @@ def main() -> None:
             print(f"\n[skipping lexid {lexid}: not found]")
             continue
         print_comparison(f"lexid:{lexid}", o, n, show=args.show)
-        all_rows.append((f"lexid:{lexid}", o, n))
+        all_rows.append((f"lexid:{lexid}", o, n, False))
 
     conn.close()
 
@@ -352,8 +401,8 @@ def main() -> None:
         print(r"Type & \multicolumn{3}{c|}{Old (length+offset)} & \multicolumn{3}{c}{New (GDEX)} \\")
         print(r" & Term.\% & Opt.len\% & Score & Term.\% & Opt.len\% & Score \\")
         print(r"\hline")
-        for typ, o, n in all_rows:
-            print(latex_table_row(typ, o, n))
+        for typ, o, n, frg in all_rows:
+            print(latex_table_row(typ, o, n, fragment=frg))
         print(r"\hline")
         print(r"\end{tabular}")
 
