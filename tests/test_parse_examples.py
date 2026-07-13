@@ -13,6 +13,7 @@ from parse_examples import (
     Example,
     Verdict,
     _build_lex_ids_for_type,
+    _build_subtypes_for_type,
     _parse_doc,
     type_in_results,
     verdict_label,
@@ -116,6 +117,45 @@ class TestBuildLexIdsForType:
         assert _build_lex_ids_for_type({}, []) == {}
 
 
+# ── _build_subtypes_for_type ──────────────────────────────────────────────────
+
+
+class TestBuildSubtypesForType:
+    def test_direct_child(self):
+        hierarchy = [("conc-rule", "abs-rule")]
+        result = _build_subtypes_for_type({"abs-rule"}, hierarchy)
+        assert "conc-rule" in result["abs-rule"]
+
+    def test_transitive_descendant(self):
+        hierarchy = [
+            ("leaf-rule", "mid-rule"),
+            ("mid-rule", "abs-rule"),
+        ]
+        result = _build_subtypes_for_type({"abs-rule"}, hierarchy)
+        assert "mid-rule" in result["abs-rule"]
+        assert "leaf-rule" in result["abs-rule"]
+
+    def test_self_not_included(self):
+        hierarchy = [("child", "parent")]
+        result = _build_subtypes_for_type({"parent"}, hierarchy)
+        assert "parent" not in result["parent"]
+
+    def test_leaf_type_has_empty_subtypes(self):
+        hierarchy = [("leaf", "root")]
+        result = _build_subtypes_for_type({"leaf"}, hierarchy)
+        assert result["leaf"] == set()
+
+    def test_only_computes_for_requested_types(self):
+        hierarchy = [("child", "parent"), ("grandchild", "child")]
+        result = _build_subtypes_for_type({"child"}, hierarchy)
+        assert "parent" not in result
+        assert "grandchild" in result["child"]
+
+    def test_empty_hierarchy(self):
+        result = _build_subtypes_for_type({"some-type"}, [])
+        assert result["some-type"] == set()
+
+
 # ── type_in_results ───────────────────────────────────────────────────────────
 
 
@@ -172,6 +212,36 @@ class TestTypeInResults:
 
     def test_empty_results(self):
         assert not type_in_results("t", ["rule"], [], {})
+
+    def test_abstract_rule_passes_via_subtype_in_internals(self):
+        subtypes = {"abs-rule": {"conc-rule"}}
+        deriv = _make_derivation(internals=["conc-rule"])
+        result = _make_result(deriv)
+        assert type_in_results("abs-rule", ["rule"], [result], {}, subtypes)
+
+    def test_abstract_rule_fails_when_no_subtype_in_tree(self):
+        subtypes = {"abs-rule": {"conc-rule"}}
+        deriv = _make_derivation(internals=["other-rule"])
+        result = _make_result(deriv)
+        assert not type_in_results("abs-rule", ["rule"], [result], {}, subtypes)
+
+    def test_abstract_lex_rule_passes_via_subtype_in_preterminals(self):
+        subtypes = {"abs-lr": {"v_pst_olr"}}
+        deriv = _make_derivation(preterminals=["v_pst_olr"])
+        result = _make_result(deriv)
+        assert type_in_results("abs-lr", ["lex-rule"], [result], {}, subtypes)
+
+    def test_subtype_not_provided_does_not_raise(self):
+        deriv = _make_derivation(internals=["conc-rule"])
+        result = _make_result(deriv)
+        assert not type_in_results("abs-rule", ["rule"], [result], {}, None)
+
+    def test_transitive_subtype_passes(self):
+        # abs → mid → leaf; leaf fires in tree; abs should pass
+        subtypes = {"abs-rule": {"mid-rule", "leaf-rule"}}
+        deriv = _make_derivation(internals=["leaf-rule"])
+        result = _make_result(deriv)
+        assert type_in_results("abs-rule", ["rule"], [result], {}, subtypes)
 
 
 # ── verdict_label ─────────────────────────────────────────────────────────────
