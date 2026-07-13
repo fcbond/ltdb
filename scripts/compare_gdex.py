@@ -36,17 +36,16 @@ def _is_fragment_cx(cx: str) -> bool:
 
 
 _GDEX_OPT_MIN = 6  # lower bound of optimal sentence length (words)
-_GDEX_OPT_MAX = 18  # upper bound
+_GDEX_OPT_MAX = 12  # upper bound
 
 
 def gdex_score_sql(
-    kw_pos_expr: str,
     len_expr: str,
     sent_expr: str,
     fragment: bool = False,
     rule_count_expr: str | None = None,
 ) -> str:
-    """GDEX SQL scoring expression (product of 3–4 soft criteria)."""
+    """GDEX SQL scoring expression (product of up to three soft criteria)."""
     if fragment:
         len_score = f"""CASE
             WHEN {len_expr} < 2  THEN 0.0
@@ -56,10 +55,9 @@ def gdex_score_sql(
         END"""
         # Fragments should not look like complete sentences: penalise terminal punct.
         terminal_score = (
-            f"CASE WHEN SUBSTR({sent_expr}, -1) IN ('.', '!', '?')"
+            f"\n        * CASE WHEN SUBSTR({sent_expr}, -1) IN ('.', '!', '?')"
             f" THEN 0.7 ELSE 1.0 END"
         )
-        pos_score = "1.0"
     else:
         lo, hi = _GDEX_OPT_MIN, _GDEX_OPT_MAX
         len_score = f"""CASE
@@ -68,15 +66,7 @@ def gdex_score_sql(
             WHEN {len_expr} <= {hi} THEN 1.0
             ELSE {hi}.0 / CAST({len_expr} AS REAL)
         END"""
-        terminal_score = (
-            f"CASE WHEN SUBSTR({sent_expr}, -1) IN ('.', '!', '?')"
-            f" THEN 1.0 ELSE 0.7 END"
-        )
-        pos_score = f"""CASE
-            WHEN {len_expr} = 0 THEN 0.8
-            WHEN CAST({kw_pos_expr} AS REAL) / {len_expr} > 0.1 THEN 1.0
-            ELSE 0.8
-        END"""
+        terminal_score = ""
     rule_factor = (
         f"\n        * 5.0 / (5.0 + COALESCE("
         f"CAST({rule_count_expr} AS REAL) / NULLIF(CAST({len_expr} AS REAL), 1.0)"
@@ -98,8 +88,7 @@ def gdex_score_sql(
     punct_factor = f"\n        * 5.0 / (5.0 + {tech_count})"
     return (
         f"\n        {len_score}"
-        f"\n        * {terminal_score}"
-        f"\n        * {pos_score}"
+        f"{terminal_score}"
         f"{rule_factor}"
         f"{markup_factor}"
         f"{punct_factor}"
@@ -148,7 +137,6 @@ def new_cx(conn: sqlite3.Connection, cx: str, lim: int) -> list[str]:
     """New get_phenomena_by_cx query (GDEX score)."""
     is_frg = _is_fragment_cx(cx)
     gdex = gdex_score_sql(
-        kw_pos_expr="MIN(COALESCE(a.kara, 0))",
         len_expr="MAX(b.wid)",
         sent_expr="g.sent",
         fragment=is_frg,
@@ -198,7 +186,6 @@ def old_lexid(conn: sqlite3.Connection, lexid: str, lim: int) -> list[str]:
 def new_lexid(conn: sqlite3.Connection, lexid: str, lim: int) -> list[str]:
     """New get_phenomena_by_lexids for a single lexid (GDEX score)."""
     gdex = gdex_score_sql(
-        kw_pos_expr="MIN(a.wid)",
         len_expr="MAX(b.wid)",
         sent_expr="g.sent",
         rule_count_expr="COALESCE(g.rule_count, 10)",
@@ -252,20 +239,20 @@ def score_set(sents: list[str], fragment: bool = False) -> dict:
         pf = 5.0 / (5.0 + tech_count)
         if fragment:
             ls = 0.0 if wc < 2 else (1.0 if wc <= 5 else (0.8 if wc <= 8 else 4.0 / wc))
-            ss = 0.7 if is_terminal(s) else 1.0  # penalise full-sentence punct in fragments
+            ss = 0.7 if is_terminal(s) else 1.0  # penalise terminal punct in fragments
         elif wc < 3:
             ls = 0.0
-            ss = 1.0 if is_terminal(s) else 0.7
+            ss = 1.0
         elif wc < lo:
             ls = wc / lo
-            ss = 1.0 if is_terminal(s) else 0.7
+            ss = 1.0
         elif wc <= hi:
             ls = 1.0
-            ss = 1.0 if is_terminal(s) else 0.7
+            ss = 1.0
         else:
             ls = hi / wc
-            ss = 1.0 if is_terminal(s) else 0.7
-        gdex_scores.append(ls * ss * pf)  # position and rule_count omitted (not available here)
+            ss = 1.0
+        gdex_scores.append(ls * ss * pf)  # rule_count omitted (not available here)
     return {
         "n": len(sents),
         "pct_terminal": 100 * terminal / len(sents),

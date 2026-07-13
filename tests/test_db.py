@@ -285,10 +285,9 @@ class TestIsFragmentCx:
 class TestGdexScoreSql:
     """Unit tests for the GDEX SQL expression generator."""
 
-    def _score(self, conn, sent_text, n_words, kw_pos, fragment=False):
+    def _score(self, conn, sent_text, n_words, fragment=False):
         """Evaluate the GDEX score for a synthetic sentence via SQLite."""
         expr = _gdex_score_sql(
-            kw_pos_expr=str(kw_pos),
             len_expr=str(n_words),
             sent_expr=f"'{sent_text}'",
             fragment=fragment,
@@ -296,55 +295,45 @@ class TestGdexScoreSql:
         row = conn.execute(f"SELECT {expr}").fetchone()
         return row[0]
 
-    def test_optimal_length_terminal_punct_mid_kw(self, mem_conn):
-        # 12-word sentence in default 6-18 range, ending in '.', kw at position 6
-        score = self._score(mem_conn, "The quick brown fox jumps over hedges.", 12, 6)
-        assert score == pytest.approx(1.0 * 1.0 * 1.0)
+    def test_optimal_length_scores_max(self, mem_conn):
+        # 9-word sentence in optimal 6-12 range scores 1.0 for length factor
+        score = self._score(mem_conn, "The quick brown fox jumps over lazy hedges.", 9)
+        assert score == pytest.approx(1.0)
 
     def test_very_short_sentence_scores_zero(self, mem_conn):
         # 2-word sentence: below min_len=3 threshold
-        score = self._score(mem_conn, "Go.", 2, 1)
+        score = self._score(mem_conn, "Go.", 2)
         assert score == pytest.approx(0.0)
 
     def test_long_sentence_penalised(self, mem_conn):
-        score_12 = self._score(mem_conn, "Normal sentence.", 12, 6)
-        score_40 = self._score(mem_conn, "Very long sentence.", 40, 6)
-        assert score_40 < score_12
-
-    def test_non_terminal_penalised_for_full_sentence_type(self, mem_conn):
-        score_full = self._score(mem_conn, "The dog barks.", 12, 6)
-        score_frag = self._score(mem_conn, "The dog barks", 12, 6)
-        assert score_frag < score_full
+        score_9 = self._score(mem_conn, "Normal sentence.", 9)
+        score_40 = self._score(mem_conn, "Very long sentence.", 40)
+        assert score_40 < score_9
 
     def test_fragment_type_penalises_terminal(self, mem_conn):
         # fragment=True: terminal punct is penalised (genuine fragments don't end in .!?)
-        score_term = self._score(mem_conn, "On ice.", 3, 0, fragment=True)
-        score_no_term = self._score(mem_conn, "On ice", 3, 0, fragment=True)
+        score_term = self._score(mem_conn, "On ice.", 3, fragment=True)
+        score_no_term = self._score(mem_conn, "On ice", 3, fragment=True)
         assert score_no_term > score_term
-
-    def test_fragment_type_neutral_on_position(self, mem_conn):
-        # fragment=True: position-0 keyword should not be penalised
-        score_init = self._score(mem_conn, "On ice.", 3, 0, fragment=True)
-        score_mid = self._score(mem_conn, "On ice.", 3, 2, fragment=True)
-        assert score_init == pytest.approx(score_mid)
 
     def test_fragment_type_prefers_short_examples(self, mem_conn):
         # 3-word genuine fragment should score higher than 9-word embedded use
-        score_short = self._score(mem_conn, "On the ice", 3, 0, fragment=True)
-        score_long = self._score(mem_conn, "Long sentence.", 9, 0, fragment=True)
+        score_short = self._score(mem_conn, "On the ice", 3, fragment=True)
+        score_long = self._score(mem_conn, "Long sentence.", 9, fragment=True)
         assert score_short > score_long
 
     def test_markup_text_scores_zero(self, mem_conn):
         # Sentences containing corpus markup (⌊…⌋) should be suppressed entirely.
-        score_clean = self._score(mem_conn, "The dog barks.", 12, 6)
-        score_markup = self._score(mem_conn, "The ⌊>dog>⌋ barks.", 12, 6)
+        score_clean = self._score(mem_conn, "The dog barks.", 9)
+        score_markup = self._score(mem_conn, "The ⌊>dog>⌋ barks.", 9)
         assert score_markup == pytest.approx(0.0)
         assert score_clean > 0.0
 
-    def test_sentence_initial_keyword_penalised(self, mem_conn):
-        score_mid = self._score(mem_conn, "The dog barks.", 12, 6)
-        score_init = self._score(mem_conn, "The dog barks.", 12, 0)
-        assert score_init < score_mid
+    def test_terminal_punct_neutral_for_full_sentence(self, mem_conn):
+        # Terminal punctuation no longer affects scoring for full sentences
+        score_with = self._score(mem_conn, "The dog barks.", 9)
+        score_without = self._score(mem_conn, "The dog barks", 9)
+        assert score_with == pytest.approx(score_without)
 
 
 class TestGetPhenomenaByLexids:
@@ -372,16 +361,24 @@ class TestGetPhenomenaByLexids:
         assert len(positions) >= 1
         assert all(isinstance(p, tuple) and len(p) == 2 for p in positions)
 
-    def test_gdex_prefers_whole_sentence(self, mem_conn):
-        """A well-formed sentence outranks a fragment with the same lexid."""
+    def test_gdex_prefers_optimal_length(self, mem_conn):
+        """A sentence in the optimal length range outranks a very short one."""
         mem_conn.executescript("""
             INSERT INTO sent VALUES (2, 'gold', 0, 'Kim', 'dog_n1');
-            INSERT INTO gold VALUES (2, 'gold', 'Kim', NULL, NULL, NULL, NULL, NULL, 2);
+            INSERT INTO gold VALUES (2, 'gold', 'Kim', NULL, NULL, NULL, NULL, NULL, 1);
+            INSERT INTO sent VALUES (3, 'gold', 0, 'The',   NULL);
+            INSERT INTO sent VALUES (3, 'gold', 1, 'big',   NULL);
+            INSERT INTO sent VALUES (3, 'gold', 2, 'brown', NULL);
+            INSERT INTO sent VALUES (3, 'gold', 3, 'dog',   'dog_n1');
+            INSERT INTO sent VALUES (3, 'gold', 4, 'runs',  NULL);
+            INSERT INTO sent VALUES (3, 'gold', 5, 'fast',  NULL);
+            INSERT INTO sent VALUES (3, 'gold', 6, 'now',   NULL);
+            INSERT INTO gold VALUES (3, 'gold', 'The big brown dog runs fast now.', NULL, NULL, NULL, NULL, NULL, 3);
         """)
         _, phenom = get_phenomena_by_lexids(mem_conn, ["dog_n1"])
         first_key = next(iter(phenom))
-        # Sentence 1 ('The dog barks.') scores higher than sentence 2 ('Kim')
-        assert first_key == ("gold", 1)
+        # Sentence 3 (7 words, in optimal 6-12 range) scores highest
+        assert first_key == ("gold", 3)
 
 
 class TestGetPhenomenaByCx:
@@ -409,14 +406,24 @@ class TestGetPhenomenaByCx:
         assert len(spans) >= 1
         assert all(isinstance(s, tuple) and len(s) == 2 for s in spans)
 
-    def test_gdex_prefers_whole_sentence(self, mem_conn):
-        """A well-formed sentence outranks a fragment for the same construction."""
+    def test_gdex_prefers_optimal_length(self, mem_conn):
+        """A sentence in the optimal length range outranks a very short one."""
         mem_conn.executescript("""
             INSERT INTO sent   VALUES (2, 'gold', 0, 'Kim', NULL);
-            INSERT INTO gold   VALUES (2, 'gold', 'Kim', NULL, NULL, NULL, NULL, NULL, 2);
+            INSERT INTO gold   VALUES (2, 'gold', 'Kim', NULL, NULL, NULL, NULL, NULL, 1);
             INSERT INTO typind VALUES ('hd-cmp_c', 'gold', 2, 0, 1);
+            INSERT INTO sent   VALUES (3, 'gold', 0, 'The',   NULL);
+            INSERT INTO sent   VALUES (3, 'gold', 1, 'big',   NULL);
+            INSERT INTO sent   VALUES (3, 'gold', 2, 'brown', NULL);
+            INSERT INTO sent   VALUES (3, 'gold', 3, 'dog',   NULL);
+            INSERT INTO sent   VALUES (3, 'gold', 4, 'runs',  NULL);
+            INSERT INTO sent   VALUES (3, 'gold', 5, 'fast',  NULL);
+            INSERT INTO sent   VALUES (3, 'gold', 6, 'now',   NULL);
+            INSERT INTO gold   VALUES (3, 'gold', 'The big brown dog runs fast now.', NULL, NULL, NULL, NULL, NULL, 3);
+            INSERT INTO typind VALUES ('hd-cmp_c', 'gold', 3, 0, 3);
         """)
         self._seed_typind(mem_conn)
         _, phenom = get_phenomena_by_cx(mem_conn, "hd-cmp_c")
         first_key = next(iter(phenom))
-        assert first_key == ("gold", 1)
+        # Sentence 3 (7 words, in optimal 6-12 range) scores highest
+        assert first_key == ("gold", 3)

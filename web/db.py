@@ -302,9 +302,9 @@ def calculate_offset_limit(N, L):
 
 # Optimal sentence length range for GDEX scoring (easily adjusted here).
 # Shorter than the original GDEX standard (10–25) because grammar parse trees
-# grow complex quickly; 6–18 balances informativeness with readability.
+# grow complex quickly; 6–12 balances informativeness with readability.
 _GDEX_OPT_MIN: int = 6
-_GDEX_OPT_MAX: int = 18
+_GDEX_OPT_MAX: int = 12
 
 
 def _is_fragment_cx(cx: str) -> bool:
@@ -312,14 +312,13 @@ def _is_fragment_cx(cx: str) -> bool:
 
     Fragment constructions (names containing '_frg') parse sub-sentential
     inputs such as section headings or isolated phrases.  Their examples are
-    expected to be fragments, so the whole-sentence and position criteria must
-    not be applied against them.
+    expected to be fragments, so the terminal-punctuation criterion is inverted
+    for them.
     """
     return "_frg" in cx
 
 
 def _gdex_score_sql(
-    kw_pos_expr: str,
     len_expr: str,
     sent_expr: str,
     fragment: bool = False,
@@ -327,31 +326,29 @@ def _gdex_score_sql(
 ) -> str:
     """Return a SQL expression computing a GDEX-inspired quality score (0–1).
 
-    Combines up to four soft ranking preferences adapted from Kilgarriff et al.
+    Combines up to three soft ranking preferences adapted from Kilgarriff et al.
     (2008) and Kosem et al. (2019) for grammar treebank corpora:
 
     1. Sentence length — optimal range ``_GDEX_OPT_MIN``–``_GDEX_OPT_MAX``
-       words (default 6–18); linear ramp below, harmonic decay above.
+       words (default 6–12); linear ramp below, harmonic decay above.
        Fragment constructions use a tighter range (2–5 words ideal, 6–8
        acceptable) because their canonical examples are short phrases.
-    2. Whole sentence — prefer sentences ending in terminal punctuation (.!?);
-       for fragment constructions the rule is inverted (penalise .!? endings,
-       as genuine fragments should not look like complete sentences).
-    3. Keyword position — prefer the target not at word index 0.
-       Neutral (1.0) for fragment constructions (which naturally start there).
-    4. Derivation simplicity (optional) — if ``rule_count_expr`` is given,
+       For fragment constructions, terminal punctuation is penalised (genuine
+       fragments such as section headings should not end in .!?).
+    2. Derivation simplicity (optional) — if ``rule_count_expr`` is given,
        prefer sentences with fewer construction applications in ``typind``
        (proxy for shallower parse trees).
+    3. Technical-text penalty — down-weight sentences containing characters
+       rare in natural prose ([, {, \\, |).
 
     All criteria are ranking weights, not hard filters: the candidate pool is
     already constrained by the queried construction or lexid.
 
     Args:
-        kw_pos_expr: SQL expression for the 0-based keyword word index.
         len_expr: SQL expression for the sentence length (max wid).
         sent_expr: SQL expression for the full sentence string (may be NULL).
         fragment: If True, apply fragment-type scoring (short length range,
-            neutral terminal and position criteria).
+            terminal punctuation penalised).
         rule_count_expr: Optional SQL expression giving the total number of
             construction applications for the sentence (from ``typind``).
             When provided, adds a derivation-simplicity factor.
@@ -359,8 +356,7 @@ def _gdex_score_sql(
     if fragment:
         # Prefer short genuine-fragment examples (2–5 words ideal).
         # Fragments should NOT look like complete sentences, so terminal
-        # punctuation is penalised (inverse of the full-sentence rule).
-        # Position criterion is neutral (fragments naturally start at pos 0).
+        # punctuation is penalised.
         len_score = f"""CASE
             WHEN {len_expr} < 2   THEN 0.0
             WHEN {len_expr} <= 5  THEN 1.0
@@ -368,10 +364,9 @@ def _gdex_score_sql(
             ELSE 4.0 / CAST({len_expr} AS REAL)
         END"""
         terminal_score = (
-            f"CASE WHEN SUBSTR({sent_expr}, -1) IN ('.', '!', '?')"
+            f"\n        * CASE WHEN SUBSTR({sent_expr}, -1) IN ('.', '!', '?')"
             f" THEN 0.7 ELSE 1.0 END"
         )
-        pos_score = "1.0"
     else:
         lo, hi = _GDEX_OPT_MIN, _GDEX_OPT_MAX
         len_score = f"""CASE
@@ -380,15 +375,7 @@ def _gdex_score_sql(
             WHEN {len_expr} <= {hi}          THEN 1.0
             ELSE {hi}.0 / CAST({len_expr} AS REAL)
         END"""
-        terminal_score = (
-            f"CASE WHEN SUBSTR({sent_expr}, -1) IN ('.', '!', '?')"
-            f" THEN 1.0 ELSE 0.7 END"
-        )
-        pos_score = f"""CASE
-            WHEN {len_expr} = 0                                 THEN 0.8
-            WHEN CAST({kw_pos_expr} AS REAL) / {len_expr} > 0.1 THEN 1.0
-            ELSE 0.8
-        END"""
+        terminal_score = ""
 
     # Derivation density = rules / sentence_length; average ERG sentence ≈ 3.
     # Score 1.0 for very simple trees, decays softly for denser derivations.
@@ -417,8 +404,7 @@ def _gdex_score_sql(
     punct_factor = f"\n        * 5.0 / (5.0 + {tech_count})"
     return (
         f"\n        {len_score}"
-        f"\n        * {terminal_score}"
-        f"\n        * {pos_score}"
+        f"{terminal_score}"
         f"{rule_factor}"
         f"{markup_factor}"
         f"{punct_factor}"
@@ -453,7 +439,6 @@ def get_phenomena_by_lexids(conn, lexids):
     maxp = result[0] if result else 0
 
     gdex = _gdex_score_sql(
-        kw_pos_expr="MIN(a.wid)",
         len_expr="MAX(b.wid)",
         sent_expr="g.sent",
         rule_count_expr="COALESCE(g.rule_count, 10)",
@@ -506,7 +491,6 @@ def get_phenomena_by_cx(conn, cx):
 
     is_frg = _is_fragment_cx(cx)
     gdex = _gdex_score_sql(
-        kw_pos_expr="MIN(COALESCE(a.kara, 0))",
         len_expr="MAX(b.wid)",
         sent_expr="g.sent",
         fragment=is_frg,
