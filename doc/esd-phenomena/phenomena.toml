@@ -1,0 +1,263 @@
+# ERG Semantic Phenomena (ESD) as grew queries over DMRS
+#
+# One table per phenomenon from the ESD inventory
+# <https://delph-in.github.io/docs/erg/ErgSemantics_Inventory/>, with:
+#   description  short characterization (from the ESD page)
+#   fingerprint  the ERS fingerprint, verbatim from the ESD page
+#   grew-query   the fingerprint as a grew request over the DMRS corpora
+#                exported by ltdb's scripts/db2grew.py (node features:
+#                pred/lemma/pos/sense/cvarsort/properties; edge features:
+#                1 = DMRS role, post = NEQ/EQ/H/HEQ)
+#   url          the ESD page documenting the phenomenon
+#
+# Conventions: DMRS (via pydelphin) renames coordination roles
+# L-INDEX/R-INDEX to ARG1/ARG2.  MRS handle arguments restricted by qeq
+# appear as edges with post=H; label sharing as post=EQ/HEQ.
+# Check the queries with: python check_phenomena.py <corpus-id>
+
+[apposition]
+description = "A full NP is followed by another nominal phrase with the same referent; the construction introduces a two-place 'appos' relation between the two instances."
+fingerprint = '''
+appos[ARG1 x1, ARG2 x2]
+[ARG0 x1]
+[ARG0 x2]
+'''
+grew-query = 'pattern { A [pred="appos"]; A -[1=ARG1]-> X; A -[1=ARG2]-> Y }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_Apposition/"
+
+[compounding]
+description = "Head-modifier compounds (e.g. 'garden dog') introduce an underspecified two-place 'compound' relation between the head's instance and the modifier's instance."
+fingerprint = '''
+h0:compound[ARG1 x1, ARG2 x2]
+h0:[ARG0 x1]
+[ARG0 x2]
+'''
+grew-query = 'pattern { C [pred="compound"]; C -[1=ARG1]-> H; C -[1=ARG2]-> M }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_Compounding/"
+
+[conditionals]
+description = "Conditional sentences introduce a two-place '_if_x_then' relation taking the consequent (main) clause handle as ARG1 and the antecedent (if-) clause handle as ARG2, both qeq."
+fingerprint = '''
+if_x_then[ARG1 h1, ARG2 h2]
+h3:[ARG0 e1]
+h4:[ARG0 e2]
+{ h1 =q h3, h2 =q h4 }
+'''
+grew-query = 'pattern { I [pred="_if_x_then"]; I -[1=ARG1, post=H]-> C1; I -[1=ARG2, post=H]-> C2 }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_Conditionals/"
+
+[coordination]
+description = "Coordination introduces a binary conjunction relation ('abstract_c': _and_c, _or_c, implicit_conj, ...); nominal coordination links the conjuncts' instances, other coordination their handles. N-ary coordination is successive binary combination."
+fingerprint = '''
+abstract_c[ARG0 x1, ARG1 x2, ARG2 x3]
+[ARG0 x2]
+[ARG0 x3]
+'''
+grew-query = 'pattern { C [pred=re".*_c\|implicit_conj"]; C -[1=ARG1]-> L; C -[1=ARG2]-> R }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_Coordination/"
+
+[foreign-expressions]
+description = "Sequences of foreign words get no internal linguistic structure; they are represented by a 'fw_seq' relation combining the parts."
+fingerprint = '''
+h0:fw_seq[ARG1 i1, ARG2 i2]
+h0:[ARG0 i1]
+h0:[ARG0 i2]
+'''
+grew-query = 'pattern { F [pred="fw_seq"] }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_ForeignExpressions/"
+
+[fragments]
+description = "Utterances consisting of just a word or phrase are interpreted as an argument or modifier of an implied eventuality represented by the 'unknown' relation."
+fingerprint = '''
+h0:unknown[ARG0 e1, ARG x2]
+_[ARG0 x2]
+'''
+grew-query = 'pattern { U [pred="unknown"] }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_Fragments/"
+
+[imperatives]
+description = "Imperative clauses leave the subject unexpressed (a second-person zero pronoun is inserted) and mark the verb's eventuality with commanding sentence force and present tense."
+fingerprint = '''
+pron[ARG0 x {PERS 2}]
+[ARG0 e {SF comm, TENSE pres}, ARG1 x]
+'''
+grew-query = 'pattern { V [SF="comm", TENSE="pres"]; V -[1=ARG1]-> P; P [pred="pron", PERS="2"] }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_Imperatives/"
+
+[implicit-locatives]
+description = "Expressions locating an entity or event in time or space without specifying the relation (now, here, every day, ...) introduce a 'loc_nonsp' relation between the located eventuality and the location entity."
+fingerprint = '''
+loc_nonsp[ARG1 i, ARG2 x]
+'''
+grew-query = 'pattern { L [pred="loc_nonsp"]; L -[1=ARG1]-> E; L -[1=ARG2]-> X }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_ImplicitLocatives/"
+
+[implicit-nominals]
+description = "Anaphoric noun phrases without a head noun (Browne's, three, one anaphora) introduce 'generic_entity', a cue that anaphora resolution is required."
+fingerprint = '''
+generic_entity[ARG0 x]
+'''
+grew-query = 'pattern { G [pred="generic_entity"] }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_ImplicitNominals/"
+
+[implicit-quantifiers]
+description = "Instances not bound by an overt determiner are bound by implicit (abstract) quantifiers such as udef_q, def_implicit_q, def_explicit_q, pronoun_q, proper_q or number_q."
+fingerprint = '''
+quant[ARG0 x, RSTR h2, BODY h3]
+h4:[ARG0 x]
+{ h2 =q h4 }
+'''
+grew-query = 'pattern { Q [pred=re"[^_].*_q"]; Q -[1=RSTR, post=H]-> N }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_ImplicitQuantifiers/"
+
+[instrumental-relatives]
+description = "Infinitival relative clauses whose head noun is an instrument of the clause (a knife to cut it with); the construction supplies a 'with_p' relation sharing its label with the clause."
+fingerprint = '''
+h:with_p[ARG1 e, ARG2 x]
+h:[ARG0 e]
+h:[ARG0 x]
+'''
+grew-query = 'pattern { W [pred="with_p"]; W -[1=ARG1, post=EQ]-> E; W -[1=ARG2]-> X }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_InstrumentalRelatives/"
+
+[measure-phrases]
+description = "A measure phrase used as degree specifier of an adjective (two inches too short) introduces a two-place 'measure' relation between the adjective's eventuality and the measured instance."
+fingerprint = '''
+h0:measure[ARG0 e1, ARG1 e2, ARG2 x]
+h0:[ARG0 e2]
+h1:[ARG0 x]
+'''
+grew-query = 'pattern { M [pred="measure"]; M -[1=ARG1]-> A; M -[1=ARG2]-> X }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_MeasurePhrases/"
+
+[nominalization]
+description = "Nominal and verbal gerunds, clausal subjects etc. wrap a verbal constituent's semantics in a 'nominalization' relation introducing a referential index whose ARG1 is the verbal handle."
+fingerprint = '''
+h0:nominalization[ARG0 x, ARG1 h1]
+h1:[ARG0 e]
+'''
+grew-query = 'pattern { N [pred="nominalization"]; N -[1=ARG1]-> V; V [cvarsort="e"] }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_Nominalization/"
+
+[non-adverbial-clausal-modifiers]
+description = "Depictive and absolutive sentence modifiers without a finite verbal head (Angry at Browne, he stormed out) are related to the modified clause by a two-place 'subord' predication over handles."
+fingerprint = '''
+subord[ARG1 h1, ARG2 h2]
+h3:[ARG0 e1]
+h4:[ARG0 e2]
+{ h1 =q h3, h2 =q h4 }
+'''
+grew-query = 'pattern { S [pred="subord"]; S -[1=ARG1, post=H]-> M; S -[1=ARG2, post=H]-> C }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_NonAdverbialClausalModifiers/"
+
+[number-sequences]
+description = "Number sequences read as strings of smaller numbers (phone numbers, zip codes: nine four three oh five) are combined by the 'num_seq' relation, binarized like coordination."
+fingerprint = '''
+num_seq[L-INDEX x1, R-INDEX x2]
+'''
+grew-query = 'pattern { N [pred="num_seq"] }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_NumberSequences/"
+
+[parentheticals]
+description = "Constituents set off by parentheses or dashes and only loosely integrated are attached by a 'parenthetical' relation between the host's intrinsic argument and the parenthetical clause's handle."
+fingerprint = '''
+h0:parenthetical[ARG1 i1, ARG2 h2]
+h0:[ARG0 i1]
+'''
+grew-query = 'pattern { P [pred="parenthetical"]; P -[1=ARG1]-> H; P -[1=ARG2, post=H]-> C }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_Parentheticals/"
+
+[partitives]
+description = "Noun phrases without an overt head noun whose referent is a subset of the entities given by an of-PP (some of the dogs) introduce the 'part_of' relation between subset and set."
+fingerprint = '''
+part_of[ARG0 x1, ARG1 x2]
+'''
+grew-query = 'pattern { P [pred="part_of"]; P -[1=ARG1]-> X }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_Partitives/"
+
+[quasi-modal-infinitivals]
+description = "Quasi-modal be and modal-flavoured infinitival relatives (the man to fix it) are modeled by the 'eventuality' relation scoping (qeq) over the infinitival clause."
+fingerprint = '''
+eventuality[ARG1 h1]
+h2:[ARG0 e]
+{ h1 =q h2 }
+'''
+# the grammar realizes the qeq as a direct label argument (post=HEQ)
+grew-query = 'pattern { E [pred="eventuality"]; E -[1=ARG1, post=HEQ]-> V }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_QuasiModalInfinitivals/"
+
+[ellipsis]
+description = "Post-auxiliary (VP) ellipsis is marked by 'ellipsis_ref' (referential subject, with an ARG1 to it) or 'ellipsis_expl' (expletive subject), cueing the search for an antecedent."
+fingerprint = '''
+ellipsis_ref[ARG1 x0]
+ellipsis_expl[ARG1 u0]
+'''
+grew-query = 'pattern { E [pred=re"ellipsis_ref\|ellipsis_expl"] }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_Ellipsis/"
+
+[time-expressions]
+description = "Complex time expressions like 'June third' relate a day/part-of-day to a named day or month with 'of_p', with def_implicit_q and def_explicit_q quantifiers binding the parts."
+fingerprint = '''
+of_p[ARG1 x1, ARG2 x2]
+dofm_or_mofy[ARG0 x2]
+def_explicit_q[ARG0 x1]
+def_implicit_q[ARG0 x2]
+'''
+grew-query = 'pattern { O [pred="of_p"]; O -[1=ARG2]-> D; D [pred=re"dofm\|mofy"] }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_TimeExpressions/"
+
+[comparatives]
+description = "Comparative constructions introduce a 'comp' relation (comp, comp_equal, comp_less, ...) whose label is shared with the gradable adjective and whose ARG1 is the adjective's eventuality."
+fingerprint = '''
+h:comp[ARG1 e]
+h:*_a*[ARG0 e]
+'''
+grew-query = 'pattern { C [pred=re"comp\(_.*\)?"]; C -[1=ARG1, post=EQ]-> A; A [pos="a"] }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_Comparatives/"
+
+[control-relations]
+description = "Control (equi) predicates take an individual argument and a clausal argument such that the individual also fills a role inside the clause (Kim tried to sleep)."
+fingerprint = '''
+[ARG0 e1, ARG1+ x2, ARG1+ h3]
+h4:[ARG0 e5, ARG1+ x2]
+{ h3 =q h4 }
+'''
+grew-query = 'pattern { P -[1=ARG1|ARG2|ARG3|ARG4, post=H]-> V; V [cvarsort="e"]; P -[1=ARG1|ARG2|ARG3|ARG4]-> X; X [cvarsort="x"]; V -[1=ARG1|ARG2|ARG3|ARG4]-> X }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_ControlRelations/"
+
+[identity-copulae]
+description = "Copula uses denoting identity between two arguments, expressed by any of several predications: _be_v_id, _colon_v_id, id, cop_id, _be_v_nv, _be_v_do."
+fingerprint = '''
+_be_v_id[ARG1 x1, ARG2 x2]
+h1:[ARG0 x1]
+h2:[ARG0 x2]
+{ h3 =q h1, h4 =q h2 }
+'''
+grew-query = 'pattern { C [pred=re"_be_v_id\|_colon_v_id\|id\|cop_id\|_be_v_nv\|_be_v_do"]; C -[1=ARG1]-> X }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_IdentityCopulae/"
+
+[propositional-arguments]
+description = "Predicates taking a clausal (propositional) argument: some ARGn of the predicate is a handle qeq to the embedded clause's eventuality (believed that S, doubted whether S)."
+fingerprint = '''
+[ARG* h1]
+h2:[ARG0 e]
+{ h1 =q h2 }
+'''
+grew-query = 'pattern { P -[1=ARG1|ARG2|ARG3|ARG4, post=H]-> V; V [cvarsort="e"] }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_PropositionalArguments/"
+
+[relational-nouns]
+description = "Nouns with semantic arguments (picture of Kim, edge of town). The ESD page gives no fingerprint; the query approximates with a noun predicate taking an ARG1."
+fingerprint = '''
+(no fingerprint on the ESD page)
+'''
+grew-query = 'pattern { N [pos="n"]; N -[1=ARG1]-> X }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_RelationalNouns/"
+
+[vocatives]
+description = "Vocative NPs explicitly mark the addressee without filling a semantic role; the 'addressee' relation links the NP instance to the situation of the rest of the sentence."
+fingerprint = '''
+addressee[ARG1 x, ARG2 e]
+'''
+grew-query = 'pattern { A [pred="addressee"]; A -[1=ARG1]-> X; A -[1=ARG2]-> E }'
+url = "https://delph-in.github.io/docs/erg/ErgSemantics_Vocatives/"

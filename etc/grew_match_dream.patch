@@ -1,0 +1,44 @@
+diff --git a/src/gmd_utils.ml b/src/gmd_utils.ml
+index eae37e3..8d470fc 100644
+--- a/src/gmd_utils.ml
++++ b/src/gmd_utils.ml
+@@ -258,6 +258,16 @@ end
+ 
+ 
+ 
++(* ============================================================================================================================ *)
++(* relative url metas (starting with "/") get the LTDB base URL from the
++   environment, so corpora need not be re-exported when the address changes *)
++let ltdb_base_url = CCOption.get_or ~default:"" (Sys.getenv_opt "LTDB_BASE_URL")
++
++let expand_url s =
++  if String.length s > 0 && s.[0] = '/'
++  then ltdb_base_url ^ s
++  else s
++
+ (* ============================================================================================================================ *)
+ let save_dep uuid ~config ?audio_info rtl base sent_id deco graph sentence meta =
+   try 
+@@ -271,7 +281,9 @@ let save_dep uuid ~config ?audio_info rtl base sent_id deco graph sentence meta
+         Some ("filename", `String (Filename.concat uuid filename));
+         Some ("sent_id", `String sent_id);
+         Some ("sentence", `String sentence);
+-        Some ("meta", `Assoc (List.map (fun (k,v) -> (k, `String v)) meta));
++        Some ("meta", `List (List.map (fun (k,v) -> `Assoc [("key", `String k); ("value", `String v); ("sub", `Assoc [])]) meta));
++        Some ("code", match Graph.get_meta_opt "code" graph with Some s -> `String s | None -> `Null);
++        Some ("url", match Graph.get_meta_opt "url" graph with Some s -> `String (expand_url s) | None -> `Null);
+         CCOption.map (fun v -> ("shift", `Float v)) shift;
+         CCOption.map (fun s -> ("audio", `String s)) audio_info;
+       ]) in 
+@@ -292,9 +304,9 @@ let save_dot uuid ~config base sent_id deco graph sentence meta =
+       ("filename", `String (Filename.concat uuid filename));
+       ("sent_id", `String sent_id);
+       ("sentence", `String sentence);
+-      ("meta", `Assoc (List.map (fun (k,v) -> (k, `String v)) meta));
++      ("meta", `List (List.map (fun (k,v) -> `Assoc [("key", `String k); ("value", `String v); ("sub", `Assoc [])]) meta));
+       ("code", match Graph.get_meta_opt "code" graph with Some s -> `String s | None -> `Null);
+-      ("url", match Graph.get_meta_opt "url" graph with Some s -> `String s | None -> `Null);
++      ("url", match Graph.get_meta_opt "url" graph with Some s -> `String (expand_url s) | None -> `Null);
+     ] in
+   data
+ 

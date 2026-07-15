@@ -1,6 +1,5 @@
 
 function DMRS(parentElement, dmrs) {
-    var dmrsData = JSON.parse(JSON.stringify(dmrs));  // make a copy
     var maxWidth = 600,
         height = 300;
 
@@ -8,8 +7,6 @@ function DMRS(parentElement, dmrs) {
         edge_radius = 15, // rounded corner radius,
         edge_xoffset = 10, // outgoing edges aren't centered
         node_dx = 20;  // horizontal separation between nodes
-
-    var color = d3.scale.category20();
 
     function prepareGraph() {
         var nodeIdx = {}, levelIdx = {};
@@ -32,7 +29,7 @@ function DMRS(parentElement, dmrs) {
         });
         dmrs.maxTopLevel = 0;
         dmrs.maxBottomLevel = 0;
-        for (dist=0; dist<dmrs.nodes.length; dist++) {
+        for (let dist=0; dist<dmrs.nodes.length; dist++) {
             dmrs.links.forEach(function(d) {
                 if (d.from == 0) return;
                 if (dist != d.distance) return;
@@ -254,8 +251,8 @@ function DMRS(parentElement, dmrs) {
               })
               .attr("x", function(d, i) {
                   d.bbox = this.getBBox();
-                  halfLen = d.bbox.width / 2;
-                  x = x_pos + halfLen;
+                  const halfLen = d.bbox.width / 2;
+                  const x = x_pos + halfLen;
                   x_pos = x + halfLen + node_dx;
                   d.x = x;
                   return x;
@@ -291,8 +288,11 @@ function DMRS(parentElement, dmrs) {
                   updateHighlights(id);
               });
 
-          // not working...
-          svg.attr("width", d3.sum(nodes.data(), function(d) { return d.bbox.width + node_dx; }));
+          var innerG = svg[0][0].querySelector('g');
+          if (innerG) {
+              var bbox = innerG.getBBox();
+              svg.attr('width', bbox.x + bbox.width + 20);
+          }
 
           var links = g.selectAll(".link").order()
               .data(dmrs.links)
@@ -331,7 +331,7 @@ function DMRS(parentElement, dmrs) {
 
     var self = {
         parent: parentElement,
-        data: dmrsData,
+        data: dmrs,
         element: drawDmrs()
     };
 

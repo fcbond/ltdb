@@ -1,74 +1,139 @@
 {% extends 'layout.html' %}
 
 {% block css %}
-<link href="{{ url_for('static', filename='css/home.css') }}" rel="stylesheet">
+<style>
+  #loadingOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(255,255,255,0.8);
+    z-index: 9999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  #loadingOverlay.active { display: flex; }
+  #grammarTable tbody tr { cursor: pointer; }
+  #grammarTable tbody tr:hover { background-color: rgba(var(--bs-primary-rgb), 0.06); }
+  #grammarTable tbody tr.selected { background-color: rgba(var(--bs-primary-rgb), 0.12); font-weight: 500; }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="container">
-  <h1>Overview</h1>
-
-
-
-  
-  <p>Welcome to the Linguistic Type Database.
-    
-    {%if grm == None %}
-    <p class="text-danger font-weight-bold">Please Select a Grammar</p>
-    {% else %}
-    <p>You can select your grammar here:
-    {% endif %}
-    
-  <form id="grammarForm" action="/" method="POST">
-      <div class="form-check">
-        {% for grammar in grammars %} 
-        <input class="form-check-input" type="radio" id="{{grammar}}" name="grm" value="{{grammar}}"
-	       {%if grammar == grm %}checked='checked'{% endif %}>
-        <label class="form-check-label" for="{{grammar}}">{{grammar}}</label><br>
-        {% endfor %}
-      </div>
-    </form>
-
-    <p>There is <a href='https://delph-in.github.io/docs/garage/LkbLtdb/'>more documentation</a> on the DELPH-IN wiki (somewhat out of date) 
-    
-      <h3>References</h3>
-      <dl>Francis Bond (2022)
-	<dt><a href='https://hpsg2022.github.io/abstracts/Bond.pdf'>Documenting
-	computational grammars with the Linguistic Type Database”</a>.
-	Invited Talk at HPSG 2022 (online)
-      
-      <dl>
-	<dt><a name="Hashimoto:Bond:Flickinger:2007"> Chikara Hashimoto, Francis Bond, and Dan Flickinger (2007)</a></dt>
-	<dd><a href="https://dl.acm.org/doi/10.5555/1769901.1769909">The lextype DB: A web-based framework for collaborative multilingual grammar and treebank development</a>. 
- In <i>The First International Workshop on Intercultural Collaboration (IWIC-2007)</i>, pages 44&ndash;58, Kyoto. 
-</dd>
-
-	<dt><a name="Hashimoto:Bond:Tanaka:Siegel:2007">Chikara Hashimoto, Francis Bond, Takaaki Tanaka and Melanie Siegel (2007)</a></dt>
-	<dd><a href='https://doi.org/10.1007/s10579-008-9065-9'>Semi-automatic documentation of an implemented linguistic grammar
-augmented with a treebank.</a>
-     <i>Language Resources and Evaluation.</i> (Special issue on Asian language technology) <b>42</b>(2):117&ndash;126.  DOI: <a href='https://doi.org/10.1007/s10579-008-9065-9'>10.1007/s10579-008-9065-9</a>
-	</dd>
-	<dt><a name="Hashimoto:Bond:Tanaka:Siegel:2005">Chikara Hashimoto, Francis Bond, Takaaki Tanaka, and Melanie Siegel (2005)</a></dt>
-	<dd><a href="https://aclanthology.org/I05-6004/">Integration of a Lexical Type Database with a Linguistically Interpreted Corpus</a>. 
-In <i><a href="https://aclanthology.org/volumes/I05-6/">Proceedings of the Sixth International Workshop on Linguistically Interpreted Corpora (LINK-2005)</a></i>, 31&ndash;40, Cheju, Korea.
-	</dd>
-	
-      </dl>
-
-      
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        const form = document.getElementById('grammarForm');
-        const radios = form.querySelectorAll('input[name="grm"]');
-        
-        radios.forEach(radio => {
-          radio.addEventListener('change', function() {
-            if (this.checked) {
-              form.submit();
-            }
-          });
-        });
-      });
-    </script>
+<div id="loadingOverlay">
+  <div class="spinner-border text-primary mb-3" role="status">
+    <span class="visually-hidden">Loading…</span>
+  </div>
+  <p class="text-muted" id="loadingMsg">Loading grammar…</p>
 </div>
+
+<section>
+  <h1>Overview</h1>
+  <p>The Linguistic Type Database (LTDB) documents <a href="https://delph-in.github.io/docs/home/HomePage">DELPH-IN</a> grammars —
+  large-scale precision grammars for natural language processing. Select a grammar below, then:</p>
+  <ul class="mb-3">
+    <li><strong>Summary</strong> — counts of types, rules, and treebank coverage</li>
+    <li><strong>Rules</strong> — phrase-structure, lexical, and morphological rules with corpus frequencies</li>
+    <li><strong>Lexical Types</strong> — the lexical type hierarchy with example words</li>
+    {% if not is_static_mirror %}
+    <li><strong>Demo</strong> — parse a sentence interactively and view the derivation tree, MRS, and DMRS</li>
+    <li><strong>Search</strong> — look up any lemma, type, or predicate using the search box in the navigation bar</li>
+    {% else %}
+    <li><strong>Search</strong> — look up any type using the search box in the navigation bar</li>
+    {% endif %}
+  </ul>
+  {% if is_static_mirror %}
+    <div class="alert alert-info" role="alert">
+      This is a static backup mirror. Interactive parsing, generation, and
+      lexical-entry and example search are available in the
+      <a href="{{ full_ltdb_base_url }}">full LTDB</a>.
+    </div>
+  {% endif %}
+  
+  {% if grm == None and not is_static_mirror %}
+    <div class="alert alert-danger" role="alert">
+      <strong>Please Select a Grammar</strong> - Choose from the available grammars below to get started.
+    </div>
+  {% endif %}
+  
+  <form id="grammarForm" action="{{ url_for('home') }}" method="POST">
+    <input type="hidden" id="grmInput" name="grm" value="">
+  </form>
+
+  <div class="table-responsive">
+  <table id="grammarTable" class="table table-hover table-sm w-100">
+    <thead>
+      <tr>
+        <th>Grammar</th>
+        <th>File</th>
+        <th class="text-end">Lexicon</th>
+        <th class="text-end">Rules</th>
+        <th class="text-end">Trees</th>
+        <th>License</th>
+        <th>Website</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for grammar in grammars %}
+      {% set s = summ[grammar] %}
+      <tr data-grm="{{ grammar }}" data-name="{{ s.get('GRAMMAR_NAME', grammar) }}"
+          {% if is_static_mirror %}data-href="{{ grammar_href(grammar) }}"{% endif %}
+          {% if grammar == grm %}class="selected"{% endif %}>
+        <td>{{ s.get('GRAMMAR_NAME', grammar.split('_')[0]) }}</td>
+        <td class="text-muted font-monospace small">{{ grammar }}</td>
+        <td class="text-end">{{ "{:,}".format(s.get('LEXICON', 0)) }}</td>
+        <td class="text-end">{{ "{:,}".format(s.get('RULES', 0)) }}</td>
+        <td class="text-end">{{ "{:,}".format(s.get('TREES', 0)) if s.get('TREES', 0) else '' }}</td>
+        <td>{{ s.get('LICENSE', '') }}</td>
+        <td>{% if s.get('WEBSITE') %}<a href="{{ s.get('WEBSITE') }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">link</a>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <p>There is <a href='https://delph-in.github.io/docs/garage/LkbLtdb/'>more documentation</a> on the DELPH-IN wiki (somewhat out of date).</p>
+  
+  <h3>References</h3>
+  <dl>
+    <dt>Francis Bond (2022)</dt>
+    <dd><a href='https://hpsg2022.github.io/abstracts/Bond.pdf'>Documenting computational grammars with the Linguistic Type Database</a>. Invited Talk at HPSG 2022 (online)</dd>
+    
+    <dt><a name="Hashimoto:Bond:Flickinger:2007">Chikara Hashimoto, Francis Bond, and Dan Flickinger (2007)</a></dt>
+    <dd><a href="https://dl.acm.org/doi/10.5555/1769901.1769909">The lextype DB: A web-based framework for collaborative multilingual grammar and treebank development</a>. In <i>The First International Workshop on Intercultural Collaboration (IWIC-2007)</i>, pages 44–58, Kyoto.</dd>
+
+    <dt><a name="Hashimoto:Bond:Tanaka:Siegel:2007">Chikara Hashimoto, Francis Bond, Takaaki Tanaka and Melanie Siegel (2007)</a></dt>
+    <dd><a href='https://doi.org/10.1007/s10579-008-9065-9'>Semi-automatic documentation of an implemented linguistic grammar augmented with a treebank.</a> <i>Language Resources and Evaluation.</i> (Special issue on Asian language technology) <b>42</b>(2):117–126. DOI: <a href='https://doi.org/10.1007/s10579-008-9065-9'>10.1007/s10579-008-9065-9</a></dd>
+    
+    <dt><a name="Hashimoto:Bond:Tanaka:Siegel:2005">Chikara Hashimoto, Francis Bond, Takaaki Tanaka, and Melanie Siegel (2005)</a></dt>
+    <dd><a href="https://aclanthology.org/I05-6004/">Integration of a Lexical Type Database with a Linguistically Interpreted Corpus</a>. In <i><a href="https://aclanthology.org/volumes/I05-6/">Proceedings of the Sixth International Workshop on Linguistically Interpreted Corpora (LINK-2005)</a></i>, 31–40, Cheju, Korea.</dd>
+  </dl>
+
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  $('#grammarTable').DataTable({
+    pageLength: 25,
+    columnDefs: [
+      { targets: [2, 3, 4], className: 'dt-right', type: 'num-fmt' },
+      { targets: [6], orderable: false }
+    ],
+    language: { search: 'Filter:' }
+  });
+
+  $('#grammarTable tbody').on('click', 'tr', function () {
+    const grm = this.dataset.grm;
+    const name = this.dataset.name;
+    {% if is_static_mirror %}
+    window.location.href = this.dataset.href;
+    {% else %}
+    document.getElementById('loadingMsg').textContent = 'Loading ' + name + '\u2026';
+    document.getElementById('loadingOverlay').classList.add('active');
+    document.getElementById('grmInput').value = grm;
+    document.getElementById('grammarForm').submit();
+    {% endif %}
+  });
+</script>
 {% endblock %}

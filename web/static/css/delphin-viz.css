@@ -16,6 +16,18 @@
 
 .highlighted {color: red}
 
+.ltdb {
+    cursor: pointer;
+    fill: #1f6f8b;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+}
+
+.ltdb:hover {
+    fill: #155a76;
+    font-weight: 600;
+}
+
 
 
 /* MRS specific */
