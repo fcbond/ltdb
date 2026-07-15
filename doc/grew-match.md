@@ -14,6 +14,9 @@ This is entirely optional: LTDB itself works without grew installed.
 python scripts/db2grew.py "web/db/ERG_(2020).db"
 ```
 
+(or pass `--grew` to `scripts/grm2db.py` to export while building the
+database, with `--ltdb-url` forwarded).
+
 This writes (by default next to the database):
 
 ```
@@ -33,9 +36,10 @@ button on each match that jumps back into LTDB (sentence with its
 tree, DMRS and MRS).  Re-export (and recompile) if the LTDB address
 changes.
 
-To serve several grammar databases from one grew-match instance, run
-the script once per database with the same `--outdir` parent and merge
-the `corpora.json` lists into one file.
+To serve several grammar databases from one grew-match instance,
+export each one and let `./run.sh --grew-match` merge the
+`corpora.json` lists (into `web/db/grew_corpora.json`); to do the
+same by hand, concatenate the lists into one file.
 
 ### Graph encoding
 
@@ -82,7 +86,9 @@ alongside LTDB, compiles the corpora, and links the two:
 ./run.sh --grew-match "web/db/ERG_(2020)-grew/corpora.json"
 ```
 
-(With a single `web/db/*-grew` export the argument can be omitted.)
+(Without the argument, every `web/db/*-grew` export is served — the
+corpora of all exported grammars appear in one dropdown.  Restart to
+pick up newly exported grammars.)
 
 To run grew-match by hand instead:
 

@@ -9,8 +9,9 @@ set -euo pipefail
 # --grew-match also starts a linked grew-match server (frontend :8000,
 # backend :8899) and sets LTDB_GREW_MATCH_URL so the navigation bar
 # links to it.  CORPORA_JSON is a corpora description produced by
-# scripts/db2grew.py; if omitted, the single web/db/*-grew/corpora.json
-# export is used.  See doc/grew-match.md for details.
+# scripts/db2grew.py; if omitted, every web/db/*-grew/corpora.json
+# export is served (merged into web/db/grew_corpora.json when there is
+# more than one).  See doc/grew-match.md for details.
 
 cd "$(dirname "$0")"
 
@@ -64,12 +65,25 @@ start_grew_match() {
            "run scripts/db2grew.py first (see doc/grew-match.md)" >&2
       exit 1
     fi
-    if [ ${#candidates[@]} -gt 1 ]; then
-      echo "Several grew exports found, pass one explicitly:" >&2
-      printf '  ./run.sh --grew-match "%s"\n' "${candidates[@]}" >&2
-      exit 1
+    if [ ${#candidates[@]} -eq 1 ]; then
+      grew_corpora="${candidates[0]}"
+    else
+      # several grammars are exported: serve them all from one instance
+      grew_corpora="web/db/grew_corpora.json"
+      echo "Merging ${#candidates[@]} grew exports into ${grew_corpora}"
+      python3 - "$grew_corpora" "${candidates[@]}" <<'PY'
+import json
+import sys
+
+merged_path, *corpora_paths = sys.argv[1:]
+corpora = []
+for path in corpora_paths:
+    with open(path) as f:
+        corpora.extend(json.load(f))
+with open(merged_path, "w") as f:
+    json.dump(corpora, f, indent=2)
+PY
     fi
-    grew_corpora="${candidates[0]}"
   fi
   if [ ! -f "$grew_corpora" ]; then
     echo "No such corpora description: $grew_corpora" >&2
