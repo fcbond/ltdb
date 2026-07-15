@@ -76,8 +76,9 @@ Options:
                in the `doctest` table of the grammar database (requires `--ace`
                or a pre-existing `.dat` in the output directory)
 - `--grew`     also export the gold trees and DMRS as grew JSON corpora next
-               to the database, ready for `./run.sh --grew-match`
-               (`--ltdb-url BASE` makes grew-match results link back to LTDB)
+               to the database, ready for `./run.sh --grew-match`; results
+               link back to LTDB via relative URLs that the grew-match
+               backend expands with `$LTDB_BASE_URL` at serve time
 
 The grammars are read by a web application written using Flask.
 See [Install.md](Install.md) for deployment instructions.

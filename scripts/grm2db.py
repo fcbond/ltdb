@@ -230,8 +230,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--ltdb-url",
-        help="With --grew: base URL of the LTDB instance, so grew-match "
-             "results link back to its sentence pages",
+        help="With --grew: bake this absolute LTDB base URL into the "
+             "exported link metas (default: relative links, expanded from "
+             "$LTDB_BASE_URL by the grew-match backend at serve time)",
     )
     parser.add_argument("metadata", type=Path, help="METADATA file for the grammar")
 

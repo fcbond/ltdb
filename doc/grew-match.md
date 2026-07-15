@@ -29,12 +29,16 @@ ERG_(2020)-grew/
 Options: `--outdir DIR`, `--profiles NAME` (repeatable),
 `--trees-only`, `--dmrs-only`, `--ltdb-url BASE`.
 
-With `--ltdb-url` (e.g. `--ltdb-url http://localhost:5000`), every
-graph gets a `url` meta pointing at the LTDB sentence page
+Every graph gets a `url` meta pointing at the LTDB sentence page
 `/sent/<profile>/<sid>?grm=<dbfile>`, and grew-match shows a link
 button on each match that jumps back into LTDB (sentence with its
-tree, DMRS and MRS).  Re-export (and recompile) if the LTDB address
-changes.
+tree, DMRS and MRS).  The stored path is *relative*: the (patched)
+backend prepends the base from the `LTDB_BASE_URL` environment
+variable at serve time, so one export works for any LTDB address —
+`run.sh` sets it automatically, and a production deployment sets it
+when starting the backend.  Pass `--ltdb-url BASE` only to bake an
+absolute base into the export instead (e.g. for corpora served by an
+unpatched grew-match).
 
 To serve several grammar databases from one grew-match instance,
 export each one and let `./run.sh --grew-match` merge the
@@ -176,8 +180,8 @@ expressions over feature values, ...).
 
 In the grew-match web page, click a `sent_id` in the results list to
 see the rendered graph with the matched nodes highlighted (the SVG
-button opens the image on its own; the link button — with
-`--ltdb-url` — opens the sentence in LTDB).
+button opens the image on its own; the link button opens the
+sentence in LTDB).
 
 The web interface only exports matches as TSV or CoNLL, but the
 corpora themselves are JSON: a match `ace/100` *is* the graph file
@@ -189,9 +193,12 @@ command line:
 grew grep -request q.req -i OUT/<corpus> > matches.json
 ```
 
-Note (2026-06-11): the grew_match_dream backend on GitHub lags
-behind the grew_match frontend and needs two patches to
-`src/gmd_utils.ml` (then `dune build` and restart):
+## 6. Backend patches
+
+The grew_match_dream backend on GitHub lags behind the grew_match
+frontend and needs the patches in `etc/grew_match_dream.patch`
+(applied to `src/gmd_utils.ml`, then `dune build` and restart;
+`run.sh --grew-match` clones and patches it automatically):
 
 - `save_dep`/`save_dot` must encode each item's `meta` as a list of
   `{"key": ..., "value": ..., "sub": {}}` objects, not a plain map —
@@ -199,4 +206,9 @@ behind the grew_match frontend and needs two patches to
   (a `meta.find is not a function` error in the browser console);
 - `save_dep` must pass the `url` and `code` metas through (only
   `save_dot` does), or the link button never appears for
-  dependency-rendered corpora.
+  dependency-rendered corpora;
+- relative `url` metas are expanded with `$LTDB_BASE_URL` at serve
+  time (see section 1).
+
+The first two are worth filing upstream at
+<https://github.com/grew-nlp/grew_match_dream>.

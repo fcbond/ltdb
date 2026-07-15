@@ -90,7 +90,8 @@ PY
     exit 1
   fi
 
-  # reuse an instance that is already running (leave its lifecycle alone)
+  # reuse an instance that is already running (leave its lifecycle alone;
+  # note it keeps the corpora and LTDB_BASE_URL from its own startup)
   if curl -s -m 2 -X POST "http://localhost:${gm_back_port}/ping" \
       >/dev/null 2>&1; then
     echo "Reusing the grew-match server already on port ${gm_back_port}"
@@ -121,6 +122,19 @@ PY
         grew_match_quick/local_files/grew_match
   fi
   mkdir -p grew_match_quick/local_files/grew_match/instances
+  # The backend needs fixes that are not upstream yet (result meta
+  # encoding, url/code passthrough, LTDB_BASE_URL expansion — see
+  # doc/grew-match.md), so clone it before grew_match_quick.py does
+  # and apply them.
+  if [ ! -d grew_match_quick/local_files/grew_match_dream/.git ]; then
+    git clone https://github.com/grew-nlp/grew_match_dream.git \
+        grew_match_quick/local_files/grew_match_dream
+    git -C grew_match_quick/local_files/grew_match_dream \
+        apply "$PWD/etc/grew_match_dream.patch"
+    git -C grew_match_quick/local_files/grew_match_dream \
+        -c user.name="ltdb run.sh" -c user.email="ltdb@localhost" \
+        commit -qam "apply ltdb local patches (etc/grew_match_dream.patch)"
+  fi
 
   local gmq_log=grew_match_quick/local_files/gmq.log
   echo "Starting grew-match for ${grew_corpora} (log: ${gmq_log})"
@@ -152,11 +166,6 @@ PY
 
 uv sync
 
-if [ -n "$grew_match" ]; then
-  start_grew_match
-  export LTDB_GREW_MATCH_URL="http://localhost:${gm_front_port}"
-fi
-
 port=$(
   uv run python3 - <<'PY'
 import socket
@@ -173,6 +182,15 @@ else:
     raise SystemExit("No free localhost port found in 5000-5099")
 PY
 )
+
+if [ -n "$grew_match" ]; then
+  # the backend expands relative url metas with this base, so
+  # grew-match results link back to the LTDB instance started below
+  export LTDB_BASE_URL="http://127.0.0.1:${port}"
+  start_grew_match
+  export LTDB_GREW_MATCH_URL="http://localhost:${gm_front_port}"
+fi
+
 echo "Starting LTDB development server on http://127.0.0.1:${port}"
 setsid uv run flask --app wsgi:app run --host 127.0.0.1 --port "${port}" \
     --debug </dev/null &
