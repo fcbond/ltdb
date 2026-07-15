@@ -162,8 +162,9 @@ $ python scripts/db2grew.py web/db/GRAMMAR.db
 
 then serve the exported corpora with a local grew-match instance and
 set `LTDB_GREW_MATCH_URL` to add a link to it in the LTDB navigation
-bar.  See [doc/grew-match.md](doc/grew-match.md) for setup and example
-queries.
+bar.  In development, `./run.sh --grew-match` does all of this and
+starts both servers together.  See
+[doc/grew-match.md](doc/grew-match.md) for setup and example queries.
 
 ## Docstring testing
 

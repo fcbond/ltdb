@@ -75,14 +75,31 @@ opam install dream dep2pictlib grew
 
 ## 3. Run a local grew-match
 
+The easiest way is the development runner, which starts grew-match
+alongside LTDB, compiles the corpora, and links the two:
+
+```bash
+./run.sh --grew-match "web/db/ERG_(2020)-grew/corpora.json"
+```
+
+(With a single `web/db/*-grew` export the argument can be omitted.)
+
+To run grew-match by hand instead:
+
 ```bash
 git clone https://github.com/grew-nlp/grew_match_quick
+git clone https://github.com/grew-nlp/grew_match.git \
+    grew_match_quick/local_files/grew_match
 mkdir -p grew_match_quick/local_files/grew_match/instances
 python3 grew_match_quick/grew_match_quick.py "ERG_(2020)-grew/corpora.json"
 ```
 
 (The `mkdir` works around the script assuming an `instances/`
-directory that newer `grew_match` checkouts no longer ship.)
+directory that newer `grew_match` checkouts no longer ship.  Clone
+`grew_match` *before* creating it: if the directory already exists,
+the script takes it for a checkout and never fetches the frontend —
+and inside another git repository, its `git pull` there silently hits
+the enclosing repo instead of failing.)
 
 JSON corpora are not compiled automatically on startup, so the first
 time (and after re-exporting) compile them and make the backend
@@ -94,8 +111,10 @@ grew compile -CORPUSBANK grew_match_quick/local_files/corpusbank
 curl -X POST http://localhost:8899/reload
 ```
 
-(Typing `r` at the grew_match_quick prompt also compiles, but it does
-not refresh the compiled status; the `reload` call above does.)
+(Typing `r` at the grew_match_quick prompt also compiles, but the
+upstream script only refreshes the corpus cache, not the compiled
+status; our local grew_match_quick clone is patched to POST `/reload`
+too, so `r` is enough there.  Reload the browser page afterwards.)
 
 Then open <http://localhost:8000> (ports configurable with
 `--frontend_port`/`--backend_port`).
