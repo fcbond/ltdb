@@ -31,6 +31,21 @@ class TestHomePage:
         assert "/grammar" in resp.headers["Location"]
 
 
+class TestSentPage:
+    def test_without_session_redirects(self, client):
+        resp = client.get("/sent/gold/1")
+        assert resp.status_code == 302
+
+    def test_loads_renderer_scripts(self, grm_client):
+        # ltdb-examples.js drives the tree/DMRS/MRS rendering; without it
+        # the page shows only the sentence text
+        resp = grm_client.get("/sent/gold/1")
+        assert resp.status_code == 200
+        assert b"js/ltdb-tree.js" in resp.data
+        assert b"js/ltdb-mrs.js" in resp.data
+        assert b"js/ltdb-examples.js" in resp.data
+
+
 class TestGrammarPage:
     def test_without_session_redirects(self, client):
         resp = client.get("/grammar.html")

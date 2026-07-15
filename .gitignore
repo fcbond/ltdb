@@ -6,3 +6,5 @@ web/db/
 etc/
 test-results/
 playwright-report/
+# external grew-match runner, cloned on demand by run.sh --grew-match
+grew_match_quick/

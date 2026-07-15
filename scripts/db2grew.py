@@ -244,6 +244,10 @@ def export(conn, out_dir, grm, args):
     """
     do_trees = not args.dmrs_only
     do_dmrs = not args.trees_only
+    # url metas are relative by default: the serving backend prepends
+    # the LTDB base URL (LTDB_BASE_URL), so exports survive address
+    # changes; --ltdb-url bakes an absolute base in instead
+    url_base = args.ltdb_url.rstrip("/") if args.ltdb_url else ""
     lextypes = get_lextypes(conn) if do_trees else {}
     trees_dir = out_dir / f"{grm}_trees"
     dmrs_dir = out_dir / f"{grm}_dmrs"
@@ -257,12 +261,11 @@ def export(conn, out_dir, grm, args):
             "profile": profile,
             "text": sent or "",
         }
-        if args.ltdb_url:
-            # grew-match shows a link button for the url meta
-            meta["url"] = (
-                f"{args.ltdb_url.rstrip('/')}/sent/{quote(profile, safe='')}/{sid}"
-                f"?grm={quote(args.db.name, safe='')}"
-            )
+        # grew-match shows a link button for the url meta
+        meta["url"] = (
+            f"{url_base}/sent/{quote(profile, safe='')}/{sid}"
+            f"?grm={quote(args.db.name, safe='')}"
+        )
         fname = f"{sanitize(profile)}__{sid}.json"
         if do_trees:
             graph = deriv_to_grew(deriv_str, lextypes, meta)
@@ -313,8 +316,9 @@ def main(argv=None):
     group.add_argument("--dmrs-only", action="store_true", help="Only export DMRS")
     parser.add_argument(
         "--ltdb-url",
-        help="Base URL of an LTDB instance: grew-match results then link "
-        "to its sentence pages (e.g. http://localhost:5000)",
+        help="Bake this absolute LTDB base URL into the exported link "
+        "metas; by default links are relative and the grew-match "
+        "backend fills in the base from $LTDB_BASE_URL at serve time",
     )
     parser.add_argument("db", type=Path, help="LTDB SQLite database")
     args = parser.parse_args(argv)

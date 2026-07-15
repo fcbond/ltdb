@@ -12,7 +12,6 @@ import tempfile
 from pathlib import Path
 
 import toml
-from delphin import itsdb
 from gold2db import process_tsdb
 from tdl2db import intodb, read_cfg, read_grm
 
@@ -223,6 +222,18 @@ if __name__ == "__main__":
         help="Parse TDL docstring examples and store results in the doctest table "
              "(requires --ace or a pre-existing .dat next to the db)",
     )
+    parser.add_argument(
+        "--grew",
+        action="store_true",
+        help="Also export the gold trees and DMRS as grew JSON corpora "
+             "next to the database (see doc/grew-match.md)",
+    )
+    parser.add_argument(
+        "--ltdb-url",
+        help="With --grew: bake this absolute LTDB base URL into the "
+             "exported link metas (default: relative links, expanded from "
+             "$LTDB_BASE_URL by the grew-match backend at serve time)",
+    )
     parser.add_argument("metadata", type=Path, help="METADATA file for the grammar")
 
     args = parser.parse_args()
@@ -319,3 +330,15 @@ if __name__ == "__main__":
                 )
                 write_to_db(verdicts, db_path)
                 print(f"Docstring tests done for {nam}")
+
+    if args.grew:
+        from db2grew import main as db2grew_main
+
+        grew_argv = [os.path.join(out_dir, dbname)]
+        if args.ltdb_url:
+            grew_argv += ["--ltdb-url", args.ltdb_url]
+        print(f"Exporting grew corpora for {nam} …")
+        try:
+            db2grew_main(grew_argv)
+        except SystemExit as exc:
+            print(f"--grew export skipped: {exc}", file=sys.stderr)
