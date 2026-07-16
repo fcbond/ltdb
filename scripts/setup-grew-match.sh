@@ -61,9 +61,12 @@ if [ ! -d grew_match_quick/local_files/grew_match_dream/.git ]; then
       commit -qam "apply ltdb local patches (etc/grew_match_dream.patch)"
 fi
 
-# build the backend now so the first server start is quick
-echo "Building the grew_match_dream backend"
-(cd grew_match_quick/local_files/grew_match_dream && dune build)
+# build the backend if it has not been built yet (grew_match_quick.py
+# rebuilds it on every server start, so an existing binary is enough)
+if [ ! -x grew_match_quick/local_files/grew_match_dream/_build/default/src/main.exe ]; then
+  echo "Building the grew_match_dream backend"
+  (cd grew_match_quick/local_files/grew_match_dream && dune build)
+fi
 
 if [ -n "$corpora" ]; then
   if [ ! -f "$corpora" ]; then

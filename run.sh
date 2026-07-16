@@ -109,18 +109,7 @@ start_grew_match() {
       # several grammars are exported: serve them all from one instance
       grew_corpora="web/db/grew_corpora.json"
       echo "Merging ${#candidates[@]} grew exports into ${grew_corpora}"
-      python3 - "$grew_corpora" "${candidates[@]}" <<'PY'
-import json
-import sys
-
-merged_path, *corpora_paths = sys.argv[1:]
-corpora = []
-for path in corpora_paths:
-    with open(path) as f:
-        corpora.extend(json.load(f))
-with open(merged_path, "w") as f:
-    json.dump(corpora, f, indent=2)
-PY
+      python3 scripts/merge_grew_corpora.py "$grew_corpora" "${candidates[@]}"
     fi
   fi
   if [ ! -f "$grew_corpora" ]; then
@@ -128,24 +117,15 @@ PY
     exit 1
   fi
 
+  # clone/build the stack and precompile the corpora (no-op when already
+  # done); runs before the takeover below so a setup failure leaves any
+  # old server in place
+  bash scripts/setup-grew-match.sh "$grew_corpora"
+
   # take over the ports: an already-running instance keeps the corpora
   # and LTDB_BASE_URL from its own startup, so serving our corpora means
   # stopping it (grew_match_quick refuses to start on busy ports anyway)
   stop_grew_match_servers
-
-  # grew and dune live in the opam switch, which may not be on PATH
-  # (setup-grew-match.sh repeats this for itself; the `grew compile`
-  # after startup below runs in this shell and needs it here too)
-  if ! command -v dune >/dev/null 2>&1 || ! command -v grew >/dev/null 2>&1; then
-    if [ -x "$HOME/.local/bin/opam" ]; then
-      eval "$("$HOME/.local/bin/opam" env)"
-    elif command -v opam >/dev/null 2>&1; then
-      eval "$(opam env)"
-    fi
-  fi
-
-  # clone/build the grew-match stack (no-op when already set up)
-  bash scripts/setup-grew-match.sh
 
   local gmq_log=grew_match_quick/local_files/gmq.log
   echo "Starting grew-match for ${grew_corpora} (log: ${gmq_log})"
@@ -168,10 +148,8 @@ PY
     exit 1
   fi
 
-  # compile any uncompiled corpora (no-op when up to date) and make the
-  # backend re-read the compiled status, or the UI says "Corpus not compiled"
-  grew compile -CORPUSBANK grew_match_quick/local_files/corpusbank
-  curl -s -X POST "http://localhost:${gm_back_port}/reload" >/dev/null
+  # the corpora were compiled by setup-grew-match.sh before the backend
+  # started, so it reads the compiled status on startup
   echo "grew-match ready on http://localhost:${gm_front_port}"
 }
 
