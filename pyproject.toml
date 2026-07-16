@@ -33,6 +33,7 @@ pythonpath = ["."]
 markers = [
     "integration: requires ACE binary and compiled grammar .dat file",
     "slow: marks tests as slow",
+    "playwright: browser UI tests (requires playwright browsers)",
 ]
 
 [tool.ruff]

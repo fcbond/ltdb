@@ -8,10 +8,9 @@ pytestmark = pytest.mark.playwright
 
 
 def _select_grammar(page, live_server_url):
-    """Navigate to home and select the test grammar."""
+    """Navigate to home and select the test grammar from the table."""
     page.goto(live_server_url)
-    page.select_option("select[name=grm]", "test-grammar_1.0.db")
-    page.click("button[type=submit]")
+    page.click("#grammarTable tbody tr[data-grm='test-grammar_1.0.db']")
     page.wait_for_url("**/grammar.html")
 
 
@@ -20,14 +19,16 @@ class TestHomePage:
         page.goto(live_server_url)
         assert page.title() != ""
 
-    def test_grammar_dropdown_present(self, page, live_server_url):
+    def test_grammar_table_present(self, page, live_server_url):
         page.goto(live_server_url)
-        assert page.locator("select[name=grm]").count() == 1
+        assert page.locator("#grammarTable").count() == 1
 
-    def test_grammar_listed_in_dropdown(self, page, live_server_url):
+    def test_grammar_listed_in_table(self, page, live_server_url):
         page.goto(live_server_url)
-        options = page.locator("select[name=grm] option").all_text_contents()
-        assert any("test-grammar" in o for o in options)
+        rows = page.locator(
+            "#grammarTable tbody tr[data-grm]"
+        ).all_text_contents()
+        assert any("test-grammar" in r for r in rows)
 
     def test_grm_param_redirects_to_grammar(self, page, live_server_url):
         page.goto(f"{live_server_url}/?grm=test-grammar_1.0")

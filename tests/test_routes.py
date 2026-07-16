@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 
 import pytest
@@ -56,6 +57,44 @@ class TestGrammarPage:
 
     def test_grammar_name_in_response(self, grm_client):
         assert b"Test Grammar" in grm_client.get("/grammar.html").data
+
+
+class TestConditionalNav:
+    """Docstring Tests / Demo tabs and the <ex> column only appear
+    when the grammar has doctest rows / a compiled .dat file."""
+
+    def test_tabs_hidden_without_doctests_or_dat(self, grm_client):
+        data = grm_client.get("/grammar.html").data
+        assert b"Docstring Tests" not in data
+        assert b">Demo<" not in data
+
+    def test_ex_column_hidden_without_doctests(self, client):
+        assert b"&lt;ex&gt;" not in client.get("/").data
+
+    def test_tabs_and_ex_column_shown_with_doctests_and_dat(self, grm_client):
+        import web.routes as routes_mod
+
+        db_dir = os.path.join(routes_mod.current_directory, "db")
+        dbfile = os.path.join(db_dir, "test-grammar_1.0.db")
+        dat = os.path.join(db_dir, "test-grammar_1.0.dat")
+        conn = sqlite3.connect(dbfile)
+        with conn:
+            conn.execute("CREATE TABLE doctest (typ TEXT)")
+            conn.execute("INSERT INTO doctest VALUES ('noun-le')")
+        conn.close()
+        with open(dat, "w") as f:
+            f.write("x")
+        try:
+            data = grm_client.get("/grammar.html").data
+            assert b"Docstring Tests" in data
+            assert b">Demo<" in data
+            assert b"&lt;ex&gt;" in grm_client.get("/").data
+        finally:
+            conn = sqlite3.connect(dbfile)
+            with conn:
+                conn.execute("DROP TABLE doctest")
+            conn.close()
+            os.unlink(dat)
 
 
 class TestRulesPage:
@@ -165,6 +204,7 @@ class TestParseRoute:
 
         monkeypatch.setattr(ace_mod, "parse", lambda *a, **kw: _FakeResponse())
         monkeypatch.setattr("web.routes.dat_path_for", lambda grm: "/fake/path.dat")
+        monkeypatch.setattr("web.routes.find_ace", lambda: "/fake/ace")
         resp = grm_client.post("/parse", data={"input": "The dog barks."})
         assert resp.status_code == 200
         data = resp.get_json()
