@@ -19,10 +19,14 @@
             <a href="{{ ltypes_href() }}"
                class="nav-item nav-link{{ ' active' if request.endpoint in ('ltypes', 'mirror_ltypes') }}">Lexical Types</a>
             {% if not is_static_mirror %}
+            {% if has_doctests %}
             <a href="{{ doctests_href() }}"
                class="nav-item nav-link{{ ' active' if request.endpoint == 'doctests' }}">Docstring Tests</a>
+            {% endif %}
+            {% if has_demo %}
             <a href="{{ url_for('demo') }}"
                class="nav-item nav-link{{ ' active' if request.endpoint == 'demo' }}">Demo</a>
+            {% endif %}
             <form action="{{ url_for('submit_fsearch') }}" method="post" class="nav-search d-flex ms-2">
               <input type="search" id="nav-search" name="search" class="form-control form-control-sm" required placeholder="lemma/type/predicate" aria-label="Search">
               <button type="submit" class="btn btn-outline-secondary btn-sm" aria-label="Search">Search</button>

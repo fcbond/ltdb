@@ -69,6 +69,9 @@
         <th class="text-end">Lexicon</th>
         <th class="text-end">Rules</th>
         <th class="text-end">Trees</th>
+        {% if any_doctests %}
+        <th class="text-end" title="docstring tests">&lt;ex&gt;</th>
+        {% endif %}
         <th>License</th>
         <th>Website</th>
       </tr>
@@ -84,6 +87,9 @@
         <td class="text-end">{{ "{:,}".format(s.get('LEXICON', 0)) }}</td>
         <td class="text-end">{{ "{:,}".format(s.get('RULES', 0)) }}</td>
         <td class="text-end">{{ "{:,}".format(s.get('TREES', 0)) if s.get('TREES', 0) else '' }}</td>
+        {% if any_doctests %}
+        <td class="text-end" title="docstring tests">{{ "{:,}".format(s.get('DOCTESTS', 0)) if s.get('DOCTESTS', 0) else '' }}</td>
+        {% endif %}
         <td>{{ s.get('LICENSE', '') }}</td>
         <td>{% if s.get('WEBSITE') %}<a href="{{ s.get('WEBSITE') }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">link</a>{% endif %}</td>
       </tr>
@@ -117,8 +123,8 @@
   $('#grammarTable').DataTable({
     pageLength: 25,
     columnDefs: [
-      { targets: [2, 3, 4], className: 'dt-right', type: 'num-fmt' },
-      { targets: [6], orderable: false }
+      { targets: [2, 3, 4{{ ', 5' if any_doctests }}], className: 'dt-right', type: 'num-fmt' },
+      { targets: [{{ 7 if any_doctests else 6 }}], orderable: false }
     ],
     language: { search: 'Filter:' }
   });

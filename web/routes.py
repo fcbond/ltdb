@@ -179,6 +179,9 @@ def _inject_static_mirror_helpers():
         grm = _stem_for_grm(grm or _mirror_grm())
         return f"../../db/{grm}.examples.sqlite"
 
+    # per-grammar navigation flags: hide tabs that would be empty
+    grm = session.get("grm")
+    live_grm = grm if grm and not _is_mirror_request() else None
     return {
         "is_static_mirror": _is_mirror_request(),
         "static_mirror_all_non_lex": STATIC_MIRROR_ALL_NON_LEX,
@@ -190,6 +193,8 @@ def _inject_static_mirror_helpers():
         "ltypes_href": ltypes_href,
         "doctests_href": doctests_href,
         "example_db_href": example_db_href,
+        "has_doctests": bool(live_grm) and _grm_has_doctests(live_grm),
+        "has_demo": bool(live_grm) and dat_path_for(live_grm) is not None,
     }
 
 
@@ -224,6 +229,30 @@ def _grm_exists(grm: str) -> bool:
             )
         }
     return {"gold", "lexfreq", "meta", "sent", "types"}.issubset(tables)
+
+
+_doctest_flag_cache: dict = {}
+
+
+def _grm_has_doctests(grm):
+    """Return True if the grammar db has doctest rows (cached by mtime/size)."""
+    path = os.path.join(current_directory, "db", grm)
+    try:
+        st = os.stat(path)
+    except OSError:
+        return False
+    key = (grm, st.st_mtime, st.st_size)
+    if key not in _doctest_flag_cache:
+        with sqlite3.connect(path) as conn:
+            try:
+                has = (
+                    conn.execute("SELECT 1 FROM doctest LIMIT 1").fetchone()
+                    is not None
+                )
+            except sqlite3.OperationalError:
+                has = False
+        _doctest_flag_cache[key] = has
+    return _doctest_flag_cache[key]
 
 
 def _db_for_stem(stem):
@@ -344,6 +373,7 @@ def home():
         title="LTDB",
         grammars=grammars,
         summ=summ,
+        any_doctests=any(s.get("DOCTESTS") for s in summ.values()),
         grm=session.get("grm", None),
     )
 
@@ -567,6 +597,7 @@ def mirror_home():
         title="LTDB Static Mirror",
         grammars=grammars,
         summ=summ,
+        any_doctests=any(s.get("DOCTESTS") for s in summ.values()),
         grm=None,
     )
 

@@ -652,10 +652,13 @@ def get_short_summary(current_directory, grammars):
     """
     summ = dict()
     for grm in grammars:
-        if grm in _short_summary_cache:
-            summ[grm] = _short_summary_cache[grm]
-            continue
         dbpath = os.path.join(current_directory, f"db/{grm}")
+        # key the cache on mtime/size so a rebuilt db is re-read
+        st = os.stat(dbpath)
+        key = (grm, st.st_mtime, st.st_size)
+        if key in _short_summary_cache:
+            summ[grm] = _short_summary_cache[key]
+            continue
         with sqlite3.connect(dbpath) as conn:
             c = conn.cursor()
             c.execute("""
@@ -672,6 +675,14 @@ def get_short_summary(current_directory, grammars):
             SELECT 'TREES', COUNT(DISTINCT sid || ',' || profile)
             FROM sent
             """)
-            _short_summary_cache[grm] = dict(c.fetchall())
-        summ[grm] = _short_summary_cache[grm]
+            entry = dict(c.fetchall())
+            try:
+                entry["DOCTESTS"] = c.execute(
+                    "SELECT count(*) FROM doctest"
+                ).fetchone()[0]
+            except sqlite3.OperationalError:
+                # database built before the doctest table existed
+                entry["DOCTESTS"] = 0
+        _short_summary_cache[key] = entry
+        summ[grm] = entry
     return summ
