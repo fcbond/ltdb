@@ -43,7 +43,20 @@ unpatched grew-match).
 To serve several grammar databases from one grew-match instance,
 export each one and let `./run.sh --grew-match` merge the
 `corpora.json` lists (into `web/db/grew_corpora.json`); to do the
-same by hand, concatenate the lists into one file.
+same by hand, concatenate the lists into one file.  When there are no
+`web/db/*-grew` exports, `./run.sh --grew-match` falls back to an
+existing `web/db/grew_corpora.json`, so a build pipeline can install a
+pre-merged description there (the graph paths inside are absolute, so
+the export directories can live anywhere).
+
+`scripts/setup-grew-match.sh [CORPORA_JSON]` performs the setup ahead
+of time: it clones grew_match_quick, the frontend and the patched
+backend, builds the backend, and — when given a corpora description —
+installs it as the corpusbank and runs `grew compile` over it.  A build
+pipeline can call it after exporting so `./run.sh --grew-match` starts
+without cloning or compiling anything.  `run.sh` stops any grew-match
+already on its ports before starting, so the running instance always
+serves the corpora just built.
 
 ### Graph encoding
 

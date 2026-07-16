@@ -8,10 +8,13 @@ set -euo pipefail
 #
 # --grew-match also starts a linked grew-match server (frontend :8000,
 # backend :8899) and sets LTDB_GREW_MATCH_URL so the navigation bar
-# links to it.  CORPORA_JSON is a corpora description produced by
-# scripts/db2grew.py; if omitted, every web/db/*-grew/corpora.json
-# export is served (merged into web/db/grew_corpora.json when there is
-# more than one).  See doc/grew-match.md for details.
+# links to it.  Any grew-match already on those ports is stopped first,
+# so the new instance serves *our* corpora.  CORPORA_JSON is a corpora
+# description produced by scripts/db2grew.py; if omitted, every
+# web/db/*-grew/corpora.json export is served (merged into
+# web/db/grew_corpora.json when there is more than one), falling back
+# to a pre-built web/db/grew_corpora.json installed by a build pipeline
+# (see scripts/setup-grew-match.sh and doc/grew-match.md).
 
 cd "$(dirname "$0")"
 
@@ -57,15 +60,50 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
+# Stop whatever is listening on the grew-match ports (killing the whole
+# process group catches the grew_match_quick wrapper along with the
+# backend/frontend it spawned), then wait for the ports to be released.
+stop_grew_match_servers() {
+  local port pids pid pgid own_pgid
+  own_pgid=$(ps -o pgid= -p $$ | tr -d ' ')
+  for port in "$gm_back_port" "$gm_front_port"; do
+    pids=$(lsof -t -i ":${port}" 2>/dev/null || true)
+    [ -z "$pids" ] && continue
+    echo "Stopping existing server on port ${port}"
+    for pid in $pids; do
+      pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
+      if [ -n "$pgid" ] && [ "$pgid" != "$own_pgid" ]; then
+        kill -TERM -- "-${pgid}" 2>/dev/null || true
+      else
+        kill -TERM "$pid" 2>/dev/null || true
+      fi
+    done
+  done
+  for _ in $(seq 20); do
+    if [ -z "$(lsof -t -i ":${gm_back_port}" -i ":${gm_front_port}" \
+        2>/dev/null)" ]; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "Ports ${gm_back_port}/${gm_front_port} are still in use" >&2
+  exit 1
+}
+
 start_grew_match() {
   if [ -z "$grew_corpora" ]; then
     local candidates=(web/db/*-grew/corpora.json)
     if [ ${#candidates[@]} -eq 0 ] || [ ! -f "${candidates[0]}" ]; then
-      echo "No web/db/*-grew/corpora.json export found;" \
-           "run scripts/db2grew.py first (see doc/grew-match.md)" >&2
-      exit 1
-    fi
-    if [ ${#candidates[@]} -eq 1 ]; then
+      # no local exports: fall back to a combined description installed
+      # by a build pipeline (e.g. grammary's build-ltdb.sh)
+      if [ ! -f web/db/grew_corpora.json ]; then
+        echo "No web/db/grew_corpora.json or web/db/*-grew/corpora.json" \
+             "export found; run scripts/db2grew.py first" \
+             "(see doc/grew-match.md)" >&2
+        exit 1
+      fi
+      grew_corpora="web/db/grew_corpora.json"
+    elif [ ${#candidates[@]} -eq 1 ]; then
       grew_corpora="${candidates[0]}"
     else
       # several grammars are exported: serve them all from one instance
@@ -90,15 +128,14 @@ PY
     exit 1
   fi
 
-  # reuse an instance that is already running (leave its lifecycle alone;
-  # note it keeps the corpora and LTDB_BASE_URL from its own startup)
-  if curl -s -m 2 -X POST "http://localhost:${gm_back_port}/ping" \
-      >/dev/null 2>&1; then
-    echo "Reusing the grew-match server already on port ${gm_back_port}"
-    return
-  fi
+  # take over the ports: an already-running instance keeps the corpora
+  # and LTDB_BASE_URL from its own startup, so serving our corpora means
+  # stopping it (grew_match_quick refuses to start on busy ports anyway)
+  stop_grew_match_servers
 
   # grew and dune live in the opam switch, which may not be on PATH
+  # (setup-grew-match.sh repeats this for itself; the `grew compile`
+  # after startup below runs in this shell and needs it here too)
   if ! command -v dune >/dev/null 2>&1 || ! command -v grew >/dev/null 2>&1; then
     if [ -x "$HOME/.local/bin/opam" ]; then
       eval "$("$HOME/.local/bin/opam" env)"
@@ -106,35 +143,9 @@ PY
       eval "$(opam env)"
     fi
   fi
-  if ! command -v dune >/dev/null 2>&1 || ! command -v grew >/dev/null 2>&1; then
-    echo "grew/dune not found; install them with opam (see doc/grew-match.md)" >&2
-    exit 1
-  fi
 
-  if [ ! -f grew_match_quick/grew_match_quick.py ]; then
-    git clone https://github.com/grew-nlp/grew_match_quick
-  fi
-  # Clone the frontend ourselves: if only local_files/grew_match/instances
-  # is pre-created (the workaround grew_match_quick needs), the script
-  # mistakes the stub for a checkout and never fetches the frontend.
-  if [ ! -d grew_match_quick/local_files/grew_match/.git ]; then
-    git clone https://github.com/grew-nlp/grew_match.git \
-        grew_match_quick/local_files/grew_match
-  fi
-  mkdir -p grew_match_quick/local_files/grew_match/instances
-  # The backend needs fixes that are not upstream yet (result meta
-  # encoding, url/code passthrough, LTDB_BASE_URL expansion — see
-  # doc/grew-match.md), so clone it before grew_match_quick.py does
-  # and apply them.
-  if [ ! -d grew_match_quick/local_files/grew_match_dream/.git ]; then
-    git clone https://github.com/grew-nlp/grew_match_dream.git \
-        grew_match_quick/local_files/grew_match_dream
-    git -C grew_match_quick/local_files/grew_match_dream \
-        apply "$PWD/etc/grew_match_dream.patch"
-    git -C grew_match_quick/local_files/grew_match_dream \
-        -c user.name="ltdb run.sh" -c user.email="ltdb@localhost" \
-        commit -qam "apply ltdb local patches (etc/grew_match_dream.patch)"
-  fi
+  # clone/build the grew-match stack (no-op when already set up)
+  bash scripts/setup-grew-match.sh
 
   local gmq_log=grew_match_quick/local_files/gmq.log
   echo "Starting grew-match for ${grew_corpora} (log: ${gmq_log})"
