@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sqlite3
+
 import pytest
 
 from web.db import (
@@ -315,3 +317,46 @@ class TestGetPhenomenaByCx:
         spans = phenom["gold", 1]
         assert len(spans) >= 1
         assert all(isinstance(s, tuple) and len(s) == 2 for s in spans)
+
+
+class TestGetShortSummary:
+    def _make_grammar_db(self, base, name, doctests=0):
+        """(Re)create a minimal on-disk grammar db under base/db/."""
+        db_dir = base / "db"
+        db_dir.mkdir(exist_ok=True)
+        (db_dir / name).unlink(missing_ok=True)
+        conn = sqlite3.connect(db_dir / name)
+        conn.executescript("""
+            CREATE TABLE meta  (att TEXT, val TEXT);
+            CREATE TABLE types (typ TEXT, status TEXT);
+            CREATE TABLE sent  (sid INTEGER, profile TEXT);
+        """)
+        conn.execute("INSERT INTO meta VALUES ('GRAMMAR_NAME', 'Testish')")
+        conn.execute("INSERT INTO types VALUES ('noun-le', 'lex-entry')")
+        if doctests:
+            conn.execute("CREATE TABLE doctest (typ TEXT)")
+            conn.executemany(
+                "INSERT INTO doctest VALUES (?)", [("noun-le",)] * doctests
+            )
+        conn.commit()
+        conn.close()
+
+    def test_doctests_zero_without_table(self, tmp_path):
+        self._make_grammar_db(tmp_path, "old_1.0.db")
+        summ = get_short_summary(str(tmp_path), ["old_1.0.db"])
+        assert summ["old_1.0.db"]["DOCTESTS"] == 0
+
+    def test_doctests_counted(self, tmp_path):
+        self._make_grammar_db(tmp_path, "doc_1.0.db", doctests=3)
+        summ = get_short_summary(str(tmp_path), ["doc_1.0.db"])
+        assert summ["doc_1.0.db"]["DOCTESTS"] == 3
+        assert summ["doc_1.0.db"]["LEXICON"] == 1
+
+    def test_rebuilt_db_is_reread(self, tmp_path):
+        """A rebuilt db file must not be served stale from the cache."""
+        self._make_grammar_db(tmp_path, "re_1.0.db")
+        summ = get_short_summary(str(tmp_path), ["re_1.0.db"])
+        assert summ["re_1.0.db"]["DOCTESTS"] == 0
+        self._make_grammar_db(tmp_path, "re_1.0.db", doctests=2)
+        summ = get_short_summary(str(tmp_path), ["re_1.0.db"])
+        assert summ["re_1.0.db"]["DOCTESTS"] == 2
