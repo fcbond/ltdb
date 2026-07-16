@@ -30,7 +30,12 @@ def read_metadata(metadata_path):
 
 
 def make_db(dbdir, db):
-    conn = sqlite3.connect(os.path.join(dbdir, db))  # loads dbfile as con
+    dbfile = os.path.join(dbdir, db)
+    # always build from scratch: tables.sql cannot be applied on top of an
+    # existing database, so a leftover file from an earlier run must go
+    if os.path.exists(dbfile):
+        os.remove(dbfile)
+    conn = sqlite3.connect(dbfile)
     c = conn.cursor()
 
     # Get the script directory to find tables.sql

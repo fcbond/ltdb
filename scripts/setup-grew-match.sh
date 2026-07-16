@@ -15,9 +15,13 @@
 
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
-
 corpora="${1:-}"
+# resolve the corpora path relative to the caller's cwd before we cd
+if [ -n "$corpora" ]; then
+  corpora=$(realpath "$corpora")
+fi
+
+cd "$(dirname "$0")/.."
 
 # grew and dune live in the opam switch, which may not be on PATH
 if ! command -v dune >/dev/null 2>&1 || ! command -v grew >/dev/null 2>&1; then
