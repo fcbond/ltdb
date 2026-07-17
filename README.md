@@ -75,6 +75,8 @@ Options:
 - `--doctest`  parse all TDL docstring examples through ACE and store results
                in the `doctest` table of the grammar database (requires `--ace`
                or a pre-existing `.dat` in the output directory)
+- `--jobs`     with `--doctest`: number of parallel ACE processes
+               (0 = auto-sized from CPUs and available memory)
 - `--grew`     also export the gold trees and DMRS as grew JSON corpora next
                to the database, ready for `./run.sh --grew-match`; results
                link back to LTDB via relative URLs that the grew-match
@@ -174,29 +176,32 @@ queries.
 
 ## Docstring testing
 
-The `<ex>`, `<nex>`, and `<mex>` tags are testable: `parse_examples.py`
-extracts every tagged sentence, parses it through ACE, and checks whether
-the documented type appears in the derivation tree:
+The `<ex>`, `<nex>`, and `<mex>` tags are testable: every tagged
+sentence is parsed through ACE and the documented type is checked
+against the resulting derivations (as node entity, `--udx=all` type
+annotation, or inheriting lexical entry), giving one verdict per
+example: `PASS`, `FAIL-no-parse`, `FAIL-type-absent`, or
+`FAIL-type-in-tree`.  There are three ways to run them:
 
 ```bash
+# while building the database — results go to the doctest table and
+# are shown on type pages and the "Docstring Tests" tab
+python scripts/grm2db.py --outdir web/db --ace --doctest --jobs 0 \
+    path/to/METADATA
+
+# standalone, with database and/or report output
 python scripts/parse_examples.py ace/config.tdl grammar.dat /tmp/profile \
-    --db web/db/grammar.db     # store results in the grammar database
-    --report results.txt       # also write a text summary
-    --no-profile               # skip writing the itsdb profile
+    --db web/db/grammar.db --report results.txt --no-profile -j 0
+
+# dated itsdb profile inside the grammar, verdicts in i-comment
+python scripts/docstring_profile.py ace/config.tdl grammar.dat
 ```
 
-Results are stored in the `doctest` table of the grammar database and
-surfaced in the LTDB browser:
-
-- **Type pages** show a "Docstring Tests" section with per-example pass/fail.
-- **"Docstring Tests" nav page** (`/doctests.html`) lists all examples for the
-  grammar in a sortable table, with failures sorted first.
-
-The `--doctest` flag on `grm2db.py` runs this automatically after building:
-
-```bash
-python scripts/grm2db.py --outdir web/db --ace --doctest path/to/METADATA
-```
+All runners can parse with multiple ACE processes (`--jobs 0` sizes
+the worker count to the machine).  See
+[doc/docstring-tests.md](doc/docstring-tests.md) for the tag
+semantics, verdict definitions, matching rules, and full option
+reference.
 
 Types, instances in the same table, distinguished by status.
 
