@@ -323,7 +323,7 @@ if __name__ == "__main__":
             except FileNotFoundError as exc:
                 print(f"--doctest skipped: {exc}", file=sys.stderr)
             else:
-                print(f"Running docstring tests for {nam} …")
+                print(f"Running docstring tests for {nam} …", file=sys.stderr)
                 cfg_path = os.path.join(
                     os.path.dirname(args.metadata), md["ACE_CONFIG_FILE"]
                 )
@@ -334,7 +334,7 @@ if __name__ == "__main__":
                     examples, dat_path, ace_bin_resolved, ex_types, lex_ids
                 )
                 write_to_db(verdicts, db_path)
-                print(f"Docstring tests done for {nam}")
+                print(f"Docstring tests done for {nam}", file=sys.stderr)
 
     if args.grew:
         from db2grew import main as db2grew_main
