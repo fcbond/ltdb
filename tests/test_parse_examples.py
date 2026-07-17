@@ -71,15 +71,21 @@ class TestParseDoc:
 # ── type_in_results ───────────────────────────────────────────────────────────
 
 
+def _mock_node(spec):
+    """Node from "entity" or ("entity", "type") — type is the --udx=all
+    annotation (None when absent, as in pre-udx derivations)."""
+    if isinstance(spec, tuple):
+        entity, typ = spec
+    else:
+        entity, typ = spec, None
+    return MagicMock(entity=entity, type=typ)
+
+
 def _make_derivation(internals=(), preterminals=()):
-    """Build a mock derivation with given entity names."""
+    """Build a mock derivation with given entity names (or (entity, type))."""
     deriv = MagicMock()
-    deriv.internals.return_value = [
-        MagicMock(entity=e) for e in internals
-    ]
-    deriv.preterminals.return_value = [
-        MagicMock(entity=e) for e in preterminals
-    ]
+    deriv.internals.return_value = [_mock_node(e) for e in internals]
+    deriv.preterminals.return_value = [_mock_node(e) for e in preterminals]
     return deriv
 
 
@@ -153,6 +159,32 @@ class TestTypeInResults:
         deriv = _make_derivation(preterminals=["bark_v1"])
         result = _make_result(deriv)
         assert not type_in_results("intrans-verb-lxm", ["type"], [result], lex_ids)
+
+    def test_lex_type_via_udx_node_type(self):
+        # --udx=all annotates the preterminal with its lexical type
+        deriv = _make_derivation(preterminals=[("dog_n1", "n_-_c_le")])
+        result = _make_result(deriv)
+        assert type_in_results("n_-_c_le", ["lex-type"], [result], {})
+
+    def test_generic_lex_type_via_udx_node_type(self):
+        # generic/unknown-word types have no static lex entries, so only
+        # the udx annotation can find them (the *-gen_le / *-unk_le case)
+        deriv = _make_derivation(
+            preterminals=[("generic_proper_ne", "n_-_pn-gen_le")]
+        )
+        result = _make_result(deriv)
+        assert type_in_results("n_-_pn-gen_le", ["lex-type"], [result], {})
+
+    def test_phrase_type_via_udx_node_type(self):
+        # internal nodes are annotated with their phrase type
+        deriv = _make_derivation(internals=[("sb-hd_mc_c", "subjh_mc_rule")])
+        result = _make_result(deriv)
+        assert type_in_results("subjh_mc_rule", ["rule"], [result], {})
+
+    def test_udx_node_type_absent_is_not_found(self):
+        deriv = _make_derivation(preterminals=[("dog_n1", "n_-_c_le")])
+        result = _make_result(deriv)
+        assert not type_in_results("v_-_le", ["lex-type"], [result], {})
 
     def test_found_in_any_parse(self):
         deriv1 = _make_derivation(internals=["other-rule"])

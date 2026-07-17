@@ -89,6 +89,49 @@ def test_mrs_renders_on_click(page, gunicorn_url):
 
 
 @needs_dat
+def test_tree_shows_lexical_types(page, gunicorn_url):
+    """The rendered tree includes lex-type (_le) and lex-entry nodes."""
+    _load_demo(page, gunicorn_url, "Dogs bark.")
+    page.wait_for_selector(".result-card .ltdb-tree-svg", timeout=TIMEOUT)
+
+    card = page.locator(".result-card").first
+    lex_types = card.locator(".ltdb-tree-node.lex-type text")
+    assert lex_types.count() > 0, "no lex-type nodes in the tree"
+    labels = lex_types.all_text_contents()
+    assert any(label.endswith("_le") for label in labels), \
+        f"no _le lexical type shown: {labels}"
+    assert card.locator(".ltdb-tree-node.lex-entry").count() > 0, \
+        "no lex-entry nodes in the tree"
+
+
+@needs_dat
+def test_raw_buttons_show_source_strings(page, gunicorn_url):
+    """Tree, MRS and DMRS each get a [raw] toggle with the original string."""
+    _load_demo(page, gunicorn_url, "Dogs bark.")
+    page.wait_for_selector(".result-card", timeout=TIMEOUT)
+
+    card = page.locator(".result-card").first
+    raw_btns = card.get_by_role("button", name="raw", exact=True)
+    assert raw_btns.count() == 3, "expected raw buttons for tree, MRS and DMRS"
+
+    def visible_pre_texts():
+        pres = card.locator("pre:visible")
+        return [pres.nth(i).inner_text() for i in range(pres.count())]
+
+    raw_btns.nth(0).click()  # tree: ACE's UDX derivation string
+    assert any("@" in t and "(" in t for t in visible_pre_texts()), \
+        "tree raw did not show a UDX derivation string"
+
+    raw_btns.nth(1).click()  # MRS: simplemrs string
+    assert any("TOP:" in t and "RELS:" in t for t in visible_pre_texts()), \
+        "MRS raw did not show a simplemrs string"
+
+    raw_btns.nth(2).click()  # DMRS: JSON
+    assert any('"nodes"' in t for t in visible_pre_texts()), \
+        "DMRS raw did not show DMRS JSON"
+
+
+@needs_dat
 @pytest.mark.parametrize("sentence", SENTENCES[:5])
 def test_multiple_sentences_parse(page, gunicorn_url, sentence):
     """Each sentence should yield results without a 500 or 'No parses' warning."""

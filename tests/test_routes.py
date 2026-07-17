@@ -211,6 +211,46 @@ class TestParseRoute:
         assert data["readings"] == 1
         assert data["input"] == "The dog barks."
 
+    def test_parse_uses_udx_and_returns_raw_derivation(
+        self, grm_client, monkeypatch
+    ):
+        import delphin.ace as ace_mod
+
+        class _FakeDeriv:
+            def to_dict(self):
+                return {"entity": "root"}
+
+            def to_udx(self):
+                return '(root (1 dog_n1@n_-_c_le 0 0 1 ("dog")))'
+
+        class _FakeResult:
+            def derivation(self):
+                return _FakeDeriv()
+
+        class _FakeResponse:
+            def results(self):
+                return [_FakeResult()]
+
+        seen = {}
+
+        def fake_parse(dat, text, **kwargs):
+            seen.update(kwargs)
+            return _FakeResponse()
+
+        monkeypatch.setattr(ace_mod, "parse", fake_parse)
+        monkeypatch.setattr("web.routes.dat_path_for", lambda grm: "/fake/path.dat")
+        monkeypatch.setattr("web.routes.find_ace", lambda: "/fake/ace")
+        resp = grm_client.post(
+            "/parse", data={"input": "The dog barks.", "derivation": "json"}
+        )
+        assert resp.status_code == 200
+        # types come from --udx=all; the root from --rooted-derivations
+        assert "--udx=all" in seen["cmdargs"]
+        assert "--rooted-derivations" in seen["cmdargs"]
+        result = resp.get_json()["results"][0]
+        assert result["derivation"] == {"entity": "root"}
+        assert result["derivation_str"] == '(root (1 dog_n1@n_-_c_le 0 0 1 ("dog")))'
+
 
 class TestGenerateRoute:
     def test_no_grammar_returns_400(self, client):
