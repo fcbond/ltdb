@@ -140,10 +140,14 @@ start_grew_match() {
 
   local gmq_log=grew_match_quick/local_files/gmq.log
   echo "Starting grew-match for ${grew_corpora} (log: ${gmq_log})"
-  # run under the project venv so gmq's python deps (requests) are
-  # guaranteed regardless of what the system python has
-  setsid uv run python3 grew_match_quick/grew_match_quick.py "$grew_corpora" \
-      --frontend_port "$gm_front_port" --backend_port "$gm_back_port" \
+  # Run under the project venv so gmq's python deps (requests) are
+  # guaranteed regardless of what the system python has.  gmq ends in an
+  # interactive input() loop, so keep its stdin open via sleep — on a
+  # closed stdin it crashes with EOFError right after startup (the
+  # servers survive, but the traceback in the log misleads).
+  setsid bash -c "sleep infinity | uv run python3 \
+      grew_match_quick/grew_match_quick.py '${grew_corpora}' \
+      --frontend_port '${gm_front_port}' --backend_port '${gm_back_port}'" \
       </dev/null >"$gmq_log" 2>&1 &
   gmq_pid=$!
 
