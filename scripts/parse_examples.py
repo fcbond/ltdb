@@ -470,17 +470,19 @@ def make_test_suite(
 # ── Parsing ───────────────────────────────────────────────────────────────────
 
 
-# rough peak memory per ACE worker on a large grammar (ERG-sized)
-_ACE_WORKER_MEM_KIB = 2 * 1024 * 1024
+# rough peak memory per ACE worker on a large grammar (ERG-sized):
+# ~2 GiB to parse plus ~2 GiB to unpack
+_ACE_WORKER_MEM_KIB = 4 * 1024 * 1024
 
 
 def default_jobs() -> int:
     """Return a job count fitted to this machine.
 
     One ACE process per CPU, capped by available memory at roughly
-    2 GiB per worker (what a large grammar like the ERG can need at
-    peak).  Falls back to min(cpus, 8) when available memory cannot be
-    determined (e.g. no /proc/meminfo on non-Linux systems).
+    4 GiB per worker (what a large grammar like the ERG can need at
+    peak: ~2 GiB to parse plus ~2 GiB to unpack).  Falls back to
+    min(cpus, 8) when available memory cannot be determined (e.g. no
+    /proc/meminfo on non-Linux systems).
     """
     cpus = os.cpu_count() or 1
     try:
