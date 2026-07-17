@@ -209,6 +209,19 @@
     return btn;
   }
 
+  function makeRawBtn(body, getText, title) {
+    const pre = $('<pre class="result-viz small" style="display:none;white-space:pre-wrap">');
+    body.append(pre);
+    const btn = $(`<button class="btn btn-outline-secondary btn-sm" title="Show raw ${title}">raw</button>`);
+    let filled = false;
+    btn.on('click', function () {
+      if (!filled) { pre.text(getText()); filled = true; }
+      pre.toggle();
+      $(this).toggleClass('btn-secondary btn-outline-secondary');
+    });
+    return btn;
+  }
+
   let _lastRenderData = null;
   let _lastRenderGrm = null;
 
@@ -284,6 +297,11 @@
           $(this).toggleClass('btn-primary btn-outline-primary');
         });
         header.append(btn);
+        header.append(makeRawBtn(body, () =>
+          result.derivation_str ||
+          (typeof result.derivation === 'string'
+            ? result.derivation
+            : JSON.stringify(result.derivation, null, 2)), 'derivation'));
         header.append(makeCopyBtn(() =>
           typeof result.derivation === 'string'
             ? result.derivation
@@ -315,6 +333,7 @@
           }
         });
         header.append(btn);
+        header.append(makeRawBtn(body, () => result.mrs_str, 'MRS'));
         header.append(makeCopyBtn(() => result.mrs_str));
         if (window.LTDBLatex) {
           header.append(makeCopyBtn(() =>
@@ -341,6 +360,10 @@
           }
         });
         header.append(btn);
+        header.append(makeRawBtn(body, () =>
+          JSON.stringify(
+            window.LTDBMrs.mrsToDmrs(window.LTDBMrs.parseMrs(result.mrs_str)),
+            null, 2), 'DMRS'));
         if (window.LTDBLatex) {
           header.append(makeCopyBtn(() =>
             window.LTDBLatex.dmrsToTikz(

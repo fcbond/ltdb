@@ -20,7 +20,9 @@ dependencies = [
     "requests",  # used by grew_match_quick.py, launched from run.sh
 ]
 
-[project.optional-dependencies]
+# dependency-groups (not an extra) so a plain `uv sync`/`uv run` keeps
+# the dev tools installed instead of pruning them
+[dependency-groups]
 dev = [
     "ruff>=0.9",
     "pytest>=9",

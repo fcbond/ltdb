@@ -236,15 +236,15 @@ dependencies = [
     { name = "markupsafe" },
     { name = "orjson" },
     { name = "pydelphin" },
+    { name = "requests" },
     { name = "toml" },
     { name = "werkzeug" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "pytest" },
     { name = "pytest-playwright" },
-    { name = "requests" },
     { name = "ruff" },
 ]
 
@@ -261,12 +261,16 @@ requires-dist = [
     { name = "markupsafe" },
     { name = "orjson" },
     { name = "pydelphin" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9" },
-    { name = "pytest-playwright", marker = "extra == 'dev'", specifier = ">=0.7" },
-    { name = "requests", marker = "extra == 'dev'", specifier = ">=2.32" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.9" },
+    { name = "requests" },
     { name = "toml" },
     { name = "werkzeug" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=9" },
+    { name = "pytest-playwright", specifier = ">=0.7" },
+    { name = "ruff", specifier = ">=0.9" },
 ]
 
 [[package]]

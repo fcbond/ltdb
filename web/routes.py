@@ -769,7 +769,10 @@ def parse_sentence():
 
         if want_derivation:
             try:
-                r["derivation"] = result.derivation().to_dict()
+                deriv = result.derivation()
+                r["derivation"] = deriv.to_dict()
+                # raw UDX string (ACE's own derivation format) for display
+                r["derivation_str"] = deriv.to_udx()
             except Exception as e:
                 r["derivation"] = None
                 errors.append(f"result {i} derivation: {e}")
