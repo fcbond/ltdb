@@ -127,6 +127,10 @@ start_grew_match() {
   # stopping it (grew_match_quick refuses to start on busy ports anyway)
   stop_grew_match_servers
 
+  # grew_match_quick.py runs dune (and grew) itself, so the opam switch
+  # must be on PATH in the shell that launches it
+  source scripts/opam-env.sh
+
   local gmq_log=grew_match_quick/local_files/gmq.log
   echo "Starting grew-match for ${grew_corpora} (log: ${gmq_log})"
   setsid python3 grew_match_quick/grew_match_quick.py "$grew_corpora" \

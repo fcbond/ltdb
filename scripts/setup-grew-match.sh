@@ -24,13 +24,7 @@ fi
 cd "$(dirname "$0")/.."
 
 # grew and dune live in the opam switch, which may not be on PATH
-if ! command -v dune >/dev/null 2>&1 || ! command -v grew >/dev/null 2>&1; then
-  if [ -x "$HOME/.local/bin/opam" ]; then
-    eval "$("$HOME/.local/bin/opam" env)"
-  elif command -v opam >/dev/null 2>&1; then
-    eval "$(opam env)"
-  fi
-fi
+source scripts/opam-env.sh
 if ! command -v dune >/dev/null 2>&1 || ! command -v grew >/dev/null 2>&1; then
   echo "grew/dune not found; install them with opam (see doc/grew-match.md)" >&2
   exit 1
