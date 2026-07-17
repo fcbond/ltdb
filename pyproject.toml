@@ -17,6 +17,7 @@ dependencies = [
     "click",
     "toml",
     "gunicorn",
+    "requests",  # used by grew_match_quick.py, launched from run.sh
 ]
 
 [project.optional-dependencies]
@@ -24,7 +25,6 @@ dev = [
     "ruff>=0.9",
     "pytest>=9",
     "pytest-playwright>=0.7",
-    "requests>=2.32",
 ]
 
 [tool.pytest.ini_options]

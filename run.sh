@@ -91,6 +91,13 @@ stop_grew_match_servers() {
 }
 
 start_grew_match() {
+  # both the port takeover below and grew_match_quick.py rely on lsof
+  if ! command -v lsof >/dev/null 2>&1; then
+    echo "lsof is required for --grew-match" \
+         "(install it, e.g. sudo apt install lsof)" >&2
+    exit 1
+  fi
+
   if [ -z "$grew_corpora" ]; then
     local candidates=(web/db/*-grew/corpora.json)
     if [ ${#candidates[@]} -eq 0 ] || [ ! -f "${candidates[0]}" ]; then
@@ -133,7 +140,9 @@ start_grew_match() {
 
   local gmq_log=grew_match_quick/local_files/gmq.log
   echo "Starting grew-match for ${grew_corpora} (log: ${gmq_log})"
-  setsid python3 grew_match_quick/grew_match_quick.py "$grew_corpora" \
+  # run under the project venv so gmq's python deps (requests) are
+  # guaranteed regardless of what the system python has
+  setsid uv run python3 grew_match_quick/grew_match_quick.py "$grew_corpora" \
       --frontend_port "$gm_front_port" --backend_port "$gm_back_port" \
       </dev/null >"$gmq_log" 2>&1 &
   gmq_pid=$!
