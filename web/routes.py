@@ -748,8 +748,14 @@ def parse_sentence():
         return jsonify({"error": "ACE is busy; please try again in a moment."}), 503
 
     try:
+        # --udx=all annotates every node with its type (lexical type for
+        # lexemes, phrase type for rules); --rooted-derivations puts the
+        # matching root condition at the top of the tree
         response = _ace.parse(
-            dat, input_text, executable=find_ace(), cmdargs=[f"-n{n_results}"]
+            dat,
+            input_text,
+            executable=find_ace(),
+            cmdargs=[f"-n{n_results}", "--udx=all", "--rooted-derivations"],
         )
     except Exception as e:
         return jsonify({"error": _ace_error_message(e, dat)}), 500

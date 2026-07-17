@@ -347,11 +347,22 @@ def extract_examples(
 # ── Type-in-derivation check ─────────────────────────────────────────────────
 
 
-def _entities(deriv) -> tuple[set[str], set[str]]:
-    """Return (internal_entities, preterminal_entities) from a derivation."""
+def _entities(deriv) -> tuple[set[str], set[str], set[str]]:
+    """Return (internal entities, preterminal entities, node types).
+
+    Node types are the ``@type`` annotations ACE adds under ``--udx=all``:
+    the lexical type of each preterminal and the phrase type of each
+    internal node.
+    """
+    internals = list(deriv.internals())
+    preterminals = list(deriv.preterminals())
+    node_types = {
+        t for n in internals + preterminals if (t := getattr(n, "type", None))
+    }
     return (
-        {n.entity for n in deriv.internals()},
-        {n.entity for n in deriv.preterminals()},
+        {n.entity for n in internals},
+        {n.entity for n in preterminals},
+        node_types,
     )
 
 
@@ -364,13 +375,16 @@ def type_in_results(
     """
     Return True if *typ* appears in any parse result's derivation.
 
-    Two checks are tried for each derivation and either is sufficient:
+    Three checks are tried for each derivation and any is sufficient:
 
     1. Direct entity match — *typ* appears as an entity name in an internal
        or preterminal node.  This covers rules and lexical rules.
-    2. Lex-entry descendant match — a preterminal entity is a lex-entry id
+    2. Node-type match — *typ* is the ``@type`` annotation of a node
+       (``--udx=all``): the lexical type of a lexeme or the phrase type
+       of a rule.
+    3. Lex-entry descendant match — a preterminal entity is a lex-entry id
        that inherits from *typ* (via *lex_ids_for_type*).  This covers
-       lex-types, regardless of the TDL environment status string.
+       supertypes of the annotated lexical type.
 
     ``type_statuses`` is retained for API compatibility but is no longer used
     to distinguish rule vs. lex-type; the presence of lex-entry descendants
@@ -385,8 +399,8 @@ def type_in_results(
             continue
         if deriv is None:
             continue
-        internals, preterminals = _entities(deriv)
-        if typ in internals or typ in preterminals:
+        internals, preterminals, node_types = _entities(deriv)
+        if typ in internals or typ in preterminals or typ in node_types:
             return True
         if lex_ids and lex_ids & preterminals:
             return True
@@ -485,7 +499,9 @@ def run_examples(
     """
     verdicts_by_id: dict[int, Verdict] = {}
     fm = itsdb.FieldMapper() if ts is not None else None
-    base_cmdargs = ["--rooted-derivations"]
+    # --udx=all annotates nodes with their types so lex-types and phrase
+    # types can be matched directly in the derivation
+    base_cmdargs = ["--rooted-derivations", "--udx=all"]
 
     # Root-condition types need a separate ACE invocation with -r <root>
     # so that ACE is forced to use that root; without it root_gen, root_frag
