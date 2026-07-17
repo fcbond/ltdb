@@ -86,13 +86,26 @@ matches can be traced back to LTDB.
 
 ## 2. Install grew (once)
 
-Grew is an OCaml program, installed through [opam](https://opam.ocaml.org/):
+Grew is an OCaml program, installed through [opam](https://opam.ocaml.org/).
+On a fresh machine install and initialise opam first:
+
+```bash
+sudo apt install opam   # or see https://opam.ocaml.org/doc/Install.html
+opam init -a
+eval $(opam env)
+```
+
+then install grew (dune comes with it) and its grew-match dependencies:
 
 ```bash
 opam remote add grew "https://opam.grew.fr"
 opam update
-opam install dream dep2pictlib grew
+opam install dune dream dep2pictlib grew
 ```
+
+`run.sh` and `scripts/setup-grew-match.sh` find the opam switch via
+`opam` on PATH (or `~/.local/bin/opam`), so no further setup is needed;
+"grew/dune not found" means this step has not been done yet.
 
 ## 3. Run a local grew-match
 
