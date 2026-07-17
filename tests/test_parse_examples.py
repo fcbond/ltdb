@@ -14,6 +14,7 @@ from parse_examples import (
     Verdict,
     _build_lex_ids_for_type,
     _parse_doc,
+    run_examples,
     type_in_results,
     verdict_label,
 )
@@ -249,3 +250,63 @@ class TestVerdictLabel:
     def test_nex_fail_type_in_tree_no_parse(self):
         # edge case: type_found implies parse happened, but guard it anyway
         assert verdict_label(_v("nex", 0, True)) == "FAIL-type-in-tree"
+
+
+# ── run_examples parallelism ──────────────────────────────────────────────────
+
+
+class _FakeParser:
+    """Stands in for ace.ACEParser; counts how many were started."""
+
+    instances = 0
+
+    def __init__(self, dat, executable=None, cmdargs=None):
+        type(self).instances += 1
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def process_item(self, text, keys=None):
+        response = MagicMock()
+        response.results.return_value = []
+        return response
+
+
+class TestRunExamplesJobs:
+    def _examples(self, n):
+        return [
+            Example(i_id=(i + 1) * 10, text=f"s {i}", typ="some-type", wf=1, kind="ex")
+            for i in range(n)
+        ]
+
+    def test_parallel_matches_serial_and_keeps_order(self, monkeypatch):
+        monkeypatch.setattr("parse_examples.ace.ACEParser", _FakeParser)
+        exs = self._examples(9)
+        serial = run_examples(exs, "g.dat", "ace", {}, {}, jobs=1)
+        parallel = run_examples(exs, "g.dat", "ace", {}, {}, jobs=3)
+        assert parallel == serial
+        assert [v.example.i_id for v in parallel] == [ex.i_id for ex in exs]
+
+    def test_parallel_starts_one_parser_per_worker(self, monkeypatch):
+        monkeypatch.setattr("parse_examples.ace.ACEParser", _FakeParser)
+        exs = self._examples(9)
+        _FakeParser.instances = 0
+        run_examples(exs, "g.dat", "ace", {}, {}, jobs=3)
+        assert _FakeParser.instances == 3
+
+    def test_jobs_capped_by_example_count(self, monkeypatch):
+        monkeypatch.setattr("parse_examples.ace.ACEParser", _FakeParser)
+        exs = self._examples(2)
+        _FakeParser.instances = 0
+        run_examples(exs, "g.dat", "ace", {}, {}, jobs=8)
+        assert _FakeParser.instances == 2
+
+    def test_default_jobs_is_positive(self):
+        from parse_examples import default_jobs
+
+        jobs = default_jobs()
+        assert isinstance(jobs, int)
+        assert jobs >= 1

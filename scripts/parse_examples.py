@@ -12,9 +12,12 @@ Usage:
 """
 import argparse
 import logging
+import os
 import sys
+import threading
 from collections import defaultdict
 from pathlib import Path
+from queue import Empty, Queue
 from typing import NamedTuple
 
 from delphin import ace, itsdb
@@ -467,6 +470,31 @@ def make_test_suite(
 # ── Parsing ───────────────────────────────────────────────────────────────────
 
 
+# rough peak memory per ACE worker on a large grammar (ERG-sized)
+_ACE_WORKER_MEM_KIB = 2 * 1024 * 1024
+
+
+def default_jobs() -> int:
+    """Return a job count fitted to this machine.
+
+    One ACE process per CPU, capped by available memory at roughly
+    2 GiB per worker (what a large grammar like the ERG can need at
+    peak).  Falls back to min(cpus, 8) when available memory cannot be
+    determined (e.g. no /proc/meminfo on non-Linux systems).
+    """
+    cpus = os.cpu_count() or 1
+    try:
+        with open("/proc/meminfo") as f:
+            mem_kib = next(
+                int(line.split()[1])
+                for line in f
+                if line.startswith("MemAvailable:")
+            )
+    except (OSError, StopIteration, ValueError, IndexError):
+        return max(1, min(cpus, 8))
+    return max(1, min(cpus, mem_kib // _ACE_WORKER_MEM_KIB))
+
+
 def run_examples(
     examples: list[Example],
     dat: str,
@@ -474,6 +502,7 @@ def run_examples(
     types: dict[str, list[str]],
     lex_ids_for_type: dict[str, set[str]],
     ts: itsdb.TestSuite | None = None,
+    jobs: int = 1,
 ) -> list[Verdict]:
     """
     Parse every example with ACE and return verdicts.
@@ -493,11 +522,13 @@ def run_examples(
         types:            maps type name → list of TDL environment statuses
         lex_ids_for_type: maps type → all lex-entry ids that inherit from it
         ts:               optional TestSuite to write parse results into
+        jobs:             number of parallel ACE processes per batch
 
     Returns:
         list of Verdict objects in the same order as *examples*.
     """
     verdicts_by_id: dict[int, Verdict] = {}
+    responses_by_id: dict[int, object] = {}
     fm = itsdb.FieldMapper() if ts is not None else None
     # --udx=all annotates nodes with their types so lex-types and phrase
     # types can be matched directly in the derivation
@@ -514,20 +545,68 @@ def run_examples(
         else:
             normal.append(ex)
 
+    def _process(parser, ex: Example) -> None:
+        response = parser.process_item(ex.text, keys={"i-id": ex.i_id})
+        results = response.results()
+        found = type_in_results(
+            ex.typ, types.get(ex.typ, ["type"]), results, lex_ids_for_type
+        )
+        verdicts_by_id[ex.i_id] = Verdict(ex, len(results), found)
+        if fm is not None:
+            responses_by_id[ex.i_id] = response
+
     def _run_batch(exs: list[Example], cmdargs: list[str]) -> None:
         # Pass a copy: ACEParser mutates its cmdargs list in-place (appending
         # tsdb flags), which would corrupt the caller's list on reuse.
-        with ace.ACEParser(dat, executable=ace_bin, cmdargs=list(cmdargs)) as parser:
+        n_workers = max(1, min(jobs, len(exs)))
+        if n_workers == 1:
+            with ace.ACEParser(
+                dat, executable=ace_bin, cmdargs=list(cmdargs)
+            ) as parser:
+                for ex in exs:
+                    _process(parser, ex)
+        else:
+            # one ACE process per worker, all pulling from a shared queue;
+            # the parsing happens in the subprocesses, so threads suffice
+            print(
+                f"  parsing {len(exs)} examples with {n_workers}"
+                " ACE processes …",
+                file=sys.stderr,
+            )
+            pending: Queue[Example] = Queue()
             for ex in exs:
-                response = parser.process_item(ex.text, keys={"i-id": ex.i_id})
-                results = response.results()
-                found = type_in_results(
-                    ex.typ, types.get(ex.typ, ["type"]), results, lex_ids_for_type
-                )
-                verdicts_by_id[ex.i_id] = Verdict(ex, len(results), found)
-                if fm is not None:
-                    for tablename, data in fm.map(response):
-                        ts[tablename].append(data)
+                pending.put(ex)
+            failures: list[BaseException] = []
+
+            def _worker() -> None:
+                try:
+                    with ace.ACEParser(
+                        dat, executable=ace_bin, cmdargs=list(cmdargs)
+                    ) as parser:
+                        while True:
+                            try:
+                                ex = pending.get_nowait()
+                            except Empty:
+                                return
+                            _process(parser, ex)
+                except BaseException as exc:
+                    failures.append(exc)
+
+            threads = [
+                threading.Thread(target=_worker) for _ in range(n_workers)
+            ]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            if failures:
+                raise failures[0]
+        # write profile rows in stable example order (FieldMapper is not
+        # thread-safe and assigns parse ids sequentially)
+        if fm is not None:
+            for ex in exs:
+                for tablename, data in fm.map(responses_by_id.pop(ex.i_id)):
+                    ts[tablename].append(data)
 
     _run_batch(normal, base_cmdargs)
 
@@ -762,6 +841,15 @@ def main() -> None:
         help="Write results into the doctest table of this grammar SQLite DB",
     )
     parser.add_argument(
+        "-j",
+        "--jobs",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Number of parallel ACE processes; 0 = auto from CPUs and "
+             "available memory (default: 1)",
+    )
+    parser.add_argument(
         "--verbose", "-v", action="store_true", help="Log TDL parsing warnings"
     )
     args = parser.parse_args()
@@ -786,7 +874,8 @@ def main() -> None:
 
     print(f"Parsing with {args.dat} …", file=sys.stderr)
     verdicts = run_examples(
-        examples, str(args.dat), ace_bin, types, lex_ids_for_type, ts
+        examples, str(args.dat), ace_bin, types, lex_ids_for_type, ts,
+        jobs=args.jobs or default_jobs(),
     )
 
     if ts is not None:

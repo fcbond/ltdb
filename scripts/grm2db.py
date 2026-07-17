@@ -228,6 +228,14 @@ if __name__ == "__main__":
              "(requires --ace or a pre-existing .dat next to the db)",
     )
     parser.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        metavar="N",
+        help="With --doctest: number of parallel ACE processes; 0 = auto "
+             "from CPUs and available memory (default: 1)",
+    )
+    parser.add_argument(
         "--grew",
         action="store_true",
         help="Also export the gold trees and DMRS as grew JSON corpora "
@@ -303,6 +311,7 @@ if __name__ == "__main__":
 
     if args.doctest:
         from parse_examples import (
+            default_jobs,
             extract_examples,
             run_examples,
             write_to_db,
@@ -331,7 +340,8 @@ if __name__ == "__main__":
                 with open(log_path, "a") as log:
                     examples, ex_types, lex_ids = extract_examples(doctest_cfg, log)
                 verdicts = run_examples(
-                    examples, dat_path, ace_bin_resolved, ex_types, lex_ids
+                    examples, dat_path, ace_bin_resolved, ex_types, lex_ids,
+                    jobs=args.jobs or default_jobs(),
                 )
                 write_to_db(verdicts, db_path)
                 print(f"Docstring tests done for {nam}", file=sys.stderr)
