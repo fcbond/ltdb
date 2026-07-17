@@ -32,18 +32,6 @@ from parse_examples import (
 from tdl2db import read_cfg
 
 
-def find_grammar_dir(config: Path) -> Path:
-    """Return the nearest ancestor of *config* containing a tsdb/ directory.
-
-    Falls back to the config file's own directory when no ancestor has one
-    (the profile is then created under a fresh tsdb/run/ there).
-    """
-    for parent in config.resolve().parents:
-        if (parent / "tsdb").is_dir():
-            return parent
-    return config.resolve().parent
-
-
 def unique_profile_dir(base: Path) -> Path:
     """Return *base*, or the first of base-2, base-3, ... that is unused."""
     if not base.exists():
@@ -78,8 +66,8 @@ def main() -> None:
         "--grammar-dir",
         type=Path,
         metavar="DIR",
-        help="Grammar root holding tsdb/ (default: nearest ancestor of the "
-             "config file with a tsdb/ directory)",
+        help="Grammar root holding tsdb/ (default: the directory of the "
+             "grammar-top file named in the ACE config)",
     )
     parser.add_argument(
         "--outdir",
@@ -119,7 +107,10 @@ def main() -> None:
     if args.outdir is not None:
         outdir = args.outdir
     else:
-        grammar_dir = args.grammar_dir or find_grammar_dir(args.config)
+        # the grammar root is where the ACE config's grammar-top file lives
+        grammar_dir = (
+            args.grammar_dir or Path(cfg["grammar_file"]).resolve().parent
+        )
         date = datetime.date.today().isoformat()
         outdir = unique_profile_dir(
             grammar_dir / "tsdb" / "run" / f"docstring_{date}"

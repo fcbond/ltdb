@@ -6,22 +6,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-from docstring_profile import find_grammar_dir, summarize, unique_profile_dir
+from docstring_profile import summarize, unique_profile_dir
 from parse_examples import Example, Verdict
-
-
-class TestFindGrammarDir:
-    def test_finds_ancestor_with_tsdb(self, tmp_path):
-        (tmp_path / "tsdb").mkdir()
-        cfg = tmp_path / "ace" / "config.tdl"
-        cfg.parent.mkdir()
-        cfg.touch()
-        assert find_grammar_dir(cfg) == tmp_path.resolve()
-
-    def test_falls_back_to_config_dir(self, tmp_path):
-        cfg = tmp_path / "config.tdl"
-        cfg.touch()
-        assert find_grammar_dir(cfg) == tmp_path.resolve()
 
 
 class TestUniqueProfileDir:
