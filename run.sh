@@ -71,7 +71,9 @@ stop_grew_match_servers() {
     [ -z "$pids" ] && continue
     echo "Stopping existing server on port ${port}"
     for pid in $pids; do
-      pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
+      # the process may already be gone (killing a sibling's group can
+      # take it down between the lsof listing and this lookup)
+      pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ' || true)
       if [ -n "$pgid" ] && [ "$pgid" != "$own_pgid" ]; then
         kill -TERM -- "-${pgid}" 2>/dev/null || true
       else
@@ -91,10 +93,15 @@ stop_grew_match_servers() {
 }
 
 start_grew_match() {
-  # both the port takeover below and grew_match_quick.py rely on lsof
-  if ! command -v lsof >/dev/null 2>&1; then
-    echo "lsof is required for --grew-match" \
-         "(install it, e.g. sudo apt install lsof)" >&2
+  # external tools: lsof for the port takeover (and grew_match_quick.py
+  # itself), curl for the backend readiness check
+  local tool missing=""
+  for tool in lsof curl; do
+    command -v "$tool" >/dev/null 2>&1 || missing="${missing} ${tool}"
+  done
+  if [ -n "$missing" ]; then
+    echo "--grew-match needs:${missing}" \
+         "(install with e.g. sudo apt install${missing})" >&2
     exit 1
   fi
 
@@ -151,17 +158,22 @@ start_grew_match() {
       </dev/null >"$gmq_log" 2>&1 &
   gmq_pid=$!
 
+  # ping 127.0.0.1 explicitly (not localhost, which may resolve to ::1)
+  # and bypass any http_proxy: this is always a loopback request
   local up=""
   for _ in $(seq 30); do
-    if curl -s -m 2 -X POST "http://localhost:${gm_back_port}/ping" \
-        >/dev/null 2>&1; then
+    if curl -s -m 2 --noproxy '*' -X POST \
+        "http://127.0.0.1:${gm_back_port}/ping" >/dev/null 2>&1; then
       up=1
       break
     fi
     sleep 2
   done
   if [ -z "$up" ]; then
-    echo "grew-match backend did not come up; recent ${gmq_log}:" >&2
+    echo "grew-match backend did not come up; last ping attempt:" >&2
+    curl -sS -m 2 --noproxy '*' -X POST \
+        "http://127.0.0.1:${gm_back_port}/ping" >&2 || true
+    echo "recent ${gmq_log}:" >&2
     tail -n 20 "$gmq_log" >&2 || true
     local backend_err=grew_match_quick/local_files/log/backend.stderr
     if [ -s "$backend_err" ]; then
