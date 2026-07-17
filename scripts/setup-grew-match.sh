@@ -41,6 +41,10 @@ if [ ! -d grew_match_quick/local_files/grew_match/.git ]; then
       grew_match_quick/local_files/grew_match
 fi
 mkdir -p grew_match_quick/local_files/grew_match/instances
+# serve the LTDB query snippets from the frontend (run.sh points
+# config.json's snippets_url here after each start)
+ln -sfn ../../../etc/grew_snippets \
+    grew_match_quick/local_files/grew_match/snippets
 # The backend needs fixes that are not upstream yet (result meta
 # encoding, url/code passthrough, LTDB_BASE_URL expansion — see
 # doc/grew-match.md), so clone it before grew_match_quick.py does

@@ -1,0 +1,5 @@
+% X is connected to Y through ARG1
+% edge labels: 1 = role (ARG1, ARG2, RSTR, ...); post = scopal
+% relation (NEQ, EQ, H, HEQ)
+
+pattern { X -[1=ARG1]-> Y }

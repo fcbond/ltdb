@@ -1,0 +1,4 @@
+% Search for a lexical type (annotated on lexical-entry nodes)
+% e.g. ERG: n_-_c_le; regular expressions also work
+
+pattern { N [lextype=re".*_le"] }

@@ -1,0 +1,3 @@
+% Modification: predicates sharing a label (post=EQ)
+
+pattern { A -[post=EQ]-> B }

@@ -185,6 +185,19 @@ start_grew_match() {
 
   # the corpora were compiled by setup-grew-match.sh before the backend
   # started, so it reads the compiled status on startup
+
+  # point the snippet pane at the LTDB queries in etc/grew_snippets
+  # (grew_match_quick rewrites config.json on every start)
+  uv run python - <<'PY'
+import json
+
+path = "grew_match_quick/local_files/grew_match/config.json"
+with open(path) as f:
+    cfg = json.load(f)
+cfg["snippets_url"] = "snippets/"
+with open(path, "w") as f:
+    json.dump(cfg, f, indent=2)
+PY
   echo "grew-match ready on http://localhost:${gm_front_port}"
 }
 

@@ -1,0 +1,3 @@
+% A quantifier with its restriction (scopal qeq link)
+
+pattern { Q -[1=RSTR, post=H]-> N }

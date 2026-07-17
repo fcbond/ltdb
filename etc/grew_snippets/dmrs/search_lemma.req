@@ -1,0 +1,3 @@
+% Search surface predicates by lemma
+
+pattern { N [lemma="dog"] }

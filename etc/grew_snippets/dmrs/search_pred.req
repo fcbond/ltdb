@@ -1,0 +1,4 @@
+% Search for a semantic predicate
+% e.g. "named" (proper names), "_dog_n_1", "compound"
+
+pattern { N [pred="named"] }

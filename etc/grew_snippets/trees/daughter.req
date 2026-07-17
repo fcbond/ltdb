@@ -1,0 +1,4 @@
+% A rule whose second daughter is a specific rule
+% (parent->child edges are labelled with the daughter position 1, 2, ...)
+
+pattern { P [cat="sb-hd_mc_c"]; P -[2]-> C; C [cat="hd-cmp_u_c"] }

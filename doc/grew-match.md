@@ -238,3 +238,15 @@ frontend and needs the patches in `etc/grew_match_dream.patch`
 
 The first two are worth filing upstream at
 <https://github.com/grew-nlp/grew_match_dream>.
+
+### Query snippets
+
+The snippet pane on the right of the grew-match UI is populated from
+`etc/grew_snippets/` (served by the frontend; `run.sh` points
+`config.json`'s `snippets_url` there at each start).  It has tabs for
+the DMRS corpora (predicate/lemma search, `ARG1` links, reflexive-like
+configurations, quantifier restrictions, `post=EQ` modification), the
+derivation-tree corpora (`cat`, `lextype`, `lexid`, `form`, `n`-th
+daughter), and graph metadata (sentence text, treebank profile).
+Clicking a snippet loads the query into the request box; edit the
+quoted values to taste.

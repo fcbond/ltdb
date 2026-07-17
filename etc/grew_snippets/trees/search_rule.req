@@ -1,0 +1,5 @@
+% Search for a grammar rule (internal node)
+% Rule names are grammar-specific: see the Rules page in the LTDB
+% e.g. ERG: sb-hd_mc_c, hd-cmp_u_c; Yue: subj-head, head-comp
+
+pattern { N [cat="hd-cmp_u_c"] }
