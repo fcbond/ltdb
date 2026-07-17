@@ -161,7 +161,13 @@ start_grew_match() {
     sleep 2
   done
   if [ -z "$up" ]; then
-    echo "grew-match backend did not come up; see ${gmq_log}" >&2
+    echo "grew-match backend did not come up; recent ${gmq_log}:" >&2
+    tail -n 20 "$gmq_log" >&2 || true
+    local backend_err=grew_match_quick/local_files/log/backend.stderr
+    if [ -s "$backend_err" ]; then
+      echo "--- ${backend_err}: ---" >&2
+      tail -n 20 "$backend_err" >&2
+    fi
     exit 1
   fi
 
