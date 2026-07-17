@@ -608,7 +608,9 @@ def run_examples(
         if fm is not None:
             for ex in exs:
                 for tablename, data in fm.map(responses_by_id.pop(ex.i_id)):
-                    ts[tablename].append(data)
+                    ts[tablename].append(
+                        _tsdb.make_record(data, ts.schema[tablename])
+                    )
 
     _run_batch(normal, base_cmdargs)
 
@@ -621,7 +623,7 @@ def run_examples(
 
     if fm is not None:
         for tablename, data in fm.cleanup():
-            ts[tablename].append(data)
+            ts[tablename].append(_tsdb.make_record(data, ts.schema[tablename]))
         ts.commit()
 
     return [verdicts_by_id[ex.i_id] for ex in examples]
