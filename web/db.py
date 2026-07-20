@@ -150,9 +150,11 @@ def get_lxids(conn, typ):
     """
     c = conn.cursor()
     c.execute(
-        f"""SELECT lex.lexid, orth, COALESCE(freq,0) FROM lex 
+        f"""SELECT lex.lexid, lex.orth, COALESCE(SUM(lexfreq.freq), 0) AS freq
+             FROM lex
              LEFT JOIN lexfreq ON lex.lexid = lexfreq.lexid
-             WHERE typ=? 
+             WHERE lex.typ=?
+    GROUP BY lex.lexid, lex.orth
     ORDER BY freq DESC
     LIMIT {lim // 2}""",
         (typ,),

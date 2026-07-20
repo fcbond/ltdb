@@ -10,17 +10,27 @@ from delphin.codecs import simplemrs
 
 def extract_span(terminal):
     """
-    Try to get the start and end of the construction
+    Try to get the start and end of the construction.
+
+    A terminal's tokens span the whole surface expression, which may
+    cover more than one input token for a multiword lexical entry (e.g.
+    "or what"); take the earliest FROM and latest TO across all of them
+    rather than just the first token's span.
     """
     if not terminal.tokens:
         return None
-    str_tok = terminal.tokens[0][1]
-    from_match = re.search(r'\+FROM\s+\\"(\d+)\\"', str_tok)
-    to_match = re.search(r'\+TO\s+\\"(\d+)\\"', str_tok)
+    from_value = to_value = None
+    for _, str_tok in terminal.tokens:
+        from_match = re.search(r'\+FROM\s+\\"(\d+)\\"', str_tok)
+        to_match = re.search(r'\+TO\s+\\"(\d+)\\"', str_tok)
+        if from_match:
+            v = int(from_match.group(1))
+            from_value = v if from_value is None else min(from_value, v)
+        if to_match:
+            v = int(to_match.group(1))
+            to_value = v if to_value is None else max(to_value, v)
 
-    if from_match and to_match:
-        from_value = int(from_match.group(1))
-        to_value = int(to_match.group(1))
+    if from_value is not None and to_value is not None:
         return from_value, to_value
     else:
         return None

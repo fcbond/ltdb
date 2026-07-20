@@ -89,3 +89,4 @@ CREATE INDEX idx_gold_profile_sid ON gold(profile, sid);
 CREATE INDEX idx_typind_typ ON typind(typ);
 CREATE INDEX idx_lexind_lexid ON lexind(lexid);
 CREATE INDEX idx_doctest_typ ON doctest(typ);
+CREATE INDEX idx_lexfreq_lexid ON lexfreq(lexid);
