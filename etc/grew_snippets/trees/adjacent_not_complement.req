@@ -1,0 +1,17 @@
+% "all" immediately followed by "the" (adjacent=y), but where "the" is
+% NOT the complement of "all" -- i.e. not the ordinary predeterminer
+% construction "all the strings", where a hd-cmp_u_c rule directly above
+% "all" takes "the strings" as its complement. Two hops above the "all"
+% token (its preterminal, then that preterminal's parent) is normally
+% that hd-cmp_u_c node; excluding it leaves cases like the idiom
+% "all the same" ("are they all the same price?"), where "all" and
+% "the" are unrelated except for being adjacent.
+
+pattern {
+  Pre -[1]-> X;
+  GP -[1]-> Pre;
+  X [form="all"];
+  X -[adjacent=y]-> Y;
+  Y [form="the"]
+}
+without { GP [cat="hd-cmp_u_c"] }

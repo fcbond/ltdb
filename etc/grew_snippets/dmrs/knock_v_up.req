@@ -1,0 +1,5 @@
+% Multiword particle verbs pack the particle into the sense slot:
+% predicate.split("_knock_v_up") gives lemma "knock", pos "v",
+% sense "up" -- not a numbered sense like most other verbs.
+
+pattern { N [pred="_knock_v_up"] }

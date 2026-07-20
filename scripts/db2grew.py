@@ -198,6 +198,19 @@ def dmrs_to_grew(mrs_str, meta):
     feature structures {"1": role, "post": post}; undirected /EQ links
     (no role) get the conventional role "MOD".
 
+    Every node keeps the raw `pred` string verbatim.  Predicates that
+    pydelphin's predicate.is_surface() judges "surface" (underscore-
+    prefixed with a POS-shaped suffix -- the grammarian's own naming
+    convention) additionally get lemma/pos/sense via predicate.split().
+    This is trusted as-is, including for grammars where a
+    grammar-internal composition marker happens to use that same shape
+    (e.g. NorSource's `_pronoun_q`, `_def_q`): the surface-node display
+    label in grew-match is `pred`, not `lemma` (a `main_feat` patch on
+    the grew_match_dream backend, see doc/grew-match.md), so a lemma
+    that does not mean much for a given predicate no longer costs
+    anything -- it is just an extra, occasionally-not-useful search
+    key, not something competing for the display slot.
+
     Args:
         mrs_str: raw SimpleMRS from gold.mrs
         meta: graph-level metadata (sid, profile, text)

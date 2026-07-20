@@ -89,15 +89,46 @@ serves the corpora just built.
 
 **DMRS** are dependency-style graphs:
 
-- one node per predicate, ordered by surface position, with features
-  `pred`, `lemma`/`pos`/`sense` (surface predicates only), `cvarsort`,
-  the morphosemantic properties (`NUM`, `PERS`, `TENSE`, ...),
-  `carg`, `cfrom`/`cto`, and `top`/`index` flags; characters that
-  clash with grew syntax in property names are replaced by `_`
-  (e.g. `PNG.PERNUM` becomes `PNG_PERNUM`)
+- one node per predicate, ordered by surface position, with the raw
+  `pred` string verbatim, plus `lemma`/`pos`/`sense` whenever
+  pydelphin's `predicate.is_surface()` recognises the predicate's
+  shape (roughly: underscore-prefixed with a POS-shaped suffix, e.g.
+  `_dog_n_1` → lemma `dog`, pos `n`, sense `1`). This is a
+  string-shape heuristic, trusted as the grammarian's own naming
+  convention as-is: a grammar-specific abstract predicate can use the
+  same shape as a genuinely word-anchored one (the ERG's `_the_q` is
+  a real determiner; NorSource's `_pronoun_q`/`_def_q` are
+  grammar-internal composition markers that happen to look the
+  same), so a `lemma` may occasionally not mean much — but that no
+  longer costs anything, because the node's displayed name in
+  grew-match is always `pred` (patched in, see "Backend patches"
+  below), not `lemma`; a not-very-meaningful lemma is just an extra,
+  occasionally-unhelpful search key, never something competing for
+  the display slot. Predicates that do not fit the shape at all —
+  most abstract predicates without a `_..._pos` pattern, e.g. `pron`
+  or NorSource's `_1pl-pron` — get no lemma regardless of what they
+  mean; search those by `pred` instead. See the `search_lemma`
+  snippet and "Regex and anchoring" below.
+- other node features: `cvarsort`, the morphosemantic properties
+  (`NUM`, `PERS`, `TENSE`, ...), `carg`, `cfrom`/`cto`, and
+  `top`/`index` flags; characters that clash with grew syntax in
+  property names are replaced by `_` (e.g. `PNG.PERNUM` becomes
+  `PNG_PERNUM`)
 - links become edges with two label features: `1` (the role, e.g.
   `ARG1`) and `post` (e.g. `NEQ`); undirected `/EQ` links get the
   conventional role `MOD`
+
+### Regex and anchoring
+
+Grew's `re"..."` requires a **full match**, not a substring search:
+`pred=re"dog"` matches nothing, since no predicate is literally just
+`dog`. To match a prefix (e.g. every sense of a lemma, since surface
+predicates follow `_lemma_pos_sense`), anchor with a trailing `.*`:
+`pred=re"_dog_.*"` finds `_dog_n_1`, `_dog_n_2`, .... To match
+anywhere in the string, wrap both sides: `pred=re".*dog.*"` (broader —
+on the ERG DMRS corpus this also catches predicates with "dog"
+elsewhere in the name, 184 matches against 169 for the anchored
+prefix form).
 
 Every graph carries its `profile`, `sid` and `text` as metadata so
 matches can be traced back to LTDB.
@@ -251,7 +282,7 @@ export LTDB_GREW_MATCH_URL=http://localhost:8000
 Without the web UI, you can also search from the command line:
 
 ```bash
-echo 'pattern { N [lemma="dog"] }' > q.req
+echo 'pattern { N [pred=re"_dog_.*"] }' > q.req
 grew grep -request q.req -i "ERG_(2020)-grew/ERG_2020_dmrs"
 ```
 
@@ -274,12 +305,17 @@ pattern { P [cat="sp-hd_n_c"]; P -[2]-> C;
           C [cat="n_sg_ilr"] }                % second daughter of a rule
 pattern { X -[adjacent=y]-> Y; Y [form="the"] } % word immediately
                                                  % followed by "the"
+pattern {                                       % "all" adjacent to "the",
+  Pre -[1]-> X; GP -[1]-> Pre;                  % but "the" is not the
+  X [form="all"]; X -[adjacent=y]-> Y;          % complement of "all"
+  Y [form="the"]
+} without { GP [cat="hd-cmp_u_c"] }
 ```
 
 On the DMRS corpus:
 
 ```
-pattern { N [lemma="dog", pos="n"] }           % a predicate by lemma
+pattern { N [pred=re"_dog_.*"] }               % a predicate by word
 pattern { G -[1=ARG1, post=NEQ]-> D }          % a link by role and post
 pattern { Q -[1=RSTR]-> N; N [NUM="sg"] }      % quantifier of a singular
 pattern { N [top="yes"] }                      % the TOP node
@@ -322,9 +358,18 @@ frontend and needs the patches in `etc/grew_match_dream.patch`
   `save_dot` does), or the link button never appears for
   dependency-rendered corpora;
 - relative `url` metas are expanded with `$LTDB_BASE_URL` at serve
-  time (see section 1).
+  time (see section 1);
+- `save_dep` must call `Graph.to_dep` with `~main_feat:"pred"`, so
+  DMRS nodes are drawn labelled with their `pred` feature rather than
+  grewlib's hardcoded default priority (`form`, then `lemma`, then
+  `gpred`, ...). Without this, a node with both `lemma` and `pred` set
+  displays its `lemma` — fine for a genuinely word-anchored predicate,
+  misleading for a grammar-internal one reusing the same surface shape
+  (see "Graph encoding" above). `main_feat` only picks which *existing*
+  feature is shown as the node's name; it does not add or hide data, so
+  `lemma`/`pos`/`sense` stay searchable either way.
 
-The first two are worth filing upstream at
+The first three are worth filing upstream at
 <https://github.com/grew-nlp/grew_match_dream>.
 
 ### Query snippets
@@ -332,9 +377,12 @@ The first two are worth filing upstream at
 The snippet pane on the right of the grew-match UI is populated from
 `etc/grew_snippets/` (served by the frontend; `run.sh` points
 `config.json`'s `snippets_url` there at each start).  It has tabs for
-the DMRS corpora (predicate/lemma search, `ARG1` links, reflexive-like
-configurations, quantifier restrictions, `post=EQ` modification), the
-derivation-tree corpora (`cat`, `lextype`, `lexid`, `form`, `n`-th
-daughter), and graph metadata (sentence text, treebank profile).
-Clicking a snippet loads the query into the request box; edit the
-quoted values to taste.
+the DMRS corpora (predicate search by `pred`, by exact `lemma`, or by
+regex; a regex-escaping example (`ad+hoc`); a particle verb whose
+particle lands in the sense slot (`knock_v_up`); `ARG1` links,
+reflexive-like configurations, quantifier restrictions, `post=EQ`
+modification), the derivation-tree corpora (`cat`, `lextype`, `lexid`,
+`form`, `n`-th daughter, adjacency combined with a `without` clause
+excluding a specific construction), and graph metadata (sentence text,
+treebank profile). Clicking a snippet loads the query into the request
+box; edit the quoted values to taste.

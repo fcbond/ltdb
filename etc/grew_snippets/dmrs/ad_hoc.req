@@ -1,0 +1,4 @@
+% Regex escaping: "+" is a regex metacharacter, so it must be escaped
+% to match the literal predicate "_ad+hoc_a_1".
+
+pattern { N [pred=re"^_ad\+hoc.*"] }

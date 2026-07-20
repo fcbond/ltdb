@@ -1,3 +1,13 @@
-% Search surface predicates by lemma
+% Surface predicates are decorated with lemma/pos/sense pulled out of
+% the pred name, so an exact word search can use lemma directly:
 
 pattern { N [lemma="dog"] }
+
+% Predicates not shaped "_lemma_pos_sense" at all -- e.g. "pron",
+% "compound", "unknown" -- get no lemma, so search those by pred
+% instead. Quantifiers like "_the_q" ARE surface-shaped and do get a
+% lemma ("the"). Grew's re"..." requires a FULL match, not a substring,
+% so the trailing .* is required below -- re"_dog_" alone matches
+% nothing.
+
+pattern { N [pred=re"_dog_.*"] }

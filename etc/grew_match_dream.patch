@@ -1,8 +1,8 @@
 diff --git a/src/gmd_utils.ml b/src/gmd_utils.ml
-index eae37e3..8d470fc 100644
+index eae37e3..b9ba4b7 100644
 --- a/src/gmd_utils.ml
 +++ b/src/gmd_utils.ml
-@@ -258,6 +258,16 @@ end
+@@ -258,12 +258,27 @@ end
  
  
  
@@ -19,7 +19,19 @@ index eae37e3..8d470fc 100644
  (* ============================================================================================================================ *)
  let save_dep uuid ~config ?audio_info rtl base sent_id deco graph sentence meta =
    try 
-@@ -271,7 +281,9 @@ let save_dep uuid ~config ?audio_info rtl base sent_id deco graph sentence meta
+     let folder = datadir uuid in
+     let filename = sprintf "%s.svg" base in
+-    let dep = Graph.to_dep ~filter:Draw_config.filter ~pid:(!Draw_config.current).pid ~deco ~config graph in
++    (* our graphs label nodes with a "pred" feature (DMRS predicates) or
++       a "cat"/"lexid" feature (constituency trees); grewlib's default
++       main-feature order tries "lemma" ahead of "pred", so without this
++       override a predicate with a lemma displays as its lemma instead
++       of the pred value grew-match is meant to show as the node name *)
++    let dep = Graph.to_dep ~filter:Draw_config.filter ~pid:(!Draw_config.current).pid ~main_feat:"pred" ~deco ~config graph in
+     let _ = Dep2pictlib.save_svg ~filename:(Filename.concat folder filename) (Dep2pictlib.from_dep ~rtl dep) in
+     let shift = Dep2pictlib.highlight_shift () in
+     let data = `Assoc (CCList.filter_map CCFun.id [
+@@ -271,7 +286,9 @@ let save_dep uuid ~config ?audio_info rtl base sent_id deco graph sentence meta
          Some ("filename", `String (Filename.concat uuid filename));
          Some ("sent_id", `String sent_id);
          Some ("sentence", `String sentence);
@@ -30,7 +42,7 @@ index eae37e3..8d470fc 100644
          CCOption.map (fun v -> ("shift", `Float v)) shift;
          CCOption.map (fun s -> ("audio", `String s)) audio_info;
        ]) in 
-@@ -292,9 +304,9 @@ let save_dot uuid ~config base sent_id deco graph sentence meta =
+@@ -292,9 +309,9 @@ let save_dot uuid ~config base sent_id deco graph sentence meta =
        ("filename", `String (Filename.concat uuid filename));
        ("sent_id", `String sent_id);
        ("sentence", `String sentence);
