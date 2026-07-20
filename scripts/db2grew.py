@@ -5,6 +5,7 @@
 ###
 import argparse
 import logging
+import multiprocessing as mp
 import re
 import sqlite3
 import sys
@@ -17,6 +18,8 @@ import orjson
 from delphin import derivation, predicate
 from delphin.codecs import simplemrs
 from delphin.dmrs import from_mrs
+
+from gold2db import cpu_jobs
 
 log = logging.getLogger("db2grew")
 
@@ -283,8 +286,63 @@ def write_graph(directory, fname, graph):
     (directory / fname).write_bytes(orjson.dumps(graph, option=orjson.OPT_INDENT_2))
 
 
+# Set once per worker process by _init_worker(), instead of re-pickling
+# lextypes and the export settings on every row.
+_worker_ctx = {}
+
+
+def _init_worker(lextypes, do_trees, do_dmrs, trees_dir, dmrs_dir, url_base, db_name):
+    _worker_ctx.update(
+        lextypes=lextypes,
+        do_trees=do_trees,
+        do_dmrs=do_dmrs,
+        trees_dir=trees_dir,
+        dmrs_dir=dmrs_dir,
+        url_base=url_base,
+        db_name=db_name,
+    )
+
+
+def _export_row(row):
+    """Convert one gold row to tree/DMRS graph files.
+
+    Runs either directly (jobs=1) or in a worker process set up by
+    _init_worker(); returns the (tree_fname, dmrs_fname) written, either
+    of which may be None if that graph was skipped or not requested.
+    """
+    profile, sid, sent, deriv_str, mrs_str = row
+    ctx = _worker_ctx
+    meta = {
+        "sent_id": f"{profile}/{sid}",
+        "sid": str(sid),
+        "profile": profile,
+        "text": sent or "",
+    }
+    meta["url"] = (
+        f"{ctx['url_base']}/sent/{quote(profile, safe='')}/{sid}"
+        f"?grm={quote(ctx['db_name'], safe='')}"
+    )
+    fname = f"{sanitize(profile)}__{sid}.json"
+    tree_fname = dmrs_fname = None
+    if ctx["do_trees"]:
+        graph = deriv_to_grew(deriv_str, ctx["lextypes"], meta)
+        if graph:
+            write_graph(ctx["trees_dir"], fname, graph)
+            tree_fname = fname
+    if ctx["do_dmrs"]:
+        graph = dmrs_to_grew(mrs_str, meta)
+        if graph:
+            write_graph(ctx["dmrs_dir"], fname, graph)
+            dmrs_fname = fname
+    return tree_fname, dmrs_fname
+
+
 def export(conn, out_dir, grm, args):
     """Export the gold table to grew corpora under out_dir.
+
+    Rows are independent (one input row -> one graph file), so with
+    args.jobs > 1 they are converted by a pool of worker processes
+    instead of one at a time; jobs=1 (the default) stays a plain loop.
 
     Args:
         conn: Connection to an LTDB SQLite database
@@ -304,32 +362,19 @@ def export(conn, out_dir, grm, args):
     lextypes = get_lextypes(conn) if do_trees else {}
     trees_dir = out_dir / f"{grm}_trees"
     dmrs_dir = out_dir / f"{grm}_dmrs"
-    tree_files = []
-    dmrs_files = []
-    for profile, sid, sent, deriv_str, mrs_str in iter_gold(conn, args.profiles):
-        # sent_id is the conventional grew key, shown in match results
-        meta = {
-            "sent_id": f"{profile}/{sid}",
-            "sid": str(sid),
-            "profile": profile,
-            "text": sent or "",
-        }
-        # grew-match shows a link button for the url meta
-        meta["url"] = (
-            f"{url_base}/sent/{quote(profile, safe='')}/{sid}"
-            f"?grm={quote(args.db.name, safe='')}"
-        )
-        fname = f"{sanitize(profile)}__{sid}.json"
-        if do_trees:
-            graph = deriv_to_grew(deriv_str, lextypes, meta)
-            if graph:
-                write_graph(trees_dir, fname, graph)
-                tree_files.append(fname)
-        if do_dmrs:
-            graph = dmrs_to_grew(mrs_str, meta)
-            if graph:
-                write_graph(dmrs_dir, fname, graph)
-                dmrs_files.append(fname)
+    ctx_args = (lextypes, do_trees, do_dmrs, trees_dir, dmrs_dir, url_base, args.db.name)
+
+    rows = list(iter_gold(conn, args.profiles))
+    n_workers = min(getattr(args, "jobs", 1) or 1, len(rows)) if rows else 1
+    if n_workers > 1:
+        with mp.Pool(n_workers, initializer=_init_worker, initargs=ctx_args) as pool:
+            results = pool.map(_export_row, rows, chunksize=200)
+    else:
+        _init_worker(*ctx_args)
+        results = [_export_row(row) for row in rows]
+
+    tree_files = [t for t, _ in results if t]
+    dmrs_files = [d for _, d in results if d]
     corpora = []
     for cid, directory, files in (
         (f"{grm}_trees", trees_dir, tree_files),
@@ -373,8 +418,17 @@ def main(argv=None):
         "metas; by default links are relative and the grew-match "
         "backend fills in the base from $LTDB_BASE_URL at serve time",
     )
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Parallel worker processes for graph conversion; "
+        "0 = auto from CPUs (default: 1)",
+    )
     parser.add_argument("db", type=Path, help="LTDB SQLite database")
     args = parser.parse_args(argv)
+    args.jobs = args.jobs or cpu_jobs()
 
     logging.basicConfig(level=logging.INFO)
     if not args.db.is_file():

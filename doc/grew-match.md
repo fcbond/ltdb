@@ -27,7 +27,14 @@ ERG_(2020)-grew/
 ```
 
 Options: `--outdir DIR`, `--profiles NAME` (repeatable),
-`--trees-only`, `--dmrs-only`, `--ltdb-url BASE`.
+`--trees-only`, `--dmrs-only`, `--ltdb-url BASE`, `--jobs N` (parallel
+worker processes for graph conversion; `0` = auto from CPU count,
+default `1`). `grm2db.py --grew` forwards its own `--jobs` here, and
+also uses it to parallelize treebank-to-database processing across
+profiles (see `gold2db.process_tsdb`) — each profile is independent,
+so it is a natural parallelization unit; the sqlite writes themselves
+stay on the main process, since a single `Connection` cannot be shared
+across worker processes.
 
 Every graph gets a `url` meta pointing at the LTDB sentence page
 `/sent/<profile>/<sid>?grm=<dbfile>`, and grew-match shows a link

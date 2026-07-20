@@ -1,3 +1,4 @@
+import multiprocessing as mp
 import os
 import re
 import sqlite3
@@ -6,6 +7,16 @@ from collections import defaultdict as dd
 
 from delphin import itsdb, tsdb
 from delphin.codecs import simplemrs
+
+
+def cpu_jobs():
+    """Return a job count sized to available CPUs.
+
+    Unlike ACE parsing (default_jobs() in parse_examples.py), this work
+    is pure Python with no per-worker external-process memory to budget
+    for, so plain CPU count is the only input.
+    """
+    return max(1, os.cpu_count() or 1)
 
 
 def extract_span(terminal):
@@ -70,11 +81,21 @@ def ver_match(ver, profile, log):
         return False
 
 
-def process_results(root, log):
+def process_results(root):
+    """Process one treebank profile, returning its rows and any log lines.
+
+    Runs standalone (no shared file handle) so it can be dispatched to a
+    worker process by process_tsdb(); the caller is responsible for
+    writing the returned log_lines to the shared log afterwards.  The
+    returned lexind/typind/sent are converted to plain dict/list
+    structures (rather than defaultdicts with lambda factories) because
+    lambdas cannot be pickled across a process boundary.
+    """
     lexind = dd(lambda: dd(set))  # lexind[type][(profile, sid)]((frm, to), ...)
     typind = dd(lambda: dd(set))  # typind[type][(profile, sid)]((frm, to), ...)
     sent = dd(list)  # sent[(profile, sid)][(surf, lexid)]
     gold = list()
+    log_lines = []
 
     ts = itsdb.TestSuite(root)
     for response in ts.processed_items():
@@ -89,8 +110,8 @@ def process_results(root, log):
                 mrs_obj = first_result.mrs()
                 mrs_str = simplemrs.encode(mrs_obj, indent=True)
             except Exception as e:
-                log.write("\n\nMRS couldn't be retrieved in pydelphin:\n")
-                log.write(f"{root}: {profile} {sid} {e}\n")
+                log_lines.append("\n\nMRS couldn't be retrieved in pydelphin:\n")
+                log_lines.append(f"{root}: {profile} {sid} {e}\n")
                 mrs_str = ""
             gold.append(
                 (
@@ -121,7 +142,9 @@ def process_results(root, log):
                     start = node.start
                     end = node.end
                     typind[typ][(profile, sid)].add((start, end))
-    return gold, sent, lexind, typind
+    lexind = {lexid: dict(spans) for lexid, spans in lexind.items()}
+    typind = {typ: dict(spans) for typ, spans in typind.items()}
+    return gold, dict(sent), lexind, typind, log_lines
 
 
 def gold2db(conn, gold, log):
@@ -183,11 +206,18 @@ def nodes2db(conn, lexind, typind, log):
     conn.commit()
 
 
-def process_tsdb(conn, ver, checkgrm, golddir, log, profiles):
+def process_tsdb(conn, ver, checkgrm, golddir, log, profiles, jobs=1):
     """
     look at all the trees in the golddir
     process those with the same version cfg['ver']
+
+    Profiles are independent treebank directories, so once the eligible
+    ones are found (a cheap scan), process_results() over each can run
+    in a worker pool; the sqlite writes stay on the main process
+    afterwards, since a single Connection cannot be shared across
+    processes.
     """
+    roots = []
     for root, dirs, files in os.walk(golddir):
         if "result" in files or "result.gz" in files:
             if profiles is not None:
@@ -197,9 +227,24 @@ def process_tsdb(conn, ver, checkgrm, golddir, log, profiles):
 
             ##print (root, dirs, files)
             if (not checkgrm) or ver_match(ver, root, log):
-                print(f"Processing {root}", file=sys.stderr)
-                gold, sent, lexind, typind = process_results(root, log)
-                # print(gold[0], gold[-1])
-                gold2db(conn, gold, log)
-                sent2db(conn, sent, log)
-                nodes2db(conn, lexind, typind, log)
+                roots.append(root)
+
+    n_workers = min(jobs, len(roots)) if roots else 1
+    if n_workers > 1:
+        print(
+            f"Processing {len(roots)} profiles with {n_workers} processes",
+            file=sys.stderr,
+        )
+        with mp.Pool(n_workers) as pool:
+            results = pool.map(process_results, roots)
+    else:
+        results = []
+        for root in roots:
+            print(f"Processing {root}", file=sys.stderr)
+            results.append(process_results(root))
+
+    for gold, sent, lexind, typind, log_lines in results:
+        log.writelines(log_lines)
+        gold2db(conn, gold, log)
+        sent2db(conn, sent, log)
+        nodes2db(conn, lexind, typind, log)

@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 
 import toml
-from gold2db import process_tsdb
+from gold2db import cpu_jobs, process_tsdb
 from tdl2db import intodb, read_cfg, read_grm
 
 if sys.version_info < (3, 8):
@@ -232,8 +232,10 @@ if __name__ == "__main__":
         type=int,
         default=1,
         metavar="N",
-        help="With --doctest: number of parallel ACE processes; 0 = auto "
-             "from CPUs and available memory (default: 1)",
+        help="Parallel workers for treebank processing, docstring testing, "
+             "and --grew export; 0 = auto from CPUs (ACE workers under "
+             "--doctest are further capped by available memory) "
+             "(default: 1)",
     )
     parser.add_argument(
         "--grew",
@@ -294,7 +296,10 @@ if __name__ == "__main__":
             if profiles is not None:
                 print(f"If they are in {profiles}")
             if os.path.isdir(golddir):
-                process_tsdb(conn, cfg["ver"], args.checkgrm, golddir, log, profiles)
+                process_tsdb(
+                    conn, cfg["ver"], args.checkgrm, golddir, log, profiles,
+                    jobs=args.jobs or cpu_jobs(),
+                )
 
     post_process_corpus(conn)
     conn.close()
@@ -354,6 +359,7 @@ if __name__ == "__main__":
         grew_argv = [os.path.join(out_dir, dbname)]
         if args.ltdb_url:
             grew_argv += ["--ltdb-url", args.ltdb_url]
+        grew_argv += ["--jobs", str(args.jobs or cpu_jobs())]
         print(f"Exporting grew corpora for {nam} …")
         try:
             db2grew_main(grew_argv)
