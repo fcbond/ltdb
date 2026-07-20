@@ -338,9 +338,11 @@ if __name__ == "__main__":
                 )
                 doctest_cfg = read_cfg(cfg_path)
                 with open(log_path, "a") as log:
-                    examples, ex_types, lex_ids = extract_examples(doctest_cfg, log)
+                    examples, ex_types, descendants = extract_examples(
+                        doctest_cfg, log
+                    )
                 verdicts = run_examples(
-                    examples, dat_path, ace_bin_resolved, ex_types, lex_ids,
+                    examples, dat_path, ace_bin_resolved, ex_types, descendants,
                     jobs=args.jobs or default_jobs(),
                 )
                 write_to_db(verdicts, db_path)

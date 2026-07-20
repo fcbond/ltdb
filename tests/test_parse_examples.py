@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 from parse_examples import (
     Example,
     Verdict,
-    _build_lex_ids_for_type,
+    _build_descendants_for_type,
     _parse_doc,
     run_examples,
     type_in_results,
@@ -96,31 +96,52 @@ def _make_result(deriv):
     return result
 
 
-# ── _build_lex_ids_for_type ───────────────────────────────────────────────────
+# ── _build_descendants_for_type ─────────────────────────────────────────────
 
 
-class TestBuildLexIdsForType:
+class TestBuildDescendantsForType:
     def test_direct_parent(self):
-        les = {"sleep_v1": ("verb-lxm", None, None, None, None, None, None)}
+        types = {"sleep_v1": ["lex-entry"], "verb-lxm": ["type"], "sign": ["type"]}
         hierarchy = [("sleep_v1", "verb-lxm"), ("verb-lxm", "sign")]
-        result = _build_lex_ids_for_type(les, hierarchy)
+        result = _build_descendants_for_type(types, hierarchy)
         assert "sleep_v1" in result["verb-lxm"]
         assert "sleep_v1" in result["sign"]
 
     def test_indirect_ancestor(self):
-        les = {"run_v1": ("intrans-verb-lxm", None, None, None, None, None, None)}
+        types = {
+            "run_v1": ["lex-entry"],
+            "intrans-verb-lxm": ["type"],
+            "verb-lxm": ["type"],
+            "word": ["type"],
+        }
         hierarchy = [
             ("run_v1", "intrans-verb-lxm"),
             ("intrans-verb-lxm", "verb-lxm"),
             ("verb-lxm", "word"),
         ]
-        result = _build_lex_ids_for_type(les, hierarchy)
+        result = _build_descendants_for_type(types, hierarchy)
         assert "run_v1" in result["intrans-verb-lxm"]
         assert "run_v1" in result["verb-lxm"]
         assert "run_v1" in result["word"]
 
-    def test_empty_lexicon(self):
-        assert _build_lex_ids_for_type({}, []) == {}
+    def test_empty_types(self):
+        assert _build_descendants_for_type({}, []) == {}
+
+    def test_every_type_is_its_own_descendant(self):
+        types = {"hd-cmp_u_c": ["rule"]}
+        result = _build_descendants_for_type(types, [])
+        assert result["hd-cmp_u_c"] == {"hd-cmp_u_c"}
+
+    def test_rule_descendant_not_just_lexical(self):
+        # the walk is not lexicon-specific: an abstract rule supertype
+        # with no direct instances is reached via its concrete subtype
+        types = {
+            "hd-cmp_u_c": ["rule"],
+            "basic-head-comp-phrase": ["rule"],
+        }
+        hierarchy = [("hd-cmp_u_c", "basic-head-comp-phrase")]
+        result = _build_descendants_for_type(types, hierarchy)
+        assert "hd-cmp_u_c" in result["basic-head-comp-phrase"]
 
 
 # ── type_in_results ───────────────────────────────────────────────────────────
@@ -142,7 +163,7 @@ class TestTypeInResults:
         result = _make_result(deriv)
         assert type_in_results("v_pst_olr", ["lex-rule"], [result], {})
 
-    def test_lex_type_via_lex_ids_for_type(self):
+    def test_lex_type_via_descendants_for_type(self):
         lex_ids = {"intrans-verb-lxm": {"sleep_v1", "run_v1"}}
         deriv = _make_derivation(preterminals=["sleep_v1"])
         result = _make_result(deriv)
@@ -205,6 +226,24 @@ class TestTypeInResults:
 
     def test_empty_results(self):
         assert not type_in_results("t", ["rule"], [], {})
+
+    def test_abstract_rule_matched_via_concrete_descendant(self):
+        # a documented abstract rule with no direct instances is matched
+        # when a concrete subtype fires in the derivation
+        descendants = {"basic-head-comp-phrase": {"hd-cmp_u_c", "hd-cmp_i_c"}}
+        deriv = _make_derivation(internals=["hd-cmp_u_c"])
+        result = _make_result(deriv)
+        assert type_in_results(
+            "basic-head-comp-phrase", ["rule"], [result], descendants
+        )
+
+    def test_abstract_rule_descendant_absent(self):
+        descendants = {"basic-head-comp-phrase": {"hd-cmp_u_c", "hd-cmp_i_c"}}
+        deriv = _make_derivation(internals=["other-rule"])
+        result = _make_result(deriv)
+        assert not type_in_results(
+            "basic-head-comp-phrase", ["rule"], [result], descendants
+        )
 
 
 # ── verdict_label ─────────────────────────────────────────────────────────────

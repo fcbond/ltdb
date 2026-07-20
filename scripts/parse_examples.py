@@ -281,31 +281,37 @@ def _parse_doc(typ: str, docstring: str) -> list[tuple[str, str, int, str]]:
     return out
 
 
-def _build_lex_ids_for_type(
-    les: dict, hierarchy: list[tuple[str, str]]
+def _build_descendants_for_type(
+    types: dict, hierarchy: list[tuple[str, str]]
 ) -> dict[str, set[str]]:
     """
-    Map every type to the set of lex-entry ids that inherit from it.
+    Map every identifier to the set of identifiers that inherit from it
+    (including itself), across the whole grammar: types, rules, lex-rules,
+    lex-types, and lex-entries alike.
 
-    Uses a BFS upward through the type hierarchy so that lex entries reached
-    via multi-level inheritance are still attributed to their ancestor types.
+    Uses a BFS upward through the type hierarchy from every declared
+    identifier, so a descendant reached via multi-level inheritance is
+    still attributed to all of its ancestors.  This lets an abstract
+    supertype documented in a docstring (e.g. an abstract rule with no
+    direct instances) be matched by any concrete descendant that actually
+    fires in a derivation, not just by lexical entries.
     """
     parents_of: dict[str, set[str]] = defaultdict(set)
     for child, parent in hierarchy:
         parents_of[child].add(parent)
 
-    lex_ids_for_type: dict[str, set[str]] = defaultdict(set)
-    for lexid in les:
+    descendants_for_type: dict[str, set[str]] = defaultdict(set)
+    for identifier in types:
         visited: set[str] = set()
-        queue = [lexid]
+        queue = [identifier]
         while queue:
             t = queue.pop()
             if t in visited:
                 continue
             visited.add(t)
-            lex_ids_for_type[t].add(lexid)
+            descendants_for_type[t].add(identifier)
             queue.extend(parents_of.get(t, set()))
-    return dict(lex_ids_for_type)
+    return dict(descendants_for_type)
 
 
 def extract_examples(
@@ -320,15 +326,16 @@ def extract_examples(
         log: writable log stream
 
     Returns:
-        (examples, types, lex_ids_for_type) where:
+        (examples, types, descendants_for_type) where:
           examples        — ordered list of Example objects
           types           — maps type identifier → list of TDL environment statuses
-          lex_ids_for_type — maps type → all lex-entry ids that inherit from it
-                             (transitively, for detecting lex-type usage in trees)
+          descendants_for_type — maps identifier → all identifiers (of any
+                             status) that inherit from it, transitively,
+                             including itself
     """
     tdls, types, hierarchy, les = read_grm(cfg, log)
 
-    lex_ids_for_type = _build_lex_ids_for_type(les, hierarchy)
+    descendants_for_type = _build_descendants_for_type(types, hierarchy)
 
     examples: list[Example] = []
     seen: set[tuple[str, str, str]] = set()
@@ -344,7 +351,7 @@ def extract_examples(
             i_id += 1
             examples.append(Example(i_id, text, t, wf, kind))
 
-    return examples, dict(types), lex_ids_for_type
+    return examples, dict(types), descendants_for_type
 
 
 # ── Type-in-derivation check ─────────────────────────────────────────────────
@@ -373,27 +380,32 @@ def type_in_results(
     typ: str,
     type_statuses: list[str],
     results: list,
-    lex_ids_for_type: dict[str, set[str]],
+    descendants_for_type: dict[str, set[str]],
 ) -> bool:
     """
-    Return True if *typ* appears in any parse result's derivation.
+    Return True if *typ* (or a concrete descendant of it) appears in any
+    parse result's derivation.
 
-    Three checks are tried for each derivation and any is sufficient:
+    A single check, tried against every derivation node's entity name and
+    its ``--udx=all`` ``@type`` annotation: does the node identify one of
+    *typ*'s descendants-or-self in the grammar's type hierarchy?
+    *descendants_for_type* already includes *typ* itself, so this covers:
 
-    1. Direct entity match — *typ* appears as an entity name in an internal
-       or preterminal node.  This covers rules and lexical rules.
-    2. Node-type match — *typ* is the ``@type`` annotation of a node
-       (``--udx=all``): the lexical type of a lexeme or the phrase type
-       of a rule.
-    3. Lex-entry descendant match — a preterminal entity is a lex-entry id
-       that inherits from *typ* (via *lex_ids_for_type*).  This covers
-       supertypes of the annotated lexical type.
+    - direct instantiation (*typ* is a rule, lex-rule, or lex-entry that
+      fires as-is);
+    - an abstract supertype documented with no direct instances, matched
+      via any concrete rule, lex-rule, or lexical descendant that fires
+      (e.g. a documented abstract head-complement rule matched by the
+      concrete subtype that actually applies);
+    - a lexical type matched via an inheriting lex-entry that appears as a
+      preterminal, or directly via the udx type annotation on that
+      preterminal.
 
-    ``type_statuses`` is retained for API compatibility but is no longer used
-    to distinguish rule vs. lex-type; the presence of lex-entry descendants
-    in *lex_ids_for_type* drives that decision instead.
+    ``type_statuses`` is retained for API compatibility but no longer
+    used; the type hierarchy in *descendants_for_type* drives matching
+    uniformly across rules, lex-rules, and lex-types.
     """
-    lex_ids = lex_ids_for_type.get(typ, set())
+    descendants = descendants_for_type.get(typ, {typ})
 
     for result in results:
         try:
@@ -403,9 +415,7 @@ def type_in_results(
         if deriv is None:
             continue
         internals, preterminals, node_types = _entities(deriv)
-        if typ in internals or typ in preterminals or typ in node_types:
-            return True
-        if lex_ids and lex_ids & preterminals:
+        if descendants & (internals | preterminals | node_types):
             return True
     return False
 
@@ -502,7 +512,7 @@ def run_examples(
     dat: str,
     ace_bin: str,
     types: dict[str, list[str]],
-    lex_ids_for_type: dict[str, set[str]],
+    descendants_for_type: dict[str, set[str]],
     ts: itsdb.TestSuite | None = None,
     jobs: int = 1,
 ) -> list[Verdict]:
@@ -518,13 +528,14 @@ def run_examples(
     If *ts* is provided, parse and result tables are written to it.
 
     Args:
-        examples:         list of Example objects (already in *ts* if provided)
-        dat:              path to compiled ACE grammar (.dat)
-        ace_bin:          path to ACE binary
-        types:            maps type name → list of TDL environment statuses
-        lex_ids_for_type: maps type → all lex-entry ids that inherit from it
-        ts:               optional TestSuite to write parse results into
-        jobs:             number of parallel ACE processes per batch
+        examples:             list of Example objects (already in *ts* if provided)
+        dat:                  path to compiled ACE grammar (.dat)
+        ace_bin:              path to ACE binary
+        types:                maps type name → list of TDL environment statuses
+        descendants_for_type: maps identifier → all identifiers that
+                               inherit from it, including itself
+        ts:                   optional TestSuite to write parse results into
+        jobs:                 number of parallel ACE processes per batch
 
     Returns:
         list of Verdict objects in the same order as *examples*.
@@ -551,7 +562,7 @@ def run_examples(
         response = parser.process_item(ex.text, keys={"i-id": ex.i_id})
         results = response.results()
         found = type_in_results(
-            ex.typ, types.get(ex.typ, ["type"]), results, lex_ids_for_type
+            ex.typ, types.get(ex.typ, ["type"]), results, descendants_for_type
         )
         verdicts_by_id[ex.i_id] = Verdict(ex, len(results), found)
         if fm is not None:
@@ -871,14 +882,14 @@ def main() -> None:
     cfg = read_cfg(str(args.config))
 
     print(f"Reading TDL from {cfg['grammar_file']} …", file=sys.stderr)
-    examples, types, lex_ids_for_type = extract_examples(cfg, sys.stderr)
+    examples, types, descendants_for_type = extract_examples(cfg, sys.stderr)
     print(f"  {len(examples)} examples extracted.", file=sys.stderr)
 
     ts = None if args.no_profile else make_test_suite(args.output_dir, examples)
 
     print(f"Parsing with {args.dat} …", file=sys.stderr)
     verdicts = run_examples(
-        examples, str(args.dat), ace_bin, types, lex_ids_for_type, ts,
+        examples, str(args.dat), ace_bin, types, descendants_for_type, ts,
         jobs=args.jobs or default_jobs(),
     )
 

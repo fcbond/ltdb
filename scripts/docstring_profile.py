@@ -99,7 +99,7 @@ def main() -> None:
 
     cfg = read_cfg(str(args.config))
     print(f"Reading TDL from {cfg['grammar_file']} …", file=sys.stderr)
-    examples, types, lex_ids_for_type = extract_examples(cfg, sys.stderr)
+    examples, types, descendants_for_type = extract_examples(cfg, sys.stderr)
     if not examples:
         print("No docstring examples found.")
         return
@@ -123,7 +123,7 @@ def main() -> None:
         str(args.dat),
         ace_bin,
         types,
-        lex_ids_for_type,
+        descendants_for_type,
         ts,
         jobs=args.jobs or default_jobs(),
     )
