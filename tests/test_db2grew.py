@@ -143,13 +143,8 @@ def test_dmrs_to_grew():
     assert bark["TENSE"] == "past"
     assert bark["top"] == "yes"
     assert bark["index"] == "yes"
-    # a quantifier predicate is still surface-shaped (_the_q -> lemma
-    # "the", pos "q", no sense): trusted as-is, the same as any other
-    # grammar's predicate-naming convention, even where a lemma is not
-    # particularly meaningful for a grammar-internal composition marker
-    # using the same shape (e.g. NorSource's _pronoun_q) -- pred, not
-    # lemma, is what grew-match displays as the node's name, so this
-    # costs nothing even when the lemma is not useful
+    # quantifiers are still surface-shaped and get no pos exception
+    # (see dmrs_to_grew docstring / doc/grew-match.md)
     the = next(n for n in nodes if n["pred"] == "_the_q")
     assert the["lemma"] == "the"
     assert the["pos"] == "q"

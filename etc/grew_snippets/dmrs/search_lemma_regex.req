@@ -1,0 +1,6 @@
+% Search predicates by word when there is no lemma to search (or to
+% match every sense of a word at once). Grew's re"..." requires a
+% FULL match, not a substring, so the trailing .* is required --
+% re"_dog_" alone matches nothing.
+
+pattern { N [pred=re"_dog_.*"] }

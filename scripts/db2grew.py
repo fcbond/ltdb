@@ -8,6 +8,7 @@ import logging
 import re
 import sqlite3
 import sys
+from functools import lru_cache
 from itertools import count
 from pathlib import Path
 from urllib.parse import quote
@@ -190,6 +191,19 @@ def deriv_to_grew(deriv_str, lextypes, meta):
     return graph
 
 
+@lru_cache(maxsize=None)
+def _predicate_parts(pred):
+    """Return (lemma, pos, sense) for a surface predicate, else None.
+
+    predicate.is_surface()/predicate.split() each reparse the string;
+    caching by predicate is worthwhile because the same handful of
+    predicates (e.g. "_the_q") recur constantly across a treebank.
+    """
+    if not predicate.is_surface(pred):
+        return None
+    return predicate.split(pred)
+
+
 def dmrs_to_grew(mrs_str, meta):
     """Convert a SimpleMRS string to a dependency-style grew DMRS graph.
 
@@ -199,17 +213,11 @@ def dmrs_to_grew(mrs_str, meta):
     (no role) get the conventional role "MOD".
 
     Every node keeps the raw `pred` string verbatim.  Predicates that
-    pydelphin's predicate.is_surface() judges "surface" (underscore-
-    prefixed with a POS-shaped suffix -- the grammarian's own naming
-    convention) additionally get lemma/pos/sense via predicate.split().
-    This is trusted as-is, including for grammars where a
-    grammar-internal composition marker happens to use that same shape
-    (e.g. NorSource's `_pronoun_q`, `_def_q`): the surface-node display
-    label in grew-match is `pred`, not `lemma` (a `main_feat` patch on
-    the grew_match_dream backend, see doc/grew-match.md), so a lemma
-    that does not mean much for a given predicate no longer costs
-    anything -- it is just an extra, occasionally-not-useful search
-    key, not something competing for the display slot.
+    pydelphin's predicate.is_surface() judges "surface" additionally
+    get lemma/pos/sense via predicate.split(), trusted as-is with no
+    part-of-speech exceptions -- see doc/grew-match.md ("Graph
+    encoding" and "6. Backend patches") for why a not-always-meaningful
+    lemma is safe to keep.
 
     Args:
         mrs_str: raw SimpleMRS from gold.mrs
@@ -234,8 +242,9 @@ def dmrs_to_grew(mrs_str, meta):
     nodes = {}
     for node in d.nodes:
         feats = {"pred": node.predicate}
-        if predicate.is_surface(node.predicate):
-            lemma, pos, sense = predicate.split(node.predicate)
+        parts = _predicate_parts(node.predicate)
+        if parts:
+            lemma, pos, sense = parts
             for att, val in (("lemma", lemma), ("pos", pos), ("sense", sense)):
                 if val:
                     feats[att] = val
