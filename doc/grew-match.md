@@ -62,12 +62,30 @@ serves the corpora just built.
 
 **Trees** are constituency-style graphs built from the derivation:
 
-- surface tokens are ordered leaf nodes with a `form` feature
+- surface tokens are leaf nodes with a `form` feature
 - lexical entries have `lexid`, `lextype` and `form` features
 - internal nodes carry the rule name in a `cat` feature
   (`rule` is a reserved word in grew requests)
 - parent→child edges are labelled with the daughter position
   (`1`, `2`, ...)
+- every node — tokens, lexical entries, and rules alike — carries an
+  explicit linear position (grew's `order` field), assigned in
+  postorder: a node is placed right after its own rightmost
+  descendant. Grew reads the index of a node in `order` back as its
+  `position`, which is what `grew-match`'s dependency-style renderer
+  (`dep2pict`, which has no native constituency-tree layout) uses to
+  place nodes and draw arcs — postorder happens to give exactly the
+  order needed for sibling and ancestor arcs to nest without crossing,
+  so the picture reads far closer to a real tree than the arbitrary
+  placement grew otherwise gives nodes it has no position for
+  (see the "Constituency trees in a dependency-only renderer"
+  discussion below for why postorder in particular).
+- because constituent nodes are now interleaved between words in
+  `order`, grew's own precedence relation between order-adjacent nodes
+  no longer means word-to-word adjacency; an explicit `adjacent=y`
+  edge is added between every literally-consecutive pair of surface
+  tokens instead, so `pattern { X -[adjacent=y]-> Y }` still finds
+  immediately-adjacent word pairs (bigrams) directly
 
 **DMRS** are dependency-style graphs:
 
@@ -83,6 +101,74 @@ serves the corpora just built.
 
 Every graph carries its `profile`, `sid` and `text` as metadata so
 matches can be traced back to LTDB.
+
+### Constituency trees in a dependency-only renderer
+
+Grew-match displays every graph — DMRS *and* trees alike — with
+`dep2pict`, which draws exactly one style of picture: a row of nodes
+with arcs above connecting them. This is a hard limitation, not a
+configuration option:
+
+- Grew's core graph model does have a dedicated subconstituent edge
+  kind, and a `phrase_structure_tree`/`of_pst` reader that loads
+  bracketed treebank text into it — but there is no writer the other
+  way. Nothing in grewlib or `dep2pict` ever draws a subconstituent
+  edge as a branch; nothing draws multiple vertical levels at all.
+- `void=y`, sometimes suggested as a way to push a node above the
+  baseline, does no such thing: tracing it through grewlib's `to_dep`
+  shows it only recolours a node's label red. We confirmed this live —
+  editing a real exported tree, adding `void=y` to every internal
+  node, recompiling, and reloading changed nothing but colour.
+- The OCaml package actually doing the drawing, `dep2pictlib`, is
+  described by its own metadata as, simply, "Drawing dependency tree".
+
+So grew-match's tree corpora are always going to read as dependency
+diagrams, not branching trees — but the *shape* of that diagram is
+still ours to control, and a bad one is what motivated this
+investigation in the first place: earlier exports left every
+constituent node without a linear position, so grewlib laid them out
+with its own span-blind fallback (wherever the node happened to land
+while folding an unordered map — effectively arbitrary), producing
+arcs that frequently crossed.
+
+Every node in a grew graph gets its horizontal position from its index
+in the `order` field (see [grew's JSON graph
+format](https://grew.fr/doc/graph/)); a node absent from `order` gets
+no position and falls back to that arbitrary placement. Giving every
+constituent node a position fixes this, provided the positions are
+assigned in the right order. Postorder — visiting all of a node's
+daughters (recursively) before emitting the node's own position — is
+that order: because a derivation tree's spans are contiguous (a
+mother's span is exactly the union of its daughters' spans), postorder
+guarantees that a node always immediately follows its own rightmost
+descendant, which produces properly nested, non-crossing arcs for
+constituent structure specifically:
+
+- **Nodes sharing an identical span** (a unary chain, e.g. a lexical
+  entry and the unary rule directly above it) come out **deepest
+  first** — the descendant is still mid-traversal when the ancestor's
+  turn to be emitted arrives.
+- **A mother sharing exactly one boundary with a daughter** (the
+  common case: every rule's first daughter shares its left boundary
+  with the mother, and its last daughter shares the right boundary)
+  always comes out **after** that daughter, since the daughter's own
+  postorder-complete subtree, including the daughter itself, is
+  emitted before the mother's turn.
+
+Both properties fall out of plain postorder without ever comparing
+spans explicitly — the tree structure we already have while walking
+the derivation is enough.
+
+The trade-off: grew derives its own immediate-precedence relation
+(`<<`) from raw adjacency in `order`, and interleaving constituent
+nodes into that same list means two adjacent *words* are usually no
+longer adjacent *positions* — a rule or lexical-entry node from one
+word's own postorder chain typically sits between them. Rather than
+lose word-to-word immediate precedence, `deriv_to_grew` adds it back
+as an explicit edge (`adjacent=y`) between every literally-consecutive
+pair of surface tokens, independent of position entirely — so
+`pattern { X -[adjacent=y]-> Y }` still finds bigrams directly, at the
+cost of one extra edge per word pair in the exported graph.
 
 ## 2. Install grew (once)
 
@@ -186,6 +272,8 @@ pattern { L [lextype="d_-_the_le"] }           % a lexical type
 pattern { T [form="dog"] }                     % a surface token
 pattern { P [cat="sp-hd_n_c"]; P -[2]-> C;
           C [cat="n_sg_ilr"] }                % second daughter of a rule
+pattern { X -[adjacent=y]-> Y; Y [form="the"] } % word immediately
+                                                 % followed by "the"
 ```
 
 On the DMRS corpus:

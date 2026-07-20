@@ -90,8 +90,25 @@ def iter_gold(conn, profiles=None):
     yield from c.execute(query, params)
 
 
-def _convert_deriv_node(node, graph, lextypes, ids):
+def _convert_deriv_node(node, graph, lextypes, ids, tids):
     """Recursively add a derivation node (and its daughters) to graph.
+
+    Every node -- terminal, preterminal, and internal -- is appended to
+    graph["order"] in postorder (after all of its daughters), which grew
+    reads back as each node's linear position (see grewlib G_graph.of_json:
+    position = index in the "order" list; a node absent from "order" is
+    laid out by grew's own, span-blind heuristic instead).  Postorder
+    places a node immediately after its rightmost descendant, which for a
+    span-contiguous derivation tree happens to satisfy exactly the
+    ordering grew-match needs to draw nested, non-crossing arcs: nodes
+    sharing an entire span (a unary chain) come out deepest-first, and a
+    mother sharing just one boundary with a daughter (the common case --
+    every rule's first and last daughter share a boundary with it) always
+    comes out after that daughter.  The trade-off is that adjacent words
+    are no longer adjacent positions once constituent nodes are
+    interleaved between them, so a `precedes` test between two words no
+    longer means string-adjacency; searching by tree configuration
+    (dominance, sisterhood, span containment) is what this buys instead.
 
     Args:
         node: a pydelphin UDFNode
@@ -99,6 +116,9 @@ def _convert_deriv_node(node, graph, lextypes, ids):
         lextypes: mapping from lexid to lexical type
         ids: counter assigning node ids in pre-order
              (derivation ids cannot be used: ACE leaves them all 0)
+        tids: counter assigning surface-token ids, independent of ids so
+              that t0, t1, ... stay sequential regardless of how many
+              constituent nodes are interleaved into "order"
 
     Returns:
         The grew node id assigned to node
@@ -113,7 +133,7 @@ def _convert_deriv_node(node, graph, lextypes, ids):
         feats["form"] = " ".join(t.form for t in daughters)
         graph["nodes"][nid] = feats
         for i, terminal in enumerate(daughters, 1):
-            tid = f"t{len(graph['order'])}"
+            tid = f"t{next(tids)}"
             graph["nodes"][tid] = {"form": terminal.form}
             graph["order"].append(tid)
             graph["edges"].append({"src": nid, "label": str(i), "tar": tid})
@@ -122,17 +142,25 @@ def _convert_deriv_node(node, graph, lextypes, ids):
         # ('rule' is a reserved word in grew requests)
         graph["nodes"][nid] = {"cat": node.entity}
         for i, daughter in enumerate(daughters, 1):
-            did = _convert_deriv_node(daughter, graph, lextypes, ids)
+            did = _convert_deriv_node(daughter, graph, lextypes, ids, tids)
             graph["edges"].append({"src": nid, "label": str(i), "tar": did})
+    graph["order"].append(nid)
     return nid
 
 
 def deriv_to_grew(deriv_str, lextypes, meta):
     """Convert a UDF derivation string to a constituency-style grew graph.
 
-    Surface tokens become ordered leaf nodes (t0, t1, ...); rule and
-    lexical-entry nodes are unordered; parent->child edges are labelled
-    with the daughter position ("1", "2", ...).
+    Every node -- surface tokens (t0, t1, ...), lexical entries, and
+    rules -- is ordered, in postorder (see _convert_deriv_node); parent
+    -> child edges are labelled with the daughter position ("1", "2", ...).
+
+    Grew derives its own immediate-precedence relation from raw
+    adjacency in the "order" list, which now interleaves constituent
+    nodes between words, so it no longer means word-to-word adjacency.
+    An explicit `adjacent=y` edge between literally-consecutive surface
+    tokens is added to keep that queryable regardless -- see
+    doc/grew-match.md.
 
     Args:
         deriv_str: raw UDF derivation from gold.deriv
@@ -155,7 +183,10 @@ def deriv_to_grew(deriv_str, lextypes, meta):
         )
         return None
     graph = {"meta": meta, "nodes": {}, "edges": [], "order": []}
-    _convert_deriv_node(root, graph, lextypes, count())
+    _convert_deriv_node(root, graph, lextypes, count(), count())
+    terminal_ids = [nid for nid in graph["order"] if nid.startswith("t")]
+    for src, tar in zip(terminal_ids, terminal_ids[1:]):
+        graph["edges"].append({"src": src, "label": {"adjacent": "y"}, "tar": tar})
     return graph
 
 

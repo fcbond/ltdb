@@ -82,11 +82,26 @@ def test_deriv_to_grew():
         "lextype": "n_-_c_le",
         "form": "dog",
     }
-    assert graph["order"] == ["t0", "t1", "t2"]
-    forms = [graph["nodes"][tid]["form"] for tid in graph["order"]]
+    # every node is ordered, in postorder: a node is placed right after
+    # its rightmost descendant, so e.g. n4 (dog_n1, span 1-2) precedes
+    # its unary-chain mother n3 (n_sg_ilr, span 1-2) -- same span,
+    # deepest first -- and n3 precedes n1 (sp-hd_n_c, span 0-2), which
+    # shares n3's right boundary -- narrower span first
+    assert graph["order"] == ["t0", "n2", "t1", "n4", "n3", "n1", "t2", "n6", "n5", "n0"]
+    terminal_ids = [nid for nid in graph["order"] if nid.startswith("t")]
+    forms = [graph["nodes"][tid]["form"] for tid in terminal_ids]
     assert forms == ["the", "dog", "barked."]
     assert {"src": "n0", "label": "2", "tar": "n5"} in graph["edges"]
     assert {"src": "n4", "label": "1", "tar": "t1"} in graph["edges"]
+    # word-to-word immediate precedence is no longer implicit in "order"
+    # (constituent nodes are interleaved between words), so it is added
+    # as an explicit edge between literally-consecutive surface tokens
+    assert {"src": "t0", "label": {"adjacent": "y"}, "tar": "t1"} in graph["edges"]
+    assert {"src": "t1", "label": {"adjacent": "y"}, "tar": "t2"} in graph["edges"]
+    assert not any(
+        e["label"] == {"adjacent": "y"} and e["src"] == "t0" and e["tar"] == "t2"
+        for e in graph["edges"]
+    )
 
 
 def test_deriv_with_root_and_zero_ids():
