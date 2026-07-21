@@ -1,3 +1,14 @@
+<style>
+  /* #snippets' max-height is kept in sync with #console (the search
+     column) by the script at the bottom of this file, so a long tab
+     (ERS: 26 entries) scrolls instead of stretching the page. */
+  #snippets { overflow-y: auto; }
+  /* ERS has by far the most entries; lay them out in two columns so
+     fewer of them need the scrollbar above. */
+  #step3 ul { column-count: 2; column-gap: 24px; margin: 0; }
+  #step3 ul li { break-inside: avoid; }
+</style>
+
 <div class="navbar" id="right-navbar">
   <div class="navbar-inner">
     <ul class="nav nav-pills">
@@ -40,6 +51,14 @@
 
   <div class="tab-pane" id="step3">
     <b style="font-size: 125%;">ERG Semantics Documentation (ESD) phenomena, as DMRS queries:</b>
+    <p>
+      The <a href="https://delph-in.github.io/docs/erg/ErgSemantics_Inventory/" target="_blank">ESD</a>
+      catalogues recurring semantic constructions in the ERG, each
+      identified by a DMRS "fingerprint". Every snippet below runs one
+      phenomenon's fingerprint as a live query, with its description
+      and fingerprint as a comment above the query itself; follow the
+      link above for the full writeup of each construction.
+    </p>
     <ul>
       <!-- BEGIN GENERATED: doc/esd-phenomena/gen_snippets.py -->
       <li><a href="#" snippet-file="ers/apposition.req" class="inter">apposition</a></li>
@@ -89,6 +108,24 @@
   // Vue instance) is a top-level `let` in js/main.js, not a `window`
   // property, but it is still visible here: this script and main.js
   // are both plain (non-module) <script>s sharing one global scope.
+
+  // Keep #snippets' height matched to #console (the search column) so
+  // a long tab (ERS: 26 entries) scrolls within its own pane instead
+  // of stretching the whole page. Re-observing on every reload would
+  // accumulate observers (the DOM node being observed, #console,
+  // isn't itself destroyed/recreated -- only #right-pane's content
+  // is), so disconnect whichever one this script's last run created.
+  if (window.__ltdbHeightObserver) window.__ltdbHeightObserver.disconnect();
+  var consoleEl = document.getElementById('console');
+  var snippetsEl = document.getElementById('snippets');
+  if (consoleEl && snippetsEl && window.ResizeObserver) {
+    var syncHeight = function () {
+      snippetsEl.style.maxHeight = consoleEl.offsetHeight + 'px';
+    };
+    syncHeight();
+    window.__ltdbHeightObserver = new ResizeObserver(syncHeight);
+    window.__ltdbHeightObserver.observe(consoleEl);
+  }
 
   // #step1 DMRS and #step3 ERS both want a DMRS corpus (ERS phenomena
   // are DMRS queries -- see doc/esd-phenomena); #step2 Trees wants a

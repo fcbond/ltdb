@@ -437,19 +437,33 @@ etc/grew_snippets`). It has four tabs:
 - **Trees** (`etc/grew_snippets/trees/`): `cat`, `lextype`, `lexid`,
   `form`, `n`-th daughter, adjacency combined with a `without` clause
   excluding a specific construction.
-- **ERS** (`etc/grew_snippets/ers/`): every ESD phenomenon from
-  `doc/esd-phenomena/phenomena.toml` as a ready-to-run DMRS query, with
-  its description and ERS fingerprint as a comment. **Generated, not
-  hand-edited** — edit `phenomena.toml` (the same file
-  `check_phenomena.py` counts matches against) and regenerate with:
+- **ERS** (`etc/grew_snippets/ers/`): a short blurb plus a link to the
+  [ESD inventory](https://delph-in.github.io/docs/erg/ErgSemantics_Inventory/)
+  page, then every ESD phenomenon from `doc/esd-phenomena/phenomena.toml`
+  as a ready-to-run DMRS query, with its description and ERS
+  fingerprint as a comment. Only the `<li>` list is **generated, not
+  hand-edited** — the blurb/link above it is plain `_default.html`
+  content. Edit `phenomena.toml` (the same file `check_phenomena.py`
+  counts matches against) and regenerate the list with:
   ```bash
   python doc/esd-phenomena/gen_snippets.py
   ```
   This rewrites every `ers/*.req` file and the `<li>` list inside
   `_default.html`'s `<!-- BEGIN GENERATED -->...<!-- END GENERATED
-  -->` markers (everything else in `_default.html` is untouched).
+  -->` markers (everything else in `_default.html` is untouched). The
+  ERS list itself is laid out in two CSS columns (`#step3 ul {
+  column-count: 2; }`) since it is by far the longest of the four.
 - **Metadata** (`etc/grew_snippets/global/`): sentence text and
   treebank profile filters, corpus-kind-agnostic.
+
+`_default.html`'s script also keeps `#snippets` (the whole tab-content
+box) matched in height to `#console` (the search column on the left),
+so a long tab scrolls in place instead of stretching the page — via a
+`ResizeObserver` on `#console`, since its own height also changes as
+clustering options are toggled. Re-observing on every reload would
+accumulate observers (`#console` is never destroyed/recreated, only
+`#right-pane`'s content is), so the script disconnects whichever
+observer its last run created before creating a new one.
 
 `_default.html` also carries a small inline `<script>` that keeps the
 active tab and the active corpus in sync, in both directions, with no
