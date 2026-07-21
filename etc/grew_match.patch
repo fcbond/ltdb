@@ -1,5 +1,5 @@
 diff --git a/index.html b/index.html
-index c6dac7a..0a302a7 100644
+index c6dac7a..0fdb5cf 100644
 --- a/index.html
 +++ b/index.html
 @@ -93,9 +93,14 @@
@@ -33,3 +33,12 @@ index c6dac7a..0a302a7 100644
  					<ul class="nav navbar-nav navbar-right">
  						<li v-if='top_project && "secondary_logo" in top_project'>
  							<a v-bind:href='top_project["secondary_website"]' style="padding:0px; ">
+@@ -658,7 +669,7 @@
+ 
+ 										<!-- Link button -->
+ 										<a v-show='current_item["url"]' v-bind:href='current_item["url"]' target="_blank">
+-											<button type="button" class="btn btn-primary btn-sm"><i class="fa fa-link fa-lg"></i></button>
++											<button type="button" class="btn btn-primary btn-sm">LTDB&nbsp;<i class="fa fa-link fa-lg"></i></button>
+ 										</a>
+ 
+ 										<button v-if="mode=='semantics'" type="button" id="code-button" class="btn btn-primary btn-sm tooltip-desc" onclick="javascript:show_code()">
