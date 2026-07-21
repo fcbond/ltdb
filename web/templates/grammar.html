@@ -63,6 +63,27 @@
     </table>
  </div>
 
+ {% if logs %}
+ <div class="table-responsive">
+   <table class="table table-hover table-borderless table-sm caption-top w-auto">
+    <caption>Build Logs</caption>
+    <tbody>
+      {%- for log in logs %}
+      <tr>
+        <td>
+          <a href="{{ log.url }}" download>
+            {{ {"grammar": "Grammar / docstring tests",
+                "ace": "ACE compile",
+                "grew": "Grew export"}[log.kind] }}
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+   </table>
+ </div>
+ {% endif %}
+
  <div class="table-responsive">
 	 <table class="table table-hover table-borderless table-sm caption-top w-auto">
     <caption>Tree Bank Summary</caption>

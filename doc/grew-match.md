@@ -22,9 +22,18 @@ This writes (by default next to the database):
 ```
 ERG_(2020)-grew/
   corpora.json          # grew corpora description
-  ERG_2020_trees/       # one grew JSON graph per sentence
+  ERG_2020_trees/       # one grew JSON file per treebank profile
   ERG_2020_dmrs/
 ```
+
+Each file is a JSON *list* of that profile's graphs rather than one
+graph per sentence: grewlib identifies a graph by its own `sent_id`
+meta (see `Corpus.item_of_graph` in grewlib), never by the file it
+lives in, so a corpus can freely group many graphs per file — and
+profiles are large enough (thousands of sentences) that doing so keeps
+the export directory to a handful of files instead of one per
+sentence, which matters at ERG scale (~195k graphs; large enough to
+overflow shell globs like `ls *.json`).
 
 Options: `--outdir DIR`, `--profiles NAME` (repeatable),
 `--trees-only`, `--dmrs-only`, `--ltdb-url BASE`, `--jobs N` (parallel
@@ -32,9 +41,18 @@ worker processes for graph conversion; `0` = auto from CPU count,
 default `1`). `grm2db.py --grew` forwards its own `--jobs` here, and
 also uses it to parallelize treebank-to-database processing across
 profiles (see `gold2db.process_tsdb`) — each profile is independent,
-so it is a natural parallelization unit; the sqlite writes themselves
-stay on the main process, since a single `Connection` cannot be shared
-across worker processes.
+so it is a natural parallelization unit for both steps; the sqlite
+writes themselves stay on the main process, since a single
+`Connection` cannot be shared across worker processes.
+
+Conversion failures (unreadable derivations, MRSes pydelphin can't
+decode) are logged per profile and collected into
+`<db-stem>-grew.log` next to the database (e.g. `ERG_2020-grew.log`
+next to `ERG_2020.db`) once the whole export finishes — the file is
+only written if there was at least one failure. The live LTDB's
+grammar summary page links this log, alongside the ACE compile and
+docstring-test logs, for download (see `web/routes.py`'s
+`download_log`).
 
 Every graph gets a `url` meta pointing at the LTDB sentence page
 `/sent/<profile>/<sid>?grm=<dbfile>`, and grew-match shows a link
@@ -341,10 +359,12 @@ button opens the image on its own; the link button opens the
 sentence in LTDB).
 
 The web interface only exports matches as TSV or CoNLL, but the
-corpora themselves are JSON: a match `ace/100` *is* the graph file
-`<corpus>/ace__100.json` in the export directory.  For a JSON list of
-all matches (sentence ids plus the matched nodes/edges), use the
-command line:
+corpora themselves are JSON: a match's `sent_id` (e.g. `ace/100`)
+identifies one graph inside its profile's file in the export
+directory — grep the file for that `sent_id` to pull the graph out
+directly (files are grouped by profile, not one per sentence; see
+"Export the corpora" above). For a JSON list of all matches (sentence
+ids plus the matched nodes/edges), use the command line:
 
 ```bash
 grew grep -request q.req -i OUT/<corpus> > matches.json

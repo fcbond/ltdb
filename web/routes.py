@@ -19,7 +19,16 @@ from delphin.codecs import mrsjson as _mrsjson
 from delphin.codecs import simplemrs as _simplemrs
 from delphin.highlight import TDLLexer
 from flask import current_app as app
-from flask import jsonify, redirect, render_template, request, session, url_for
+from flask import (
+    abort,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_from_directory,
+    session,
+    url_for,
+)
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 
@@ -265,6 +274,28 @@ def _stem_for_grm(grm):
     return grm[:-3] if grm and grm.endswith(".db") else grm
 
 
+# Build logs live next to the database (copied into web/db/ by
+# build-ltdb.sh alongside the .db/.dat files); each maps a stable
+# "kind" for the download URL to the filename suffix grm2db.py/
+# db2grew.py actually write.
+_LOG_SUFFIXES = {
+    "grammar": ".log",  # TDL read + docstring-test log (grm2db.py)
+    "ace": "-ace.log",  # ACE compile log (grm2db.py --ace)
+    "grew": "-grew.log",  # grew export conversion-failure log (db2grew.py)
+}
+
+
+def _available_logs(grm):
+    """Return download links for this grammar's build logs that exist."""
+    stem = _stem_for_grm(grm)
+    db_dir = os.path.join(current_directory, "db")
+    logs = []
+    for kind, suffix in _LOG_SUFFIXES.items():
+        if os.path.isfile(os.path.join(db_dir, f"{stem}{suffix}")):
+            logs.append({"kind": kind, "url": url_for("download_log", grm=grm, kind=kind)})
+    return logs
+
+
 def _all_grammars():
     grammars = []
     for file in os.listdir(os.path.join(current_directory, "db")):
@@ -395,10 +426,17 @@ def grammar():
         grm=grm,
         summ=summ,
         tsumm=tsumm,
+        logs=_available_logs(grm),
     )
 
 
 def _render_grammar(grm):
+    """Render grammar.html for the static mirror (see mirror_grammar).
+
+    No `logs` here: build-log download is a live-backend-only feature
+    (see download_log) with nothing for Flask-Frozen to freeze, and a
+    link into it would 404 on the static mirror.
+    """
     conn = get_db(current_directory, grm)
     md = get_md(conn)
     summ = get_summary(conn)
@@ -411,6 +449,22 @@ def _render_grammar(grm):
         summ=summ,
         tsumm=tsumm,
     )
+
+
+@app.route("/log/<path:grm>/<kind>")
+def download_log(grm, kind):
+    """Download a grammar's build log (grammar/ACE/grew-export)."""
+    suffix = _LOG_SUFFIXES.get(kind)
+    if suffix is None:
+        abort(404)
+    stem = _stem_for_grm(grm)
+    fname = f"{stem}{suffix}"
+    db_dir = os.path.join(current_directory, "db")
+    if not os.path.isfile(os.path.join(db_dir, fname)):
+        abort(404)
+    # send_from_directory rejects paths that would escape db_dir, so a
+    # crafted grm (e.g. containing "../") can't read files outside it
+    return send_from_directory(db_dir, fname, as_attachment=True)
 
 
 @app.route("/rules.html")

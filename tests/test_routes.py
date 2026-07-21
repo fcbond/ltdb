@@ -59,6 +59,59 @@ class TestGrammarPage:
         assert b"Test Grammar" in grm_client.get("/grammar.html").data
 
 
+class TestBuildLogs:
+    """Build-log download links on /grammar.html (see routes.download_log
+    and _available_logs); logs are only shown/served when the
+    corresponding file exists next to the database."""
+
+    def test_no_links_without_log_files(self, grm_client):
+        assert b"/log/" not in grm_client.get("/grammar.html").data
+
+    def test_link_shown_and_download_works_when_log_exists(self, grm_client):
+        import web.routes as routes_mod
+
+        db_dir = os.path.join(routes_mod.current_directory, "db")
+        log_path = os.path.join(db_dir, "test-grammar_1.0-grew.log")
+        with open(log_path, "w") as f:
+            f.write("ERROR derivation gold/1 unreadable: bad token\n")
+        try:
+            data = grm_client.get("/grammar.html").data
+            assert b"/log/test-grammar_1.0.db/grew" in data
+            resp = grm_client.get("/log/test-grammar_1.0.db/grew")
+            assert resp.status_code == 200
+            assert b"unreadable" in resp.data
+        finally:
+            os.unlink(log_path)
+
+    def test_missing_log_returns_404(self, grm_client):
+        resp = grm_client.get("/log/test-grammar_1.0.db/grew")
+        assert resp.status_code == 404
+
+    def test_unknown_kind_returns_404(self, grm_client):
+        resp = grm_client.get("/log/test-grammar_1.0.db/bogus")
+        assert resp.status_code == 404
+
+    def test_path_traversal_in_grm_returns_404(self, grm_client):
+        resp = grm_client.get("/log/..%2f..%2fetc%2fpasswd/grew")
+        assert resp.status_code == 404
+
+    def test_no_links_on_static_mirror_page(self, client):
+        # the mirror is frozen to static HTML with no backend to serve
+        # /log/..., so _render_grammar deliberately omits "logs"
+        import web.routes as routes_mod
+
+        db_dir = os.path.join(routes_mod.current_directory, "db")
+        log_path = os.path.join(db_dir, "test-grammar_1.0-grew.log")
+        with open(log_path, "w") as f:
+            f.write("ERROR whatever\n")
+        try:
+            resp = client.get("/ltdb/test-grammar_1.0/grammar.html")
+            assert resp.status_code == 200
+            assert b"/log/" not in resp.data
+        finally:
+            os.unlink(log_path)
+
+
 class TestConditionalNav:
     """Docstring Tests / Demo tabs and the <ex> column only appear
     when the grammar has doctest rows / a compiled .dat file."""

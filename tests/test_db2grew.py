@@ -206,20 +206,79 @@ def test_main_end_to_end(gold_db, tmp_path):
         assert corpus["kind"] == "json"
         directory = Path(corpus["directory"])
         assert directory.is_dir()
-        # the empty row is skipped: 2 of the 3 gold rows convert
-        assert corpus["files"] == ["mrs__1.json", "other__3.json"]
+        # one file per profile, each a JSON list of that profile's
+        # graphs; the empty "mrs" row is skipped, leaving one graph in
+        # each of the two profiles' files
+        assert corpus["files"] == ["mrs.json", "other.json"]
         assert sorted(p.name for p in directory.iterdir()) == corpus["files"]
         for fname in corpus["files"]:
-            graph = json.loads((directory / fname).read_bytes())
-            assert_valid_graph(graph)
-            assert graph["meta"]["text"] == "The dog barked."
+            graphs = json.loads((directory / fname).read_bytes())
+            assert len(graphs) == 1
+            assert_valid_graph(graphs[0])
+            assert graphs[0]["meta"]["text"] == "The dog barked."
+
+
+def test_export_merges_multiple_sentences_into_one_profile_file(tmp_path):
+    """Every graph identifies itself via meta.sent_id (grewlib reads
+    that, not the filename -- see doc/grew-match.md), so a profile
+    with several sentences can share one file."""
+    db_path = tmp_path / "toy2.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript(TABLES_SQL.read_text())
+    conn.executemany(
+        "INSERT INTO meta (att, val) VALUES (?, ?)",
+        [("SHORT_GRAMMAR_NAME", "TOY"), ("Version", "1.0")],
+    )
+    conn.executemany(
+        """INSERT INTO gold (profile, sid, sent, deriv, mrs)
+           VALUES (?, ?, ?, ?, ?)""",
+        [
+            ("mrs", 1, "The dog barked.", UDF, MRS),
+            ("mrs", 2, "The dog barked.", UDF, MRS),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+    out = tmp_path / "grew"
+    db2grew.main(["--outdir", str(out), str(db_path)])
+    corpora = json.loads((out / "corpora.json").read_bytes())
+    for corpus in corpora:
+        assert corpus["files"] == ["mrs.json"]
+        graphs = json.loads((Path(corpus["directory"]) / "mrs.json").read_bytes())
+        assert {g["meta"]["sid"] for g in graphs} == {"1", "2"}
+
+
+def test_export_writes_grew_log_on_conversion_failure(tmp_path):
+    """Conversion failures logged by deriv_to_grew are collected into
+    <db-stem>-grew.log next to the database."""
+    db_path = tmp_path / "toy3.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript(TABLES_SQL.read_text())
+    conn.executemany(
+        "INSERT INTO meta (att, val) VALUES (?, ?)",
+        [("SHORT_GRAMMAR_NAME", "TOY"), ("Version", "1.0")],
+    )
+    conn.execute(
+        """INSERT INTO gold (profile, sid, sent, deriv, mrs)
+           VALUES (?, ?, ?, ?, ?)""",
+        ("mrs", 1, "bad", "not a derivation", MRS),
+    )
+    conn.commit()
+    conn.close()
+
+    out = tmp_path / "grew"
+    db2grew.main(["--outdir", str(out), str(db_path)])
+    log_path = tmp_path / "toy3-grew.log"
+    assert log_path.is_file()
+    assert "unreadable" in log_path.read_text()
 
 
 def test_main_profiles_filter(gold_db, tmp_path):
     out = tmp_path / "grew"
     db2grew.main(["--outdir", str(out), "--profiles", "other", str(gold_db)])
     corpora = json.loads((out / "corpora.json").read_bytes())
-    assert all(c["files"] == ["other__3.json"] for c in corpora)
+    assert all(c["files"] == ["other.json"] for c in corpora)
 
 
 def test_main_ltdb_url(gold_db, tmp_path):
@@ -228,16 +287,16 @@ def test_main_ltdb_url(gold_db, tmp_path):
         ["--outdir", str(out), "--ltdb-url", "http://localhost:5000/", str(gold_db)]
     )
     corpora = json.loads((out / "corpora.json").read_bytes())
-    graph = json.loads((Path(corpora[0]["directory"]) / "mrs__1.json").read_bytes())
-    assert graph["meta"]["url"] == "http://localhost:5000/sent/mrs/1?grm=toy.db"
+    graphs = json.loads((Path(corpora[0]["directory"]) / "mrs.json").read_bytes())
+    assert graphs[0]["meta"]["url"] == "http://localhost:5000/sent/mrs/1?grm=toy.db"
 
 
 def test_main_relative_url_by_default(gold_db, tmp_path):
     out = tmp_path / "grew"
     db2grew.main(["--outdir", str(out), str(gold_db)])
     corpora = json.loads((out / "corpora.json").read_bytes())
-    graph = json.loads((Path(corpora[0]["directory"]) / "mrs__1.json").read_bytes())
-    assert graph["meta"]["url"] == "/sent/mrs/1?grm=toy.db"
+    graphs = json.loads((Path(corpora[0]["directory"]) / "mrs.json").read_bytes())
+    assert graphs[0]["meta"]["url"] == "/sent/mrs/1?grm=toy.db"
 
 
 def test_main_trees_only(gold_db, tmp_path):
