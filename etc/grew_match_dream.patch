@@ -1,3 +1,43 @@
+diff --git a/src/gmd_main.ml b/src/gmd_main.ml
+index 29ef9e8..4df1f57 100644
+--- a/src/gmd_main.ml
++++ b/src/gmd_main.ml
+@@ -567,19 +567,32 @@ let save param =
+   with Not_found -> raise (Error (`Assoc [("message", `String "save service: not connected")]))
+ 
+ (* ============================================================================================================================ *)
++(* corpusbank entries may carry a relative "grammar_url" (LTDB's link
++   back to the grammar's own page, e.g. "/?grm=ERG_2025.db"); expand it
++   the same way graph-level url metas are expanded in save_dep/save_dot *)
++let expand_corpus_desc json =
++  match json with
++  | `Assoc fields ->
++    `Assoc (List.map
++      (fun (k, v) -> match (k, v) with
++        | ("grammar_url", `String s) -> (k, `String (expand_url s))
++        | _ -> (k, v))
++      fields)
++  | other -> other
++
+ let get_corpora_desc param =
+   let open Yojson.Basic.Util in
+   let groups = param |> member "instance_desc" |> to_list in
+   let new_groups =
+-    List.map 
+-    (fun group -> 
++    List.map
++    (fun group ->
+       let corpora_list = group |> member "corpora" |> to_list |> List.map to_string in
+       let new_corpora_list =
+         List.map
+         (fun corpus_id ->
+           begin
+             match String_map.find_opt corpus_id !Global.corpora_map with
+-            | Some (corpus_desc, _) -> Corpus_desc.to_json corpus_desc
++            | Some (corpus_desc, _) -> expand_corpus_desc (Corpus_desc.to_json corpus_desc)
+             | None -> `Assoc [("id", `String corpus_id); ("error", `String "No description found")]
+           end
+         ) corpora_list in
 diff --git a/src/gmd_utils.ml b/src/gmd_utils.ml
 index eae37e3..b9ba4b7 100644
 --- a/src/gmd_utils.ml

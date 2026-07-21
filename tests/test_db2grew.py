@@ -201,7 +201,8 @@ def test_main_end_to_end(gold_db, tmp_path):
     out = tmp_path / "grew"
     db2grew.main(["--outdir", str(out), str(gold_db)])
     corpora = json.loads((out / "corpora.json").read_bytes())
-    assert [c["id"] for c in corpora] == ["TOY_1_0_trees", "TOY_1_0_dmrs"]
+    # corpus ids match the .db stem ("toy"), not SHORT_GRAMMAR_NAME/Version
+    assert [c["id"] for c in corpora] == ["toy_trees", "toy_dmrs"]
     for corpus in corpora:
         assert corpus["kind"] == "json"
         directory = Path(corpus["directory"])
@@ -289,6 +290,7 @@ def test_main_ltdb_url(gold_db, tmp_path):
     corpora = json.loads((out / "corpora.json").read_bytes())
     graphs = json.loads((Path(corpora[0]["directory"]) / "mrs.json").read_bytes())
     assert graphs[0]["meta"]["url"] == "http://localhost:5000/sent/mrs/1?grm=toy.db"
+    assert corpora[0]["grammar_url"] == "http://localhost:5000/?grm=toy.db"
 
 
 def test_main_relative_url_by_default(gold_db, tmp_path):
@@ -297,10 +299,11 @@ def test_main_relative_url_by_default(gold_db, tmp_path):
     corpora = json.loads((out / "corpora.json").read_bytes())
     graphs = json.loads((Path(corpora[0]["directory"]) / "mrs.json").read_bytes())
     assert graphs[0]["meta"]["url"] == "/sent/mrs/1?grm=toy.db"
+    assert corpora[0]["grammar_url"] == "/?grm=toy.db"
 
 
 def test_main_trees_only(gold_db, tmp_path):
     out = tmp_path / "grew"
     db2grew.main(["--outdir", str(out), "--trees-only", str(gold_db)])
     corpora = json.loads((out / "corpora.json").read_bytes())
-    assert [c["id"] for c in corpora] == ["TOY_1_0_trees"]
+    assert [c["id"] for c in corpora] == ["toy_trees"]

@@ -35,10 +35,17 @@ if [ ! -f grew_match_quick/grew_match_quick.py ]; then
 fi
 # Clone the frontend ourselves: if only local_files/grew_match/instances
 # is pre-created (the workaround grew_match_quick needs), the script
-# mistakes the stub for a checkout and never fetches the frontend.
+# mistakes the stub for a checkout and never fetches the frontend. We
+# apply small branding/UX patches on top (DELPH-IN Grammary links in
+# the corpus dropdown and navbar — see doc/grew-match.md).
 if [ ! -d grew_match_quick/local_files/grew_match/.git ]; then
   git clone https://github.com/grew-nlp/grew_match.git \
       grew_match_quick/local_files/grew_match
+  git -C grew_match_quick/local_files/grew_match \
+      apply "$PWD/etc/grew_match.patch"
+  git -C grew_match_quick/local_files/grew_match \
+      -c user.name="ltdb setup-grew-match.sh" -c user.email="ltdb@localhost" \
+      commit -qam "apply ltdb local patches (etc/grew_match.patch)"
 fi
 mkdir -p grew_match_quick/local_files/grew_match/instances
 # serve the LTDB query snippets from the frontend (run.sh points

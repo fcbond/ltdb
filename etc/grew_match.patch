@@ -1,0 +1,35 @@
+diff --git a/index.html b/index.html
+index c6dac7a..0a302a7 100644
+--- a/index.html
++++ b/index.html
+@@ -93,9 +93,14 @@
+ 
+ 							<ul v-if='group["style"] == "dropdown"' class="dropdown-menu">
+ 								<li v-for='corpus in group["corpora"]' v-bind:class='{ divider: corpus=="divider" }'>
+-									<a href="#" v-if='corpus!="divider"' v-on:click='current_group_id = group["id"]; current_corpus_id = corpus["id"]'>
+-										{{corpus["id"]}}
+-									</a>
++									<template v-if='corpus!="divider"'>
++										<a href="#" v-on:click='current_group_id = group["id"]; current_corpus_id = corpus["id"]' style="display:inline-block; max-width: calc(100% - 30px);">
++											{{corpus["id"]}}
++										</a>
++										<a v-if='corpus["grammar_url"]' v-bind:href='corpus["grammar_url"]' target="_blank" title="Open this grammar's page" v-on:click.stop style="float:right; padding-right:15px;">
++											<i class="fa fa-external-link" aria-hidden="true"></i>
++										</a>
++									</template>
+ 								</li>
+ 							</ul>
+ 
+@@ -112,6 +117,12 @@
+ 						</li>
+ 
+ 					</ul>
++
++					<a v-if='active_corpus && active_corpus["grammar_url"]' v-bind:href='active_corpus["grammar_url"]' target="_blank" class="navbar-brand" style="padding: 15px 10px; font-size: 14px;" v-bind:title='"Open the LTDB page for " + active_corpus_id'>
++						<i class="fa fa-book" aria-hidden="true"></i>
++						{{ active_corpus_id }} grammar page
++					</a>
++
+ 					<ul class="nav navbar-nav navbar-right">
+ 						<li v-if='top_project && "secondary_logo" in top_project'>
+ 							<a v-bind:href='top_project["secondary_website"]' style="padding:0px; ">

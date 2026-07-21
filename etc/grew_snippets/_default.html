@@ -44,3 +44,51 @@
     </ul>
   </div>
 </div>
+
+<script>
+(function () {
+  // This file is re-fetched and re-injected into #right-pane on every
+  // corpus change (see update_corpus() in grew_match's js/main.js), so
+  // this script re-runs then too -- which is what makes both syncs
+  // below "just work" without a grew_match patch.
+
+  // Corpus selected -> matching snippet tab: ids always end "_dmrs" or
+  // "_trees" (see scripts/db2grew.py), so the suffix tells us which of
+  // the two tabs (#step1 DMRS, #step2 Trees) applies. `app` (grew_match's
+  // Vue instance) is a top-level `let` in js/main.js, not a `window`
+  // property, but it is still visible here: this script and main.js
+  // are both plain (non-module) <script>s sharing one global scope.
+  var cid = typeof app !== 'undefined' && app.current_corpus_id;
+  if (cid && cid.endsWith('_dmrs')) {
+    $('.nav-pills a[href="#step1"]').tab('show');
+  } else if (cid && cid.endsWith('_trees')) {
+    $('.nav-pills a[href="#step2"]').tab('show');
+  }
+
+  // Snippet clicked -> matching corpus: if the snippet is for the
+  // "other" kind, switch to the sibling corpus from the same grammar
+  // when one exists (same id with the suffix swapped), else warn.
+  $('.inter').on('click', function () {
+    var file = this.getAttribute('snippet-file') || '';
+    var wantSuffix = file.startsWith('dmrs/') ? '_dmrs'
+                    : file.startsWith('trees/') ? '_trees'
+                    : null;
+    if (!wantSuffix || typeof app === 'undefined' || !app.current_corpus_id) return;
+    if (app.current_corpus_id.endsWith(wantSuffix)) return;
+    var stem = app.current_corpus_id.replace(/_(dmrs|trees)$/, '');
+    var wantedId = stem + wantSuffix;
+    var corpora = app.current_group && app.current_group.corpora;
+    var match = corpora && corpora.find(function (c) {
+      return c !== 'divider' && c.id === wantedId;
+    });
+    if (match) {
+      app.current_corpus_id = wantedId;
+    } else if (typeof direct_warning === 'function') {
+      direct_warning(
+        'This snippet is for a `' + wantSuffix.slice(1) + '` corpus, ' +
+        'but no `' + wantedId + '` corpus is available -- pick one from the corpus list.'
+      );
+    }
+  });
+})();
+</script>

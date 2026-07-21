@@ -44,20 +44,6 @@ def sanitize(name):
     return re.sub(r"\W+", "_", name).strip("_")
 
 
-def get_meta(conn):
-    """Return the meta table as a dictionary.
-
-    Args:
-        conn: Connection to an LTDB SQLite database
-
-    Returns:
-        Dictionary mapping attribute to value
-    """
-    c = conn.cursor()
-    c.execute("SELECT att, val FROM meta")
-    return dict(c.fetchall())
-
-
 def get_lextypes(conn):
     """Return a mapping from lexical-entry id to its lexical type.
 
@@ -442,6 +428,10 @@ def export(conn, out_dir, grm, args):
         log_path = args.db.parent / f"{args.db.stem}-grew.log"
         log_path.write_text("".join(log_lines))
 
+    # relative like the graph-level url metas above; the backend patch
+    # (etc/grew_match_dream.patch) expands both with $LTDB_BASE_URL
+    grammar_url = f"{url_base}/?grm={quote(args.db.name, safe='')}"
+
     corpora = []
     for cid, directory, files, n_graphs in (
         (f"{grm}_trees", trees_dir, tree_files, n_trees),
@@ -457,6 +447,7 @@ def export(conn, out_dir, grm, args):
                     "directory": str(directory.resolve()),
                     "files": sorted(files),
                     "n_graphs": n_graphs,
+                    "grammar_url": grammar_url,
                 }
             )
     return corpora
@@ -505,10 +496,10 @@ def main(argv=None):
     out_dir.mkdir(parents=True, exist_ok=True)
 
     conn = sqlite3.connect(f"file:{args.db.resolve()}?mode=ro", uri=True)
-    md = get_meta(conn)
-    grm = sanitize(
-        f"{md.get('SHORT_GRAMMAR_NAME', '')}_{md.get('Version', '')}"
-    ) or sanitize(args.db.stem)
+    # matches the .db filename exactly (not SHORT_GRAMMAR_NAME + Version,
+    # which duplicates the grammar name -- e.g. ERG's Version is
+    # "ERG (2025)", so that pair sanitized to "ERG_ERG_2025")
+    grm = sanitize(args.db.stem)
     corpora = export(conn, out_dir, grm, args)
     conn.close()
 

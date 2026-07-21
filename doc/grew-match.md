@@ -399,6 +399,26 @@ frontend and needs the patches in `etc/grew_match_dream.patch`
 The first three are worth filing upstream at
 <https://github.com/grew-nlp/grew_match_dream>.
 
+Corpus ids match the `.db` stem exactly (e.g. `ERG_2025_trees`), not
+`SHORT_GRAMMAR_NAME_Version` — that pair duplicates the grammar name
+(the ERG's `Version` metadatum is itself `"ERG (2025)"`, so the old
+scheme sanitized to `ERG_ERG_2025_trees`). Each corpus also carries a
+`grammar_url` meta (relative, like the graph-level `url` metas —
+`get_corpora_desc` expands both the same way with `$LTDB_BASE_URL`)
+pointing at that grammar's LTDB page.
+
+The frontend (`etc/grew_match.patch`, applied to `grew_match` the same
+way as the backend patch above) uses `grammar_url` for two links: an
+external-link icon next to each corpus in the dropdown, and a
+persistent "*corpus* grammar page" link in the navbar for whichever
+corpus is currently active. `run.sh` additionally rewrites the
+frontend's generated `config.json`/`instances/gmq_instance.json` after
+each start (the same way it already points `snippets_url` at
+`etc/grew_snippets/`) to set the corpus-dropdown label to "DELPH-IN
+Grammary Corpora" and point `top_project` (grew_match's own generic
+branding slot) at the DELPH-IN wiki — neither needs a frontend patch,
+since both are read from JSON grew_match_quick.py itself writes.
+
 ### Query snippets
 
 The snippet pane on the right of the grew-match UI is populated from
@@ -413,3 +433,19 @@ modification), the derivation-tree corpora (`cat`, `lextype`, `lexid`,
 excluding a specific construction), and graph metadata (sentence text,
 treebank profile). Clicking a snippet loads the query into the request
 box; edit the quoted values to taste.
+
+`_default.html` also carries a small inline `<script>` that keeps the
+DMRS/Trees tab and the active corpus in sync, in both directions, with
+no frontend patch: it re-runs on every corpus change (the pane is
+re-fetched and re-injected each time — see `update_corpus()` in
+grew_match's `js/main.js`), so it activates whichever tab matches the
+`_dmrs`/`_trees` suffix of `current_corpus_id` at that moment; and it
+adds a second click handler on every `.inter` snippet link that, for a
+snippet of the *other* kind, switches to the sibling corpus from the
+same grammar if one exists, or otherwise shows a warning. It reaches
+the frontend's Vue instance as the bare identifier `app`, not
+`window.app` — `js/main.js` declares it with a top-level `let`, which
+(unlike `var`) does not become a `window` property, though it is still
+visible from any other plain `<script>` sharing the page (confirmed
+live: `typeof window.app` is `"object"` — some unrelated browser
+global — while `app` is the real Vue instance).

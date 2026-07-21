@@ -186,17 +186,38 @@ start_grew_match() {
   # the corpora were compiled by setup-grew-match.sh before the backend
   # started, so it reads the compiled status on startup
 
-  # point the snippet pane at the LTDB queries in etc/grew_snippets
-  # (grew_match_quick rewrites config.json on every start)
+  # point the snippet pane at the LTDB queries in etc/grew_snippets and
+  # brand the frontend (grew_match_quick rewrites both files on every
+  # start, so this has to happen after each start too)
   uv run python - <<'PY'
 import json
 
-path = "grew_match_quick/local_files/grew_match/config.json"
-with open(path) as f:
+frontend_dir = "grew_match_quick/local_files/grew_match"
+
+config_path = f"{frontend_dir}/config.json"
+with open(config_path) as f:
     cfg = json.load(f)
 cfg["snippets_url"] = "snippets/"
-with open(path, "w") as f:
+# "top_project" is grew_match's own generic branding slot (logo + link
+# in the navbar, "About"/"Cite" menu entries); point it at DELPH-IN
+# instead of leaving it unset
+for instance_cfg in cfg.get("instances", {}).values():
+    instance_cfg["top_project"] = {
+        "website": "https://delph-in.github.io/docs/home/Home/",
+        "logo": "https://github.com/delph-in.png",
+    }
+with open(config_path, "w") as f:
     json.dump(cfg, f, indent=2)
+
+# the corpus dropdown label is otherwise just the corpora.json
+# filename's stem (e.g. "grew_corpora")
+instance_path = f"{frontend_dir}/instances/gmq_instance.json"
+with open(instance_path) as f:
+    groups = json.load(f)
+for group in groups:
+    group["id"] = "DELPH-IN Grammary Corpora"
+with open(instance_path, "w") as f:
+    json.dump(groups, f, indent=2)
 PY
   echo "grew-match ready on http://localhost:${gm_front_port}"
 }
