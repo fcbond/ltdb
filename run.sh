@@ -191,6 +191,7 @@ start_grew_match() {
   # start, so this has to happen after each start too)
   uv run python - <<'PY'
 import json
+import os
 
 frontend_dir = "grew_match_quick/local_files/grew_match"
 
@@ -199,12 +200,14 @@ with open(config_path) as f:
     cfg = json.load(f)
 cfg["snippets_url"] = "snippets/"
 # "top_project" is grew_match's own generic branding slot (logo + link
-# in the navbar, "About"/"Cite" menu entries); point it at DELPH-IN
+# in the navbar, "About"/"Cite" menu entries, and now an "LTDB" entry
+# in the help menu -- see etc/grew_match.patch); point it at DELPH-IN
 # instead of leaving it unset
 for instance_cfg in cfg.get("instances", {}).values():
     instance_cfg["top_project"] = {
         "website": "https://delph-in.github.io/docs/home/Home/",
         "logo": "https://github.com/delph-in.png",
+        "ltdb_url": os.environ.get("LTDB_BASE_URL", ""),
     }
 with open(config_path, "w") as f:
     json.dump(cfg, f, indent=2)

@@ -65,15 +65,14 @@
     $('.nav-pills a[href="#step2"]').tab('show');
   }
 
-  // Snippet clicked -> matching corpus: if the snippet is for the
-  // "other" kind, switch to the sibling corpus from the same grammar
-  // when one exists (same id with the suffix swapped), else warn.
-  $('.inter').on('click', function () {
-    var file = this.getAttribute('snippet-file') || '';
-    var wantSuffix = file.startsWith('dmrs/') ? '_dmrs'
-                    : file.startsWith('trees/') ? '_trees'
-                    : null;
-    if (!wantSuffix || typeof app === 'undefined' || !app.current_corpus_id) return;
+  // Tab (or snippet) picked -> matching corpus: if the current corpus
+  // is not already the wanted kind, switch to the sibling corpus from
+  // the same grammar when one exists (same id with the suffix
+  // swapped), else warn. Shared by both the DMRS/Trees tab headers
+  // (clicked directly, before picking any particular snippet) and the
+  // individual .inter snippet links below.
+  function trySwitchCorpus(wantSuffix) {
+    if (typeof app === 'undefined' || !app.current_corpus_id) return;
     if (app.current_corpus_id.endsWith(wantSuffix)) return;
     var stem = app.current_corpus_id.replace(/_(dmrs|trees)$/, '');
     var wantedId = stem + wantSuffix;
@@ -85,10 +84,19 @@
       app.current_corpus_id = wantedId;
     } else if (typeof direct_warning === 'function') {
       direct_warning(
-        'This snippet is for a `' + wantSuffix.slice(1) + '` corpus, ' +
-        'but no `' + wantedId + '` corpus is available -- pick one from the corpus list.'
+        'No `' + wantedId + '` corpus is available for the current ' +
+        'grammar -- pick one from the corpus list.'
       );
     }
+  }
+
+  $('.nav-pills a[href="#step1"]').on('click', function () { trySwitchCorpus('_dmrs'); });
+  $('.nav-pills a[href="#step2"]').on('click', function () { trySwitchCorpus('_trees'); });
+
+  $('.inter').on('click', function () {
+    var file = this.getAttribute('snippet-file') || '';
+    if (file.startsWith('dmrs/')) trySwitchCorpus('_dmrs');
+    else if (file.startsWith('trees/')) trySwitchCorpus('_trees');
   });
 })();
 </script>
