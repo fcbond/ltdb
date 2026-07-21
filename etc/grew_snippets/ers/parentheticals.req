@@ -1,0 +1,9 @@
+% Constituents set off by parentheses or dashes and only loosely integrated
+% are attached by a 'parenthetical' relation between the host's intrinsic
+% argument and the parenthetical clause's handle.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_Parentheticals/):
+%   h0:parenthetical[ARG1 i1, ARG2 h2]
+%   h0:[ARG0 i1]
+
+pattern { P [pred="parenthetical"]; P -[1=ARG1]-> H; P -[1=ARG2, post=H]-> C }

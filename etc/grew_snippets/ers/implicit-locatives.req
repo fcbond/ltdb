@@ -1,0 +1,8 @@
+% Expressions locating an entity or event in time or space without specifying
+% the relation (now, here, every day, ...) introduce a 'loc_nonsp' relation
+% between the located eventuality and the location entity.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_ImplicitLocatives/):
+%   loc_nonsp[ARG1 i, ARG2 x]
+
+pattern { L [pred="loc_nonsp"]; L -[1=ARG1]-> E; L -[1=ARG2]-> X }

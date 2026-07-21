@@ -1,0 +1,9 @@
+% Imperative clauses leave the subject unexpressed (a second-person zero
+% pronoun is inserted) and mark the verb's eventuality with commanding
+% sentence force and present tense.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_Imperatives/):
+%   pron[ARG0 x {PERS 2}]
+%   [ARG0 e {SF comm, TENSE pres}, ARG1 x]
+
+pattern { V [SF="comm", TENSE="pres"]; V -[1=ARG1]-> P; P [pred="pron", PERS="2"] }

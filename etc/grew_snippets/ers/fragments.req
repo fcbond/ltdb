@@ -1,0 +1,9 @@
+% Utterances consisting of just a word or phrase are interpreted as an
+% argument or modifier of an implied eventuality represented by the 'unknown'
+% relation.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_Fragments/):
+%   h0:unknown[ARG0 e1, ARG x2]
+%   _[ARG0 x2]
+
+pattern { U [pred="unknown"] }

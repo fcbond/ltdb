@@ -1,0 +1,11 @@
+% Depictive and absolutive sentence modifiers without a finite verbal head
+% (Angry at Browne, he stormed out) are related to the modified clause by a
+% two-place 'subord' predication over handles.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_NonAdverbialClausalModifiers/):
+%   subord[ARG1 h1, ARG2 h2]
+%   h3:[ARG0 e1]
+%   h4:[ARG0 e2]
+%   { h1 =q h3, h2 =q h4 }
+
+pattern { S [pred="subord"]; S -[1=ARG1, post=H]-> M; S -[1=ARG2, post=H]-> C }

@@ -422,30 +422,53 @@ since both are read from JSON grew_match_quick.py itself writes.
 ### Query snippets
 
 The snippet pane on the right of the grew-match UI is populated from
-`etc/grew_snippets/` (served by the frontend; `run.sh` points
-`config.json`'s `snippets_url` there at each start).  It has tabs for
-the DMRS corpora (predicate search by `pred`, by exact `lemma`, or by
-regex; a regex-escaping example (`ad+hoc`); a particle verb whose
-particle lands in the sense slot (`knock_v_up`); `ARG1` links,
-reflexive-like configurations, quantifier restrictions, `post=EQ`
-modification), the derivation-tree corpora (`cat`, `lextype`, `lexid`,
-`form`, `n`-th daughter, adjacency combined with a `without` clause
-excluding a specific construction), and graph metadata (sentence text,
-treebank profile). Clicking a snippet loads the query into the request
-box; edit the quoted values to taste.
+`etc/grew_snippets/` — plain text files, no build step; edit a `.req`
+file (or `_default.html`'s labels/tab list) and reload the page to see
+the change, no server restart needed. It's served by the frontend
+(`run.sh` points `config.json`'s `snippets_url` there at each start,
+via the symlink `grew_match_quick/local_files/grew_match/snippets ->
+etc/grew_snippets`). It has four tabs:
+
+- **DMRS** (`etc/grew_snippets/dmrs/`): predicate search by `pred`, by
+  exact `lemma`, or by regex; a regex-escaping example (`ad+hoc`); a
+  particle verb whose particle lands in the sense slot (`knock_v_up`);
+  `ARG1` links, reflexive-like configurations, quantifier restrictions,
+  `post=EQ` modification.
+- **Trees** (`etc/grew_snippets/trees/`): `cat`, `lextype`, `lexid`,
+  `form`, `n`-th daughter, adjacency combined with a `without` clause
+  excluding a specific construction.
+- **ERS** (`etc/grew_snippets/ers/`): every ESD phenomenon from
+  `doc/esd-phenomena/phenomena.toml` as a ready-to-run DMRS query, with
+  its description and ERS fingerprint as a comment. **Generated, not
+  hand-edited** — edit `phenomena.toml` (the same file
+  `check_phenomena.py` counts matches against) and regenerate with:
+  ```bash
+  python doc/esd-phenomena/gen_snippets.py
+  ```
+  This rewrites every `ers/*.req` file and the `<li>` list inside
+  `_default.html`'s `<!-- BEGIN GENERATED -->...<!-- END GENERATED
+  -->` markers (everything else in `_default.html` is untouched).
+- **Metadata** (`etc/grew_snippets/global/`): sentence text and
+  treebank profile filters, corpus-kind-agnostic.
 
 `_default.html` also carries a small inline `<script>` that keeps the
-DMRS/Trees tab and the active corpus in sync, in both directions, with
-no frontend patch: it re-runs on every corpus change (the pane is
+active tab and the active corpus in sync, in both directions, with no
+frontend patch: it re-runs on every corpus change (the pane is
 re-fetched and re-injected each time — see `update_corpus()` in
-grew_match's `js/main.js`), so it activates whichever tab matches the
-`_dmrs`/`_trees` suffix of `current_corpus_id` at that moment; and it
-adds a second click handler on every `.inter` snippet link that, for a
-snippet of the *other* kind, switches to the sibling corpus from the
-same grammar if one exists, or otherwise shows a warning. It reaches
-the frontend's Vue instance as the bare identifier `app`, not
-`window.app` — `js/main.js` declares it with a top-level `let`, which
-(unlike `var`) does not become a `window` property, though it is still
-visible from any other plain `<script>` sharing the page (confirmed
-live: `typeof window.app` is `"object"` — some unrelated browser
-global — while `app` is the real Vue instance).
+grew_match's `js/main.js`), and it adds a second click handler on
+every tab header and `.inter` snippet link that, for a tab/snippet of
+the *other* kind, switches to the sibling corpus from the same grammar
+if one exists, or otherwise shows a warning (DMRS and ERS both want a
+`_dmrs` corpus; Trees wants `_trees`; Metadata fits either and is left
+alone). Because the whole pane — including which tab starts
+`class="active"` — is rebuilt from this static file on every reload,
+remembering "the user was actually on ERS" across a corpus-triggered
+reload needs a real `window` property (`window.__ltdbSnippetTab`, set
+on Bootstrap's `shown.bs.tab` event); a variable local to the script
+would not survive the rebuild. The script reaches the frontend's Vue
+instance as the bare identifier `app`, not `window.app` — `js/main.js`
+declares it with a top-level `let`, which (unlike `var`) does not
+become a `window` property, though it is still visible from any other
+plain `<script>` sharing the page (confirmed live: `typeof window.app`
+is `"object"` — some unrelated browser global — while `app` is the
+real Vue instance).

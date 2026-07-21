@@ -1,0 +1,9 @@
+% Comparative constructions introduce a 'comp' relation (comp, comp_equal,
+% comp_less, ...) whose label is shared with the gradable adjective and whose
+% ARG1 is the adjective's eventuality.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_Comparatives/):
+%   h:comp[ARG1 e]
+%   h:*_a*[ARG0 e]
+
+pattern { C [pred=re"comp\(_.*\)?"]; C -[1=ARG1, post=EQ]-> A; A [pos="a"] }

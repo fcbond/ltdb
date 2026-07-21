@@ -1,0 +1,10 @@
+% Head-modifier compounds (e.g. 'garden dog') introduce an underspecified two-
+% place 'compound' relation between the head's instance and the modifier's
+% instance.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_Compounding/):
+%   h0:compound[ARG1 x1, ARG2 x2]
+%   h0:[ARG0 x1]
+%   [ARG0 x2]
+
+pattern { C [pred="compound"]; C -[1=ARG1]-> H; C -[1=ARG2]-> M }

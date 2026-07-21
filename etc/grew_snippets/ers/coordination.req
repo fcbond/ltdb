@@ -1,0 +1,11 @@
+% Coordination introduces a binary conjunction relation ('abstract_c': _and_c,
+% _or_c, implicit_conj, ...); nominal coordination links the conjuncts'
+% instances, other coordination their handles. N-ary coordination is
+% successive binary combination.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_Coordination/):
+%   abstract_c[ARG0 x1, ARG1 x2, ARG2 x3]
+%   [ARG0 x2]
+%   [ARG0 x3]
+
+pattern { C [pred=re".*_c\|implicit_conj"]; C -[1=ARG1]-> L; C -[1=ARG2]-> R }

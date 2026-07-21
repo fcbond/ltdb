@@ -1,0 +1,11 @@
+% Complex time expressions like 'June third' relate a day/part-of-day to a
+% named day or month with 'of_p', with def_implicit_q and def_explicit_q
+% quantifiers binding the parts.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_TimeExpressions/):
+%   of_p[ARG1 x1, ARG2 x2]
+%   dofm_or_mofy[ARG0 x2]
+%   def_explicit_q[ARG0 x1]
+%   def_implicit_q[ARG0 x2]
+
+pattern { O [pred="of_p"]; O -[1=ARG2]-> D; D [pred=re"dofm\|mofy"] }

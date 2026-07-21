@@ -1,0 +1,10 @@
+% A full NP is followed by another nominal phrase with the same referent; the
+% construction introduces a two-place 'appos' relation between the two
+% instances.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_Apposition/):
+%   appos[ARG1 x1, ARG2 x2]
+%   [ARG0 x1]
+%   [ARG0 x2]
+
+pattern { A [pred="appos"]; A -[1=ARG1]-> X; A -[1=ARG2]-> Y }

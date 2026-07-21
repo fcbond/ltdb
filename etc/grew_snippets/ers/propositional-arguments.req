@@ -1,0 +1,10 @@
+% Predicates taking a clausal (propositional) argument: some ARGn of the
+% predicate is a handle qeq to the embedded clause's eventuality (believed
+% that S, doubted whether S).
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_PropositionalArguments/):
+%   [ARG* h1]
+%   h2:[ARG0 e]
+%   { h1 =q h2 }
+
+pattern { P -[1=ARG1|ARG2|ARG3|ARG4, post=H]-> V; V [cvarsort="e"] }

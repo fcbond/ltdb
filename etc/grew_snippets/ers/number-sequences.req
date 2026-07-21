@@ -1,0 +1,8 @@
+% Number sequences read as strings of smaller numbers (phone numbers, zip
+% codes: nine four three oh five) are combined by the 'num_seq' relation,
+% binarized like coordination.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_NumberSequences/):
+%   num_seq[L-INDEX x1, R-INDEX x2]
+
+pattern { N [pred="num_seq"] }

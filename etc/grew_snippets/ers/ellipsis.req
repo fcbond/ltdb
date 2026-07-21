@@ -1,0 +1,9 @@
+% Post-auxiliary (VP) ellipsis is marked by 'ellipsis_ref' (referential
+% subject, with an ARG1 to it) or 'ellipsis_expl' (expletive subject), cueing
+% the search for an antecedent.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_Ellipsis/):
+%   ellipsis_ref[ARG1 x0]
+%   ellipsis_expl[ARG1 u0]
+
+pattern { E [pred=re"ellipsis_ref\|ellipsis_expl"] }

@@ -1,0 +1,7 @@
+% Anaphoric noun phrases without a head noun (Browne's, three, one anaphora)
+% introduce 'generic_entity', a cue that anaphora resolution is required.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_ImplicitNominals/):
+%   generic_entity[ARG0 x]
+
+pattern { G [pred="generic_entity"] }

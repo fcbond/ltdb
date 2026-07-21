@@ -1,0 +1,10 @@
+% Instances not bound by an overt determiner are bound by implicit (abstract)
+% quantifiers such as udef_q, def_implicit_q, def_explicit_q, pronoun_q,
+% proper_q or number_q.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_ImplicitQuantifiers/):
+%   quant[ARG0 x, RSTR h2, BODY h3]
+%   h4:[ARG0 x]
+%   { h2 =q h4 }
+
+pattern { Q [pred=re"[^_].*_q"]; Q -[1=RSTR, post=H]-> N }

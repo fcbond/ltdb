@@ -1,0 +1,8 @@
+% Vocative NPs explicitly mark the addressee without filling a semantic role;
+% the 'addressee' relation links the NP instance to the situation of the rest
+% of the sentence.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_Vocatives/):
+%   addressee[ARG1 x, ARG2 e]
+
+pattern { A [pred="addressee"]; A -[1=ARG1]-> X; A -[1=ARG2]-> E }

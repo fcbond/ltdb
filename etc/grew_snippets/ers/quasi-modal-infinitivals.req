@@ -1,0 +1,10 @@
+% Quasi-modal be and modal-flavoured infinitival relatives (the man to fix it)
+% are modeled by the 'eventuality' relation scoping (qeq) over the infinitival
+% clause.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_QuasiModalInfinitivals/):
+%   eventuality[ARG1 h1]
+%   h2:[ARG0 e]
+%   { h1 =q h2 }
+
+pattern { E [pred="eventuality"]; E -[1=ARG1, post=HEQ]-> V }
