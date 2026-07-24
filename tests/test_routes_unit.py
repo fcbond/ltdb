@@ -263,3 +263,47 @@ class TestGetDoctest:
         assert "&lt;ex&gt;" in html
         assert "PASS" in html
         assert "FAIL-no-parse" in html
+
+
+# ---------------------------------------------------------------------------
+# HOME_BLURB_FILE — an optional deployment-specific intro on the home page,
+# so a fork/install (e.g. a curated grammar collection) can brand its own
+# instance without hardcoding text into the shared app.
+# ---------------------------------------------------------------------------
+
+class TestLoadHomeBlurb:
+    def test_unset_env_var_returns_empty(self, app, monkeypatch):
+        import web.routes as routes
+        monkeypatch.delenv("HOME_BLURB_FILE", raising=False)
+        assert routes._load_home_blurb() == ""
+
+    def test_renders_markdown_file_to_html(self, app, tmp_path, monkeypatch):
+        import web.routes as routes
+        blurb = tmp_path / "blurb.md"
+        blurb.write_text("This is the **Curated Collection**.\n")
+        monkeypatch.setenv("HOME_BLURB_FILE", str(blurb))
+        html = routes._load_home_blurb()
+        assert "<strong>Curated Collection</strong>" in html
+
+    def test_missing_file_returns_empty_without_raising(
+        self, app, tmp_path, monkeypatch
+    ):
+        import web.routes as routes
+        monkeypatch.setenv("HOME_BLURB_FILE", str(tmp_path / "nonexistent.md"))
+        assert routes._load_home_blurb() == ""
+
+
+class TestHomeBlurbRendering:
+    def test_blurb_shown_on_home_page_when_set(self, app, client, monkeypatch):
+        import web.routes as routes
+        monkeypatch.setattr(
+            routes, "HOME_BLURB_HTML", "<p>The Curated Collection.</p>"
+        )
+        html = client.get("/").data.decode()
+        assert "The Curated Collection." in html
+
+    def test_no_blurb_block_when_unset(self, app, client, monkeypatch):
+        import web.routes as routes
+        monkeypatch.setattr(routes, "HOME_BLURB_HTML", "")
+        html = client.get("/").data.decode()
+        assert "home-blurb" not in html

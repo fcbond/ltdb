@@ -53,7 +53,7 @@ from .db import (
     get_wrds_by_ltypes,
     search_for,
 )
-from .ltdb import docstring2html, sanitize_grm
+from .ltdb import docstring2html, render_markdown, sanitize_grm
 
 _tdl_formatter = HtmlFormatter(style="friendly")
 PYGMENTS_CSS = _tdl_formatter.get_style_defs(".highlight")
@@ -95,6 +95,28 @@ STATIC_MIRROR_STATUSES = {
 }
 STATIC_MIRROR_ALL_NON_LEX = os.environ.get("STATIC_MIRROR_ALL_NON_LEX") == "1"
 STATIC_MIRROR_DYNAMIC_TYPES = os.environ.get("STATIC_MIRROR_DYNAMIC_TYPES") == "1"
+
+
+def _load_home_blurb():
+    """Render HOME_BLURB_FILE (if set) to HTML for the home page.
+
+    Lets a deployment (e.g. a curated grammar collection) add its own
+    intro blurb without forking the app: point the env var at a
+    Markdown file and it's rendered above the generic Overview text.
+    Unset by default, so other local/standalone installs see nothing.
+    """
+    path = os.environ.get("HOME_BLURB_FILE")
+    if not path:
+        return ""
+    try:
+        text = pathlib.Path(path).read_text(encoding="utf-8")
+    except OSError as e:
+        print(f"HOME_BLURB_FILE={path!r} could not be read: {e}", file=sys.stderr)
+        return ""
+    return render_markdown(text)
+
+
+HOME_BLURB_HTML = _load_home_blurb()
 
 
 def _is_mirror_request():
@@ -410,6 +432,7 @@ def home():
         can_parse=can_parse,
         any_doctests=any(s.get("DOCTESTS") for s in summ.values()),
         grm=session.get("grm", None),
+        home_blurb=HOME_BLURB_HTML,
     )
 
 
@@ -657,6 +680,7 @@ def mirror_home():
         summ=summ,
         any_doctests=any(s.get("DOCTESTS") for s in summ.values()),
         grm=None,
+        home_blurb=HOME_BLURB_HTML,
     )
 
 

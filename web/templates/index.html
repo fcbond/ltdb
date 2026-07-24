@@ -29,6 +29,9 @@
 
 <section>
   <h1>Overview</h1>
+  {% if home_blurb %}
+  <div class="home-blurb mb-3">{{ home_blurb | safe }}</div>
+  {% endif %}
   <p>The Linguistic Type Database (LTDB) documents <a href="https://delph-in.github.io/docs/home/HomePage">DELPH-IN</a> grammars —
   large-scale precision grammars for natural language processing. Select a grammar below, then:</p>
   <ul class="mb-3">

@@ -142,3 +142,8 @@ def docstring2html(typ, docstring):
         return ""
     description, _examples, _names = munge_desc(typ, docstring)
     return _md.render(description)
+
+
+def render_markdown(text):
+    """Render arbitrary Markdown (e.g. a deployment's home-page blurb) to HTML."""
+    return _md.render(text)
