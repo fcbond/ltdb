@@ -7,8 +7,15 @@ For each typed example tag in a grammar's TDL docstrings:
   <mex> : same check as <ex> (grammatical for the grammar via a mal-rule)
 
 Usage:
-    python parse_examples.py <ace-config> <grammar.dat> <output-dir>
-        [--ace-bin PATH] [--no-profile]
+    python parse_examples.py <ace-config> <grammar.dat> <profile-dir>
+        [--no-profile] [--db GRAMMAR.db] [--report FILE]
+        [-j N] [--ace-bin PATH]
+
+A [incr tsdb()] profile of the parse results is written to
+<profile-dir> by default (--no-profile skips it, the directory is
+then ignored).  A per-type report always goes to stdout; --report
+also writes it to a file, and --db stores the verdicts in the
+doctest table of a grammar database.
 """
 import argparse
 import logging
@@ -831,7 +838,8 @@ def main() -> None:
     parser.add_argument(
         "output_dir",
         type=Path,
-        help="Directory for the itsdb output profile",
+        help="Directory for the itsdb profile of the results "
+             "(written by default; ignored with --no-profile)",
     )
     parser.add_argument(
         "--ace-bin",
@@ -841,7 +849,7 @@ def main() -> None:
     parser.add_argument(
         "--no-profile",
         action="store_true",
-        help="Skip writing the itsdb profile; print summary only",
+        help="Skip writing the itsdb profile (--db/--report still work)",
     )
     parser.add_argument(
         "--report",

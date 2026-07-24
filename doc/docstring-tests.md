@@ -101,15 +101,18 @@ database (`typ`, `sent`, `kind`, `wf`, `n_parses`, `type_found`,
 
 ```bash
 python scripts/parse_examples.py ace/config.tdl grammar.dat /tmp/profile \
-    --db web/db/grammar.db \  # store results in the doctest table
-    --report results.txt \    # also write the full text report
-    --no-profile \            # skip the itsdb profile
-    -j 0                      # parallel ACE, sized to the machine
+    --db web/db/grammar.db --report results.txt -j 0
 ```
 
-Positional arguments: the ACE config, the compiled `.dat`, and a
-directory for the itsdb profile.  Prints a full per-type report to
-stdout.
+Positional arguments: the ACE config, the compiled `.dat`, and the
+directory for the itsdb profile of the results.  The profile is
+written by default; pass `--no-profile` to skip it (the directory
+argument is then ignored).  A full per-type report always goes to
+stdout; the options above additionally store the verdicts in the
+doctest table of the grammar database (`--db`, surfaced on the type
+pages and the "Docstring Tests" tab), write the report to a file
+(`--report`), and parse with as many ACE processes as the machine
+supports (`-j 0`).
 
 ### Dated profile in the grammar: `docstring_profile.py`
 

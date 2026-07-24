@@ -189,9 +189,11 @@ example: `PASS`, `FAIL-no-parse`, `FAIL-type-absent`, or
 python scripts/grm2db.py --outdir web/db --ace --doctest --jobs 0 \
     path/to/METADATA
 
-# standalone, with database and/or report output
+# standalone — writes an itsdb profile of the results to /tmp/profile
+# (skip with --no-profile) and a per-type report to stdout; --db and
+# --report additionally store the verdicts
 python scripts/parse_examples.py ace/config.tdl grammar.dat /tmp/profile \
-    --db web/db/grammar.db --report results.txt --no-profile -j 0
+    --db web/db/grammar.db --report results.txt -j 0
 
 # dated itsdb profile inside the grammar, verdicts in i-comment
 python scripts/docstring_profile.py ace/config.tdl grammar.dat

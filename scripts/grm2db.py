@@ -168,37 +168,6 @@ def compile_ace(cfg_path, out_path, log_path, ace_bin=None):
         raise
 
 
-
-def make_ex_profile(exdir, examples, md):
-    """Write a parseable itsdb profile from docstring examples.
-
-    Copies etc/Relations into exdir and writes an item file with one
-    row per (text, typ, wf) triple.  The profile can then be processed
-    directly with delphin.itsdb or fed to parse_examples.py.
-    """
-    exdir.mkdir(parents=True, exist_ok=True)
-    script_dir = Path(__file__).parent.absolute()
-    shutil.copyfile(script_dir / "../etc/Relations", exdir / "relations")
-    with open(exdir / "item", "w") as out:
-        iid = 10
-        for text, typ, wf in examples:
-            row = [
-                iid,       # i-id
-                "ltdb",    # i-origin
-                "", "", "",
-                typ,       # i-category (type name)
-                text,      # i-input
-                "", "", "",
-                wf,        # i-wf
-                len(text.split()),
-                "",
-                md.get("Version", ""),
-                "today",
-            ]
-            print("@".join(str(x) for x in row), file=out)
-            iid += 10
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="grm2db",
