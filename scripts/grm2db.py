@@ -54,8 +54,13 @@ def meta_to_db(conn, md):
     for att, val in md.items():
         if isinstance(val, list):
             # Wrap the list in a dictionary with a standard key
-            # as TOML requires key-value pairs at the top level
-            val = json.dumps(val)
+            # as TOML requires key-value pairs at the top level.
+            # ensure_ascii=False: grammar.html's meta-data table
+            # renders att/val pairs as plain text without decoding
+            # JSON, so an escaped "\uXXXX" would show up literally
+            # instead of the actual character (e.g. for EXAMPLES in
+            # a non-Latin-script grammar).
+            val = json.dumps(val, ensure_ascii=False)
         if att and val:
             c.execute(
                 """
