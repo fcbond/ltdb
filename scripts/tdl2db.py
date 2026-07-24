@@ -24,6 +24,11 @@ def read_cfg(ace_config):
                 match = re.findall(rf'{attr}\s+:=\s+"?([^"]+)"?.', line)
                 if match:
                     cfg[attr] = match[0]
+    if "orth-path" in cfg:
+        # ACE config paths use whitespace to separate feature path segments
+        # (e.g. "MORPH LIST FIRST STEM"), but Conjunction.get() expects
+        # dot-separated paths (e.g. "MORPH.LIST.FIRST.STEM")
+        cfg["orth-path"] = ".".join(cfg["orth-path"].split())
     cfg["grammar_file"] = os.path.normpath(
         os.path.join(os.path.dirname(ace_config), cfg["grammar-top"])
     )
@@ -49,40 +54,9 @@ def read_grm(cfg, log):
     grammarfile = cfg["grammar_file"]
     path = Path(grammarfile)
     base = path.parent
-    for event, obj, lineno in tdl.iterparse(grammarfile):
-        if event == "LineComment":
-            continue
-        # print (event, obj, lineno)
-        # if event == "BeginEnvironment":
-        #     status = getattr(obj, 'status', 'type')
-        #     print ("Environment is", status)
-        if event == "EndEnvironment":
-            status = getattr(obj, "status", "type")
-            for entry in obj.entries:
-                # print('ENTRY', entry, status)
-                if isinstance(entry, tdl.FileInclude):
-                    path = entry.path.with_suffix(".tdl")
-                    if path.is_file():
-                        try:
-                            tdls, types, hierarchy, les = process_type(
-                                cfg,
-                                str(base),
-                                str(path),
-                                status,
-                                tdls,
-                                types,
-                                hierarchy,
-                                les,
-                                log,
-                            )
-                        except ValueError as e:
-                            print(f"Skipping {path}: {e}", file=log)
-                            print(f"Skipping {path}: {e}", file=sys.stderr)
-                    else:
-                        print("INCLUDED FILE NOT FOUND: {!s}".format(path))
-                else:
-                    print("WARNING unknown type:", entry.status, file=log)
-    return tdls, types, hierarchy, les
+    # a bare top-level ":include" (not wrapped in a :begin/:end block)
+    # implicitly belongs to the "type" environment per the TDL spec
+    return process_type(cfg, str(base), str(path), "type", tdls, types, hierarchy, les, log)
 
 
 def _safe_format(obj, path, log):
@@ -93,19 +67,91 @@ def _safe_format(obj, path, log):
         return ""
 
 
-def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
+def _safe_get(conjunction, key, default=None):
+    """Like Conjunction.get, but tolerates paths that bottom out early.
+
+    Conjunction.get() only catches KeyError; if an intermediate feature
+    holds a leaf value (e.g. a grammar where KEYREL is itself the pred
+    string, rather than an AVM with a PRED sub-feature, as in GG) trying
+    to descend further raises TypeError instead. Treat that the same as
+    "not found".
+    """
+    try:
+        return conjunction.get(key, default=default)
+    except TypeError:
+        return default
+
+
+def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log, seen=None):
+    """Recursively process a TDL file and any files it :include's.
+
+    ``status`` is the environment status (e.g. "type", "instance",
+    "lex-entry") in effect for ``path`` itself; a nested :include found
+    inside an explicit :begin/:end block uses that block's own status,
+    while a bare :include outside any block inherits ``status`` from its
+    enclosing file.
+    """
+    if seen is None:
+        seen = set()
+    real_path = os.path.realpath(path)
+    if real_path in seen:
+        return tdls, types, hierarchy, les
+    seen.add(real_path)
+
     filename = os.path.basename(path)
     if "root" in filename:
         status = "root"
     elif "parse-nodes" in filename:
         status = "labels"
 
+    def include(entry, inc_status):
+        nonlocal tdls, types, hierarchy, les
+        inc_path = entry.path.with_suffix(".tdl")
+        if inc_path.is_file():
+            try:
+                tdls, types, hierarchy, les = process_type(
+                    cfg,
+                    base,
+                    str(inc_path),
+                    inc_status,
+                    tdls,
+                    types,
+                    hierarchy,
+                    les,
+                    log,
+                    seen,
+                )
+            except ValueError as e:
+                print(f"Skipping {inc_path}: {e}", file=log)
+                print(f"Skipping {inc_path}: {e}", file=sys.stderr)
+        else:
+            print("INCLUDED FILE NOT FOUND: {!s}".format(inc_path))
+
     print(f"Processing types in {path} as {status}", file=sys.stderr)
     try:
         current_token_lineno = None  # To track the current token's line number
+        env_depth = 0  # nesting depth of :begin/:end environments
         for event, obj, lineno in tdl.iterparse(path):  # assume utf-8
             current_token_lineno = lineno  # Store the current line number
-            if event in ["TypeDefinition", "TypeAddendum", "LexicalRuleDefinition"]:
+            if event == "BeginEnvironment":
+                env_depth += 1
+            elif event == "EndEnvironment":
+                env_depth -= 1
+                entry_status = getattr(obj, "status", "type")
+                for entry in obj.entries:
+                    if isinstance(entry, tdl.FileInclude):
+                        include(entry, entry_status)
+                    # other entry kinds (type/instance definitions, nested
+                    # environments) are already recorded via their own
+                    # inline TypeDefinition/TypeAddendum/... events fired
+                    # earlier in this same iterparse pass
+            elif event == "FileInclude":
+                # a bare :include not inside any :begin/:end block; one
+                # nested inside a block is handled above, via obj.entries
+                # on that block's EndEnvironment
+                if env_depth == 0:
+                    include(obj, status)
+            elif event in ["TypeDefinition", "TypeAddendum", "LexicalRuleDefinition"]:
                 parents = [c for c in obj.conjunction.types()]
                 if status == "lex-entry":
                     if len(parents) != 1:
@@ -118,17 +164,13 @@ def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
                         except Exception:
                             orth = ""
                             print("No Orthography", obj.identifier, sep="\t", file=log)
-                        pred = obj.conjunction.get(
-                            "SYNSEM.LKEYS.KEYREL.PRED", default=None
+                        pred = _safe_get(obj.conjunction, "SYNSEM.LKEYS.KEYREL.PRED")
+                        altpred = _safe_get(
+                            obj.conjunction, "SYNSEM.LKEYS.ALTKEYREL.PRED"
                         )
-                        altpred = obj.conjunction.get(
-                            "SYNSEM.LKEYS.ALTKEYREL.PRED", default=None
-                        )
-                        carg = obj.conjunction.get(
-                            "SYNSEM.LKEYS.KEYREL.CARG", default=None
-                        )
-                        altcarg = obj.conjunction.get(
-                            "SYNSEM.LKEYS.ALTKEYREL.CARG", default=None
+                        carg = _safe_get(obj.conjunction, "SYNSEM.LKEYS.KEYREL.CARG")
+                        altcarg = _safe_get(
+                            obj.conjunction, "SYNSEM.LKEYS.ALTKEYREL.CARG"
                         )
                         les[obj.identifier] = (
                             str(parents[0]),
@@ -164,13 +206,7 @@ def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
                     hierarchy.append((obj.identifier, str(c)))
                 if event != "TypeAddendum":
                     types[obj.identifier].append(status)
-            elif event not in [
-                "LineComment",
-                "BlockComment",
-                "BeginEnvironment",
-                "EndEnvironment",
-                "FileInclude",
-            ]:
+            elif event not in ["LineComment", "BlockComment"]:
                 ## ToDo log properly
                 print("Unknown Event", event, obj, path, lineno, sep="\t", file=log)
     except Exception as e:
@@ -179,6 +215,8 @@ def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
         print(error_msg, file=log)
         # Optionally, re-raise the exception with the enhanced error message
         raise ValueError(error_msg) from e
+
+    return tdls, types, hierarchy, les
 
     return tdls, types, hierarchy, les
 
