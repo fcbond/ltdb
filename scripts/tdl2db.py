@@ -97,7 +97,7 @@ def process_type(cfg, base, path, status, tdls, types, hierarchy, les, log):
     elif "parse-nodes" in filename:
         status = "labels"
 
-    print(f"Processing types in {path} as {status}")
+    print(f"Processing types in {path} as {status}", file=sys.stderr)
     try:
         current_token_lineno = None  # To track the current token's line number
         for event, obj, lineno in tdl.iterparse(path):  # assume utf-8

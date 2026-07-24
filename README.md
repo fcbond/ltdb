@@ -75,6 +75,12 @@ Options:
 - `--doctest`  parse all TDL docstring examples through ACE and store results
                in the `doctest` table of the grammar database (requires `--ace`
                or a pre-existing `.dat` in the output directory)
+- `--jobs`     with `--doctest`: number of parallel ACE processes
+               (0 = auto-sized from CPUs and available memory)
+- `--grew`     also export the gold trees and DMRS as grew JSON corpora next
+               to the database, ready for `./run.sh --grew-match`; results
+               link back to LTDB via relative URLs that the grew-match
+               backend expands with `$LTDB_BASE_URL` at serve time
 
 The grammars are read by a web application written using Flask.
 See [Install.md](Install.md) for deployment instructions.
@@ -151,31 +157,53 @@ literally until they are explicitly supported.
 There is `more documentation <http://moin.delph-in.net/LkbLtdb>`__ at
 the DELPH-IN Wiki.
 
+## Searching with grew-match
+
+The trees and DMRS in a compiled database can be searched by structure
+with [grew-match](https://grew.fr/grew_match/).  Export them with:
+
+```
+$ python scripts/db2grew.py web/db/GRAMMAR.db
+```
+
+(or build and export in one go with `grm2db.py --grew`), then serve
+the exported corpora with a local grew-match instance and set
+`LTDB_GREW_MATCH_URL` to add a link to it in the LTDB navigation bar.
+In development, `./run.sh --grew-match` does all of this and starts
+both servers together, serving the corpora of every exported grammar.
+See [doc/grew-match.md](doc/grew-match.md) for setup and example
+queries.
+
 ## Docstring testing
 
-The `<ex>`, `<nex>`, and `<mex>` tags are testable: `parse_examples.py`
-extracts every tagged sentence, parses it through ACE, and checks whether
-the documented type appears in the derivation tree:
+The `<ex>`, `<nex>`, and `<mex>` tags are testable: every tagged
+sentence is parsed through ACE and the documented type is checked
+against the resulting derivations (as node entity, `--udx=all` type
+annotation, or inheriting lexical entry), giving one verdict per
+example: `PASS`, `FAIL-no-parse`, `FAIL-type-absent`, or
+`FAIL-type-in-tree`.  There are three ways to run them:
 
 ```bash
+# while building the database — results go to the doctest table and
+# are shown on type pages and the "Docstring Tests" tab
+python scripts/grm2db.py --outdir web/db --ace --doctest --jobs 0 \
+    path/to/METADATA
+
+# standalone — writes an itsdb profile of the results to /tmp/profile
+# (skip with --no-profile) and a per-type report to stdout; --db and
+# --report additionally store the verdicts
 python scripts/parse_examples.py ace/config.tdl grammar.dat /tmp/profile \
-    --db web/db/grammar.db     # store results in the grammar database
-    --report results.txt       # also write a text summary
-    --no-profile               # skip writing the itsdb profile
+    --db web/db/grammar.db --report results.txt -j 0
+
+# dated itsdb profile inside the grammar, verdicts in i-comment
+python scripts/docstring_profile.py ace/config.tdl grammar.dat
 ```
 
-Results are stored in the `doctest` table of the grammar database and
-surfaced in the LTDB browser:
-
-- **Type pages** show a "Docstring Tests" section with per-example pass/fail.
-- **"Docstring Tests" nav page** (`/doctests.html`) lists all examples for the
-  grammar in a sortable table, with failures sorted first.
-
-The `--doctest` flag on `grm2db.py` runs this automatically after building:
-
-```bash
-python scripts/grm2db.py --outdir web/db --ace --doctest path/to/METADATA
-```
+All runners can parse with multiple ACE processes (`--jobs 0` sizes
+the worker count to the machine).  See
+[doc/docstring-tests.md](doc/docstring-tests.md) for the tag
+semantics, verdict definitions, matching rules, and full option
+reference.
 
 Types, instances in the same table, distinguished by status.
 

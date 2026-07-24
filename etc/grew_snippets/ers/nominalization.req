@@ -1,0 +1,9 @@
+% Nominal and verbal gerunds, clausal subjects etc. wrap a verbal
+% constituent's semantics in a 'nominalization' relation introducing a
+% referential index whose ARG1 is the verbal handle.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_Nominalization/):
+%   h0:nominalization[ARG0 x, ARG1 h1]
+%   h1:[ARG0 e]
+
+pattern { N [pred="nominalization"]; N -[1=ARG1]-> V; V [cvarsort="e"] }

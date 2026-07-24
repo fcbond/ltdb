@@ -1,0 +1,11 @@
+% Conditional sentences introduce a two-place '_if_x_then' relation taking the
+% consequent (main) clause handle as ARG1 and the antecedent (if-) clause
+% handle as ARG2, both qeq.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_Conditionals/):
+%   if_x_then[ARG1 h1, ARG2 h2]
+%   h3:[ARG0 e1]
+%   h4:[ARG0 e2]
+%   { h1 =q h3, h2 =q h4 }
+
+pattern { I [pred="_if_x_then"]; I -[1=ARG1, post=H]-> C1; I -[1=ARG2, post=H]-> C2 }

@@ -5,6 +5,7 @@ description = "Linguistic Type Database — Flask web app for DELPH-IN grammars"
 requires-python = ">=3.12"
 dependencies = [
     "pydelphin",
+    "orjson",
     "markdown-it-py",
     "lxml",
     "Flask",
@@ -16,14 +17,16 @@ dependencies = [
     "click",
     "toml",
     "gunicorn",
+    "requests",  # used by grew_match_quick.py, launched from run.sh
 ]
 
-[project.optional-dependencies]
+# dependency-groups (not an extra) so a plain `uv sync`/`uv run` keeps
+# the dev tools installed instead of pruning them
+[dependency-groups]
 dev = [
     "ruff>=0.9",
     "pytest>=9",
     "pytest-playwright>=0.7",
-    "requests>=2.32",
 ]
 
 [tool.pytest.ini_options]
@@ -32,19 +35,15 @@ pythonpath = ["."]
 markers = [
     "integration: requires ACE binary and compiled grammar .dat file",
     "slow: marks tests as slow",
+    "playwright: browser UI tests (requires playwright browsers)",
 ]
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["web"]
-
-[dependency-groups]
-dev = [
-    "pytest>=9.0.2",
-]

@@ -1,0 +1,10 @@
+% Infinitival relative clauses whose head noun is an instrument of the clause
+% (a knife to cut it with); the construction supplies a 'with_p' relation
+% sharing its label with the clause.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_InstrumentalRelatives/):
+%   h:with_p[ARG1 e, ARG2 x]
+%   h:[ARG0 e]
+%   h:[ARG0 x]
+
+pattern { W [pred="with_p"]; W -[1=ARG1, post=EQ]-> E; W -[1=ARG2]-> X }

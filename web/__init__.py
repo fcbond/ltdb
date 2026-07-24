@@ -19,6 +19,9 @@ def create_app():
             file=sys.stderr,
         )
     app.secret_key = secret
+    # URL of a grew-match instance serving the exported corpora
+    # (see doc/grew-match.md); the nav link is hidden if unset
+    app.config["GREW_MATCH_URL"] = os.environ.get("LTDB_GREW_MATCH_URL", "")
 
     with app.app_context():
         from . import routes  # noqa: F401

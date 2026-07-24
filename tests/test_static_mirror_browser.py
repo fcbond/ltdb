@@ -11,6 +11,13 @@ import pytest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 DOCS = os.path.join(ROOT, "docs")
 
+# these tests exercise the frozen mirror in the enclosing grammary
+# checkout; skip when it has not been generated
+pytestmark = pytest.mark.skipif(
+    not os.path.isfile(os.path.join(DOCS, "ltdb", "type.html")),
+    reason="static mirror not generated (run scripts/freeze_ltdb.py)",
+)
+
 
 def _free_port():
     with socket.socket() as sock:

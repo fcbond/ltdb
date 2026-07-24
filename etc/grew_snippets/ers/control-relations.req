@@ -1,0 +1,10 @@
+% Control (equi) predicates take an individual argument and a clausal argument
+% such that the individual also fills a role inside the clause (Kim tried to
+% sleep).
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_ControlRelations/):
+%   [ARG0 e1, ARG1+ x2, ARG1+ h3]
+%   h4:[ARG0 e5, ARG1+ x2]
+%   { h3 =q h4 }
+
+pattern { P -[1=ARG1|ARG2|ARG3|ARG4, post=H]-> V; V [cvarsort="e"]; P -[1=ARG1|ARG2|ARG3|ARG4]-> X; X [cvarsort="x"]; V -[1=ARG1|ARG2|ARG3|ARG4]-> X }

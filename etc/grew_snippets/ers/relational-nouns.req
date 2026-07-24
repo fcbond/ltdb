@@ -1,0 +1,8 @@
+% Nouns with semantic arguments (picture of Kim, edge of town). The ESD page
+% gives no fingerprint; the query approximates with a noun predicate taking an
+% ARG1.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_RelationalNouns/):
+%   (no fingerprint on the ESD page)
+
+pattern { N [pos="n"]; N -[1=ARG1]-> X }

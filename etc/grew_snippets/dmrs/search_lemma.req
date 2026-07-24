@@ -1,0 +1,8 @@
+% Surface predicates are decorated with lemma/pos/sense pulled out of
+% the pred name, so an exact word search can use lemma directly.
+% Predicates not shaped "_lemma_pos_sense" at all -- e.g. "pron",
+% "compound", "unknown" -- get no lemma, so search those by pred
+% instead (see the regex snippet). Quantifiers like "_the_q" ARE
+% surface-shaped and do get a lemma ("the").
+
+pattern { N [lemma="dog"] }

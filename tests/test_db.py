@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sqlite3
+
 import pytest
 
 from web.db import (
@@ -10,11 +12,11 @@ from web.db import (
     calculate_offset_limit,
     get_gold,
     get_ltypes,
-    get_phenomena_by_cx,
-    get_phenomena_by_lexids,
     get_lxid,
     get_lxids,
     get_md,
+    get_phenomena_by_cx,
+    get_phenomena_by_lexids,
     get_rules,
     get_sents,
     get_short_summary,
@@ -311,7 +313,8 @@ class TestGdexScoreSql:
         assert score_40 < score_9
 
     def test_fragment_type_penalises_terminal(self, mem_conn):
-        # fragment=True: terminal punct is penalised (genuine fragments don't end in .!?)
+        # fragment=True: terminal punct is penalised (genuine fragments
+        # don't end in .!?)
         score_term = self._score(mem_conn, "On ice.", 3, fragment=True)
         score_no_term = self._score(mem_conn, "On ice", 3, fragment=True)
         assert score_no_term > score_term
@@ -373,7 +376,8 @@ class TestGetPhenomenaByLexids:
             INSERT INTO sent VALUES (3, 'gold', 4, 'runs',  NULL);
             INSERT INTO sent VALUES (3, 'gold', 5, 'fast',  NULL);
             INSERT INTO sent VALUES (3, 'gold', 6, 'now',   NULL);
-            INSERT INTO gold VALUES (3, 'gold', 'The big brown dog runs fast now.', NULL, NULL, NULL, NULL, NULL, 3);
+            INSERT INTO gold VALUES (3, 'gold', 'The big brown dog runs fast now.',
+                NULL, NULL, NULL, NULL, NULL, 3);
         """)
         _, phenom = get_phenomena_by_lexids(mem_conn, ["dog_n1"])
         first_key = next(iter(phenom))
@@ -410,7 +414,8 @@ class TestGetPhenomenaByCx:
         """A sentence in the optimal length range outranks a very short one."""
         mem_conn.executescript("""
             INSERT INTO sent   VALUES (2, 'gold', 0, 'Kim', NULL);
-            INSERT INTO gold   VALUES (2, 'gold', 'Kim', NULL, NULL, NULL, NULL, NULL, 1);
+            INSERT INTO gold   VALUES (2, 'gold', 'Kim',
+                NULL, NULL, NULL, NULL, NULL, 1);
             INSERT INTO typind VALUES ('hd-cmp_c', 'gold', 2, 0, 1);
             INSERT INTO sent   VALUES (3, 'gold', 0, 'The',   NULL);
             INSERT INTO sent   VALUES (3, 'gold', 1, 'big',   NULL);
@@ -419,7 +424,8 @@ class TestGetPhenomenaByCx:
             INSERT INTO sent   VALUES (3, 'gold', 4, 'runs',  NULL);
             INSERT INTO sent   VALUES (3, 'gold', 5, 'fast',  NULL);
             INSERT INTO sent   VALUES (3, 'gold', 6, 'now',   NULL);
-            INSERT INTO gold   VALUES (3, 'gold', 'The big brown dog runs fast now.', NULL, NULL, NULL, NULL, NULL, 3);
+            INSERT INTO gold   VALUES (3, 'gold', 'The big brown dog runs fast now.',
+                NULL, NULL, NULL, NULL, NULL, 3);
             INSERT INTO typind VALUES ('hd-cmp_c', 'gold', 3, 0, 3);
         """)
         self._seed_typind(mem_conn)
@@ -427,3 +433,46 @@ class TestGetPhenomenaByCx:
         first_key = next(iter(phenom))
         # Sentence 3 (7 words, in optimal 6-12 range) scores highest
         assert first_key == ("gold", 3)
+
+
+class TestGetShortSummary:
+    def _make_grammar_db(self, base, name, doctests=0):
+        """(Re)create a minimal on-disk grammar db under base/db/."""
+        db_dir = base / "db"
+        db_dir.mkdir(exist_ok=True)
+        (db_dir / name).unlink(missing_ok=True)
+        conn = sqlite3.connect(db_dir / name)
+        conn.executescript("""
+            CREATE TABLE meta  (att TEXT, val TEXT);
+            CREATE TABLE types (typ TEXT, status TEXT);
+            CREATE TABLE sent  (sid INTEGER, profile TEXT);
+        """)
+        conn.execute("INSERT INTO meta VALUES ('GRAMMAR_NAME', 'Testish')")
+        conn.execute("INSERT INTO types VALUES ('noun-le', 'lex-entry')")
+        if doctests:
+            conn.execute("CREATE TABLE doctest (typ TEXT)")
+            conn.executemany(
+                "INSERT INTO doctest VALUES (?)", [("noun-le",)] * doctests
+            )
+        conn.commit()
+        conn.close()
+
+    def test_doctests_zero_without_table(self, tmp_path):
+        self._make_grammar_db(tmp_path, "old_1.0.db")
+        summ = get_short_summary(str(tmp_path), ["old_1.0.db"])
+        assert summ["old_1.0.db"]["DOCTESTS"] == 0
+
+    def test_doctests_counted(self, tmp_path):
+        self._make_grammar_db(tmp_path, "doc_1.0.db", doctests=3)
+        summ = get_short_summary(str(tmp_path), ["doc_1.0.db"])
+        assert summ["doc_1.0.db"]["DOCTESTS"] == 3
+        assert summ["doc_1.0.db"]["LEXICON"] == 1
+
+    def test_rebuilt_db_is_reread(self, tmp_path):
+        """A rebuilt db file must not be served stale from the cache."""
+        self._make_grammar_db(tmp_path, "re_1.0.db")
+        summ = get_short_summary(str(tmp_path), ["re_1.0.db"])
+        assert summ["re_1.0.db"]["DOCTESTS"] == 0
+        self._make_grammar_db(tmp_path, "re_1.0.db", doctests=2)
+        summ = get_short_summary(str(tmp_path), ["re_1.0.db"])
+        assert summ["re_1.0.db"]["DOCTESTS"] == 2

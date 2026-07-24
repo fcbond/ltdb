@@ -1,0 +1,3 @@
+% Search for a surface token
+
+pattern { T [form="dog"] }

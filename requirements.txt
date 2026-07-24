@@ -1,6 +1,7 @@
 # Production dependencies — canonical list is in pyproject.toml
 # Regenerate with: uv pip compile pyproject.toml -o requirements.txt
 pydelphin
+orjson
 markdown-it-py
 lxml
 Flask

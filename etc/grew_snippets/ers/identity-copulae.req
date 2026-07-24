@@ -1,0 +1,10 @@
+% Copula uses denoting identity between two arguments, expressed by any of
+% several predications: _be_v_id, _colon_v_id, id, cop_id, _be_v_nv, _be_v_do.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_IdentityCopulae/):
+%   _be_v_id[ARG1 x1, ARG2 x2]
+%   h1:[ARG0 x1]
+%   h2:[ARG0 x2]
+%   { h3 =q h1, h4 =q h2 }
+
+pattern { C [pred=re"_be_v_id\|_colon_v_id\|id\|cop_id\|_be_v_nv\|_be_v_do"]; C -[1=ARG1]-> X }

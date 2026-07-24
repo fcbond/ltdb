@@ -1,0 +1,10 @@
+% A measure phrase used as degree specifier of an adjective (two inches too
+% short) introduces a two-place 'measure' relation between the adjective's
+% eventuality and the measured instance.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_MeasurePhrases/):
+%   h0:measure[ARG0 e1, ARG1 e2, ARG2 x]
+%   h0:[ARG0 e2]
+%   h1:[ARG0 x]
+
+pattern { M [pred="measure"]; M -[1=ARG1]-> A; M -[1=ARG2]-> X }

@@ -190,7 +190,7 @@ class TestGetDoctest:
             CREATE TABLE lexfreq (lexid TEXT, word TEXT, freq INTEGER);
             CREATE TABLE typfreq (typ TEXT, freq INTEGER);
             CREATE TABLE gold (sid INTEGER, profile TEXT, sent TEXT, comment TEXT,
-                deriv TEXT, pst TEXT, mrs TEXT, flags TEXT,
+                deriv TEXT, pst TEXT, mrs TEXT, flags TEXT, rule_count INTEGER,
                 UNIQUE(profile, sid));
             CREATE TABLE sent (sid INTEGER, profile TEXT, wid INTEGER,
                 word TEXT, lexid TEXT, UNIQUE(profile, sid, wid));

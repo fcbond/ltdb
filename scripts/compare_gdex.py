@@ -14,9 +14,7 @@ from __future__ import annotations
 import argparse
 import sqlite3
 import sys
-from collections import defaultdict as dd
 from pathlib import Path
-
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -315,7 +313,9 @@ def print_comparison(
         print(f"    {marker}{truncate(s)}")
 
 
-def latex_table_row(typ: str, old: list[str], new: list[str], fragment: bool = False) -> str:
+def latex_table_row(
+    typ: str, old: list[str], new: list[str], fragment: bool = False
+) -> str:
     """One LaTeX table row comparing old vs. new aggregate statistics."""
     os_ = score_set(old, fragment=fragment)
     ns_ = score_set(new, fragment=fragment)
@@ -412,7 +412,10 @@ def main() -> None:
         print("\n\n% --- LaTeX table ---")
         print(r"\begin{tabular}{lrrr|rrr}")
         print(r"\hline")
-        print(r"Type & \multicolumn{3}{c|}{Old (length+offset)} & \multicolumn{3}{c}{New (GDEX)} \\")
+        print(
+            r"Type & \multicolumn{3}{c|}{Old (length+offset)}"
+            r" & \multicolumn{3}{c}{New (GDEX)} \\"
+        )
         print(r" & Term.\% & Opt.len\% & Score & Term.\% & Opt.len\% & Score \\")
         print(r"\hline")
         for typ, o, n, frg in all_rows:

@@ -6,19 +6,16 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 from parse_examples import (
     Example,
     Verdict,
-    _build_lex_ids_for_type,
-    _build_subtypes_for_type,
+    _build_descendants_for_type,
     _parse_doc,
+    run_examples,
     type_in_results,
     verdict_label,
 )
-
 
 # ── _parse_doc ────────────────────────────────────────────────────────────────
 
@@ -72,15 +69,21 @@ class TestParseDoc:
 # ── type_in_results ───────────────────────────────────────────────────────────
 
 
+def _mock_node(spec):
+    """Node from "entity" or ("entity", "type") — type is the --udx=all
+    annotation (None when absent, as in pre-udx derivations)."""
+    if isinstance(spec, tuple):
+        entity, typ = spec
+    else:
+        entity, typ = spec, None
+    return MagicMock(entity=entity, type=typ)
+
+
 def _make_derivation(internals=(), preterminals=()):
-    """Build a mock derivation with given entity names."""
+    """Build a mock derivation with given entity names (or (entity, type))."""
     deriv = MagicMock()
-    deriv.internals.return_value = [
-        MagicMock(entity=e) for e in internals
-    ]
-    deriv.preterminals.return_value = [
-        MagicMock(entity=e) for e in preterminals
-    ]
+    deriv.internals.return_value = [_mock_node(e) for e in internals]
+    deriv.preterminals.return_value = [_mock_node(e) for e in preterminals]
     return deriv
 
 
@@ -90,70 +93,52 @@ def _make_result(deriv):
     return result
 
 
-# ── _build_lex_ids_for_type ───────────────────────────────────────────────────
+# ── _build_descendants_for_type ─────────────────────────────────────────────
 
 
-class TestBuildLexIdsForType:
+class TestBuildDescendantsForType:
     def test_direct_parent(self):
-        les = {"sleep_v1": ("verb-lxm", None, None, None, None, None, None)}
+        types = {"sleep_v1": ["lex-entry"], "verb-lxm": ["type"], "sign": ["type"]}
         hierarchy = [("sleep_v1", "verb-lxm"), ("verb-lxm", "sign")]
-        result = _build_lex_ids_for_type(les, hierarchy)
+        result = _build_descendants_for_type(types, hierarchy)
         assert "sleep_v1" in result["verb-lxm"]
         assert "sleep_v1" in result["sign"]
 
     def test_indirect_ancestor(self):
-        les = {"run_v1": ("intrans-verb-lxm", None, None, None, None, None, None)}
+        types = {
+            "run_v1": ["lex-entry"],
+            "intrans-verb-lxm": ["type"],
+            "verb-lxm": ["type"],
+            "word": ["type"],
+        }
         hierarchy = [
             ("run_v1", "intrans-verb-lxm"),
             ("intrans-verb-lxm", "verb-lxm"),
             ("verb-lxm", "word"),
         ]
-        result = _build_lex_ids_for_type(les, hierarchy)
+        result = _build_descendants_for_type(types, hierarchy)
         assert "run_v1" in result["intrans-verb-lxm"]
         assert "run_v1" in result["verb-lxm"]
         assert "run_v1" in result["word"]
 
-    def test_empty_lexicon(self):
-        assert _build_lex_ids_for_type({}, []) == {}
+    def test_empty_types(self):
+        assert _build_descendants_for_type({}, []) == {}
 
+    def test_every_type_is_its_own_descendant(self):
+        types = {"hd-cmp_u_c": ["rule"]}
+        result = _build_descendants_for_type(types, [])
+        assert result["hd-cmp_u_c"] == {"hd-cmp_u_c"}
 
-# ── _build_subtypes_for_type ──────────────────────────────────────────────────
-
-
-class TestBuildSubtypesForType:
-    def test_direct_child(self):
-        hierarchy = [("conc-rule", "abs-rule")]
-        result = _build_subtypes_for_type({"abs-rule"}, hierarchy)
-        assert "conc-rule" in result["abs-rule"]
-
-    def test_transitive_descendant(self):
-        hierarchy = [
-            ("leaf-rule", "mid-rule"),
-            ("mid-rule", "abs-rule"),
-        ]
-        result = _build_subtypes_for_type({"abs-rule"}, hierarchy)
-        assert "mid-rule" in result["abs-rule"]
-        assert "leaf-rule" in result["abs-rule"]
-
-    def test_self_not_included(self):
-        hierarchy = [("child", "parent")]
-        result = _build_subtypes_for_type({"parent"}, hierarchy)
-        assert "parent" not in result["parent"]
-
-    def test_leaf_type_has_empty_subtypes(self):
-        hierarchy = [("leaf", "root")]
-        result = _build_subtypes_for_type({"leaf"}, hierarchy)
-        assert result["leaf"] == set()
-
-    def test_only_computes_for_requested_types(self):
-        hierarchy = [("child", "parent"), ("grandchild", "child")]
-        result = _build_subtypes_for_type({"child"}, hierarchy)
-        assert "parent" not in result
-        assert "grandchild" in result["child"]
-
-    def test_empty_hierarchy(self):
-        result = _build_subtypes_for_type({"some-type"}, [])
-        assert result["some-type"] == set()
+    def test_rule_descendant_not_just_lexical(self):
+        # the walk is not lexicon-specific: an abstract rule supertype
+        # with no direct instances is reached via its concrete subtype
+        types = {
+            "hd-cmp_u_c": ["rule"],
+            "basic-head-comp-phrase": ["rule"],
+        }
+        hierarchy = [("hd-cmp_u_c", "basic-head-comp-phrase")]
+        result = _build_descendants_for_type(types, hierarchy)
+        assert "hd-cmp_u_c" in result["basic-head-comp-phrase"]
 
 
 # ── type_in_results ───────────────────────────────────────────────────────────
@@ -175,7 +160,7 @@ class TestTypeInResults:
         result = _make_result(deriv)
         assert type_in_results("v_pst_olr", ["lex-rule"], [result], {})
 
-    def test_lex_type_via_lex_ids_for_type(self):
+    def test_lex_type_via_descendants_for_type(self):
         lex_ids = {"intrans-verb-lxm": {"sleep_v1", "run_v1"}}
         deriv = _make_derivation(preterminals=["sleep_v1"])
         result = _make_result(deriv)
@@ -193,6 +178,32 @@ class TestTypeInResults:
         deriv = _make_derivation(preterminals=["bark_v1"])
         result = _make_result(deriv)
         assert not type_in_results("intrans-verb-lxm", ["type"], [result], lex_ids)
+
+    def test_lex_type_via_udx_node_type(self):
+        # --udx=all annotates the preterminal with its lexical type
+        deriv = _make_derivation(preterminals=[("dog_n1", "n_-_c_le")])
+        result = _make_result(deriv)
+        assert type_in_results("n_-_c_le", ["lex-type"], [result], {})
+
+    def test_generic_lex_type_via_udx_node_type(self):
+        # generic/unknown-word types have no static lex entries, so only
+        # the udx annotation can find them (the *-gen_le / *-unk_le case)
+        deriv = _make_derivation(
+            preterminals=[("generic_proper_ne", "n_-_pn-gen_le")]
+        )
+        result = _make_result(deriv)
+        assert type_in_results("n_-_pn-gen_le", ["lex-type"], [result], {})
+
+    def test_phrase_type_via_udx_node_type(self):
+        # internal nodes are annotated with their phrase type
+        deriv = _make_derivation(internals=[("sb-hd_mc_c", "subjh_mc_rule")])
+        result = _make_result(deriv)
+        assert type_in_results("subjh_mc_rule", ["rule"], [result], {})
+
+    def test_udx_node_type_absent_is_not_found(self):
+        deriv = _make_derivation(preterminals=[("dog_n1", "n_-_c_le")])
+        result = _make_result(deriv)
+        assert not type_in_results("v_-_le", ["lex-type"], [result], {})
 
     def test_found_in_any_parse(self):
         deriv1 = _make_derivation(internals=["other-rule"])
@@ -213,35 +224,23 @@ class TestTypeInResults:
     def test_empty_results(self):
         assert not type_in_results("t", ["rule"], [], {})
 
-    def test_abstract_rule_passes_via_subtype_in_internals(self):
-        subtypes = {"abs-rule": {"conc-rule"}}
-        deriv = _make_derivation(internals=["conc-rule"])
+    def test_abstract_rule_matched_via_concrete_descendant(self):
+        # a documented abstract rule with no direct instances is matched
+        # when a concrete subtype fires in the derivation
+        descendants = {"basic-head-comp-phrase": {"hd-cmp_u_c", "hd-cmp_i_c"}}
+        deriv = _make_derivation(internals=["hd-cmp_u_c"])
         result = _make_result(deriv)
-        assert type_in_results("abs-rule", ["rule"], [result], {}, subtypes)
+        assert type_in_results(
+            "basic-head-comp-phrase", ["rule"], [result], descendants
+        )
 
-    def test_abstract_rule_fails_when_no_subtype_in_tree(self):
-        subtypes = {"abs-rule": {"conc-rule"}}
+    def test_abstract_rule_descendant_absent(self):
+        descendants = {"basic-head-comp-phrase": {"hd-cmp_u_c", "hd-cmp_i_c"}}
         deriv = _make_derivation(internals=["other-rule"])
         result = _make_result(deriv)
-        assert not type_in_results("abs-rule", ["rule"], [result], {}, subtypes)
-
-    def test_abstract_lex_rule_passes_via_subtype_in_preterminals(self):
-        subtypes = {"abs-lr": {"v_pst_olr"}}
-        deriv = _make_derivation(preterminals=["v_pst_olr"])
-        result = _make_result(deriv)
-        assert type_in_results("abs-lr", ["lex-rule"], [result], {}, subtypes)
-
-    def test_subtype_not_provided_does_not_raise(self):
-        deriv = _make_derivation(internals=["conc-rule"])
-        result = _make_result(deriv)
-        assert not type_in_results("abs-rule", ["rule"], [result], {}, None)
-
-    def test_transitive_subtype_passes(self):
-        # abs → mid → leaf; leaf fires in tree; abs should pass
-        subtypes = {"abs-rule": {"mid-rule", "leaf-rule"}}
-        deriv = _make_derivation(internals=["leaf-rule"])
-        result = _make_result(deriv)
-        assert type_in_results("abs-rule", ["rule"], [result], {}, subtypes)
+        assert not type_in_results(
+            "basic-head-comp-phrase", ["rule"], [result], descendants
+        )
 
 
 # ── verdict_label ─────────────────────────────────────────────────────────────
@@ -287,3 +286,63 @@ class TestVerdictLabel:
     def test_nex_fail_type_in_tree_no_parse(self):
         # edge case: type_found implies parse happened, but guard it anyway
         assert verdict_label(_v("nex", 0, True)) == "FAIL-type-in-tree"
+
+
+# ── run_examples parallelism ──────────────────────────────────────────────────
+
+
+class _FakeParser:
+    """Stands in for ace.ACEParser; counts how many were started."""
+
+    instances = 0
+
+    def __init__(self, dat, executable=None, cmdargs=None):
+        type(self).instances += 1
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def process_item(self, text, keys=None):
+        response = MagicMock()
+        response.results.return_value = []
+        return response
+
+
+class TestRunExamplesJobs:
+    def _examples(self, n):
+        return [
+            Example(i_id=(i + 1) * 10, text=f"s {i}", typ="some-type", wf=1, kind="ex")
+            for i in range(n)
+        ]
+
+    def test_parallel_matches_serial_and_keeps_order(self, monkeypatch):
+        monkeypatch.setattr("parse_examples.ace.ACEParser", _FakeParser)
+        exs = self._examples(9)
+        serial = run_examples(exs, "g.dat", "ace", {}, {}, jobs=1)
+        parallel = run_examples(exs, "g.dat", "ace", {}, {}, jobs=3)
+        assert parallel == serial
+        assert [v.example.i_id for v in parallel] == [ex.i_id for ex in exs]
+
+    def test_parallel_starts_one_parser_per_worker(self, monkeypatch):
+        monkeypatch.setattr("parse_examples.ace.ACEParser", _FakeParser)
+        exs = self._examples(9)
+        _FakeParser.instances = 0
+        run_examples(exs, "g.dat", "ace", {}, {}, jobs=3)
+        assert _FakeParser.instances == 3
+
+    def test_jobs_capped_by_example_count(self, monkeypatch):
+        monkeypatch.setattr("parse_examples.ace.ACEParser", _FakeParser)
+        exs = self._examples(2)
+        _FakeParser.instances = 0
+        run_examples(exs, "g.dat", "ace", {}, {}, jobs=8)
+        assert _FakeParser.instances == 2
+
+    def test_default_jobs_is_positive(self):
+        from parse_examples import default_jobs
+
+        jobs = default_jobs()
+        assert isinstance(jobs, int)
+        assert jobs >= 1

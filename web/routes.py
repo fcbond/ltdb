@@ -19,7 +19,16 @@ from delphin.codecs import mrsjson as _mrsjson
 from delphin.codecs import simplemrs as _simplemrs
 from delphin.highlight import TDLLexer
 from flask import current_app as app
-from flask import jsonify, redirect, render_template, request, session, url_for
+from flask import (
+    abort,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_from_directory,
+    session,
+    url_for,
+)
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 
@@ -179,6 +188,9 @@ def _inject_static_mirror_helpers():
         grm = _stem_for_grm(grm or _mirror_grm())
         return f"../../db/{grm}.examples.sqlite"
 
+    # per-grammar navigation flags: hide tabs that would be empty
+    grm = session.get("grm")
+    live_grm = grm if grm and not _is_mirror_request() else None
     return {
         "is_static_mirror": _is_mirror_request(),
         "static_mirror_all_non_lex": STATIC_MIRROR_ALL_NON_LEX,
@@ -190,6 +202,8 @@ def _inject_static_mirror_helpers():
         "ltypes_href": ltypes_href,
         "doctests_href": doctests_href,
         "example_db_href": example_db_href,
+        "has_doctests": bool(live_grm) and _grm_has_doctests(live_grm),
+        "has_demo": bool(live_grm) and dat_path_for(live_grm) is not None,
     }
 
 
@@ -226,6 +240,30 @@ def _grm_exists(grm: str) -> bool:
     return {"gold", "lexfreq", "meta", "sent", "types"}.issubset(tables)
 
 
+_doctest_flag_cache: dict = {}
+
+
+def _grm_has_doctests(grm):
+    """Return True if the grammar db has doctest rows (cached by mtime/size)."""
+    path = os.path.join(current_directory, "db", grm)
+    try:
+        st = os.stat(path)
+    except OSError:
+        return False
+    key = (grm, st.st_mtime, st.st_size)
+    if key not in _doctest_flag_cache:
+        with sqlite3.connect(path) as conn:
+            try:
+                has = (
+                    conn.execute("SELECT 1 FROM doctest LIMIT 1").fetchone()
+                    is not None
+                )
+            except sqlite3.OperationalError:
+                has = False
+        _doctest_flag_cache[key] = has
+    return _doctest_flag_cache[key]
+
+
 def _db_for_stem(stem):
     """Return the .db filename for a mirror grammar stem."""
     return stem if stem.endswith(".db") else f"{stem}.db"
@@ -234,6 +272,28 @@ def _db_for_stem(stem):
 def _stem_for_grm(grm):
     """Return a mirror URL grammar stem for a .db filename or stem."""
     return grm[:-3] if grm and grm.endswith(".db") else grm
+
+
+# Build logs live next to the database (copied into web/db/ by
+# build-ltdb.sh alongside the .db/.dat files); each maps a stable
+# "kind" for the download URL to the filename suffix grm2db.py/
+# db2grew.py actually write.
+_LOG_SUFFIXES = {
+    "grammar": ".log",  # TDL read + docstring-test log (grm2db.py)
+    "ace": "-ace.log",  # ACE compile log (grm2db.py --ace)
+    "grew": "-grew.log",  # grew export conversion-failure log (db2grew.py)
+}
+
+
+def _available_logs(grm):
+    """Return download links for this grammar's build logs that exist."""
+    stem = _stem_for_grm(grm)
+    db_dir = os.path.join(current_directory, "db")
+    logs = []
+    for kind, suffix in _LOG_SUFFIXES.items():
+        if os.path.isfile(os.path.join(db_dir, f"{stem}{suffix}")):
+            logs.append({"kind": kind, "url": url_for("download_log", grm=grm, kind=kind)})
+    return logs
 
 
 def _all_grammars():
@@ -344,6 +404,7 @@ def home():
         title="LTDB",
         grammars=grammars,
         summ=summ,
+        any_doctests=any(s.get("DOCTESTS") for s in summ.values()),
         grm=session.get("grm", None),
     )
 
@@ -365,10 +426,17 @@ def grammar():
         grm=grm,
         summ=summ,
         tsumm=tsumm,
+        logs=_available_logs(grm),
     )
 
 
 def _render_grammar(grm):
+    """Render grammar.html for the static mirror (see mirror_grammar).
+
+    No `logs` here: build-log download is a live-backend-only feature
+    (see download_log) with nothing for Flask-Frozen to freeze, and a
+    link into it would 404 on the static mirror.
+    """
     conn = get_db(current_directory, grm)
     md = get_md(conn)
     summ = get_summary(conn)
@@ -381,6 +449,22 @@ def _render_grammar(grm):
         summ=summ,
         tsumm=tsumm,
     )
+
+
+@app.route("/log/<path:grm>/<kind>")
+def download_log(grm, kind):
+    """Download a grammar's build log (grammar/ACE/grew-export)."""
+    suffix = _LOG_SUFFIXES.get(kind)
+    if suffix is None:
+        abort(404)
+    stem = _stem_for_grm(grm)
+    fname = f"{stem}{suffix}"
+    db_dir = os.path.join(current_directory, "db")
+    if not os.path.isfile(os.path.join(db_dir, fname)):
+        abort(404)
+    # send_from_directory rejects paths that would escape db_dir, so a
+    # crafted grm (e.g. containing "../") can't read files outside it
+    return send_from_directory(db_dir, fname, as_attachment=True)
 
 
 @app.route("/rules.html")
@@ -567,7 +651,25 @@ def mirror_home():
         title="LTDB Static Mirror",
         grammars=grammars,
         summ=summ,
+        any_doctests=any(s.get("DOCTESTS") for s in summ.values()),
         grm=None,
+    )
+
+
+@app.route("/sent/<profile>/<int:sid>")
+def sent(profile, sid):
+    """Show one treebanked sentence with its tree, MRS and DMRS.
+
+    Deep links (e.g. from grew-match results) select the grammar with
+    ?grm=<db>, which is handled by _apply_grm_param.
+    """
+    grm = session.get("grm")
+    if not grm:
+        return redirect(url_for("home"))
+    conn = get_db(current_directory, grm)
+    gold = get_gold(conn, [(profile, sid)], convert=False)
+    return render_template(
+        "sent.html", grm=grm, profile=profile, sid=sid, gold=gold
     )
 
 
@@ -700,8 +802,14 @@ def parse_sentence():
         return jsonify({"error": "ACE is busy; please try again in a moment."}), 503
 
     try:
+        # --udx=all annotates every node with its type (lexical type for
+        # lexemes, phrase type for rules); --rooted-derivations puts the
+        # matching root condition at the top of the tree
         response = _ace.parse(
-            dat, input_text, executable=find_ace(), cmdargs=[f"-n{n_results}"]
+            dat,
+            input_text,
+            executable=find_ace(),
+            cmdargs=[f"-n{n_results}", "--udx=all", "--rooted-derivations"],
         )
     except Exception as e:
         return jsonify({"error": _ace_error_message(e, dat)}), 500
@@ -715,7 +823,10 @@ def parse_sentence():
 
         if want_derivation:
             try:
-                r["derivation"] = result.derivation().to_dict()
+                deriv = result.derivation()
+                r["derivation"] = deriv.to_dict()
+                # raw UDX string (ACE's own derivation format) for display
+                r["derivation_str"] = deriv.to_udx()
             except Exception as e:
                 r["derivation"] = None
                 errors.append(f"result {i} derivation: {e}")

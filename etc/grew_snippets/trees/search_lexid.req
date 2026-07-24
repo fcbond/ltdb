@@ -1,0 +1,3 @@
+% Search for a specific lexical entry
+
+pattern { N [lexid="dog_n1"] }

@@ -3,7 +3,230 @@ set -euo pipefail
 
 # Development-only runner. Binds to localhost and enables Flask debug mode.
 # Use the systemd/gunicorn configuration for production deployments.
+#
+# Usage: ./run.sh [--grew-match [CORPORA_JSON]]
+#
+# --grew-match also starts a linked grew-match server (frontend :8000,
+# backend :8899) and sets LTDB_GREW_MATCH_URL so the navigation bar
+# links to it.  Any grew-match already on those ports is stopped first,
+# so the new instance serves *our* corpora.  CORPORA_JSON is a corpora
+# description produced by scripts/db2grew.py; if omitted, every
+# web/db/*-grew/corpora.json export is served (merged into
+# web/db/grew_corpora.json when there is more than one), falling back
+# to a pre-built web/db/grew_corpora.json installed by a build pipeline
+# (see scripts/setup-grew-match.sh and doc/grew-match.md).
+
+cd "$(dirname "$0")"
+
+grew_match=""
+grew_corpora=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --grew-match)
+      grew_match=1
+      if [ $# -gt 1 ] && [[ "$2" != -* ]]; then
+        grew_corpora="$2"
+        shift
+      fi
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      echo "Usage: $0 [--grew-match [CORPORA_JSON]]" >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+gm_front_port=8000
+gm_back_port=8899
+
+gmq_pid=""
+flask_pid=""
+
+# Both the grew-match stack and flask run in their own process groups
+# (setsid), so Ctrl-C is handled here: the INT/TERM trap turns the
+# signal into an exit, and the EXIT trap tears both groups down.
+cleanup() {
+  if [ -n "$flask_pid" ]; then
+    kill -TERM -- "-${flask_pid}" 2>/dev/null || true
+  fi
+  if [ -n "$gmq_pid" ]; then
+    echo "Stopping grew-match"
+    kill -TERM -- "-${gmq_pid}" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# Stop whatever is listening on the grew-match ports (killing the whole
+# process group catches the grew_match_quick wrapper along with the
+# backend/frontend it spawned), then wait for the ports to be released.
+stop_grew_match_servers() {
+  local port pids pid pgid own_pgid
+  own_pgid=$(ps -o pgid= -p $$ | tr -d ' ')
+  for port in "$gm_back_port" "$gm_front_port"; do
+    pids=$(lsof -t -i ":${port}" 2>/dev/null || true)
+    [ -z "$pids" ] && continue
+    echo "Stopping existing server on port ${port}"
+    for pid in $pids; do
+      # the process may already be gone (killing a sibling's group can
+      # take it down between the lsof listing and this lookup)
+      pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ' || true)
+      if [ -n "$pgid" ] && [ "$pgid" != "$own_pgid" ]; then
+        kill -TERM -- "-${pgid}" 2>/dev/null || true
+      else
+        kill -TERM "$pid" 2>/dev/null || true
+      fi
+    done
+  done
+  for _ in $(seq 20); do
+    if [ -z "$(lsof -t -i ":${gm_back_port}" -i ":${gm_front_port}" \
+        2>/dev/null)" ]; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "Ports ${gm_back_port}/${gm_front_port} are still in use" >&2
+  exit 1
+}
+
+start_grew_match() {
+  # external tools: lsof for the port takeover (and grew_match_quick.py
+  # itself), curl for the backend readiness check
+  local tool missing=""
+  for tool in lsof curl; do
+    command -v "$tool" >/dev/null 2>&1 || missing="${missing} ${tool}"
+  done
+  if [ -n "$missing" ]; then
+    echo "--grew-match needs:${missing}" \
+         "(install with e.g. sudo apt install${missing})" >&2
+    exit 1
+  fi
+
+  if [ -z "$grew_corpora" ]; then
+    local candidates=(web/db/*-grew/corpora.json)
+    if [ ${#candidates[@]} -eq 0 ] || [ ! -f "${candidates[0]}" ]; then
+      # no local exports: fall back to a combined description installed
+      # by a build pipeline (e.g. grammary's build-ltdb.sh)
+      if [ ! -f web/db/grew_corpora.json ]; then
+        echo "No web/db/grew_corpora.json or web/db/*-grew/corpora.json" \
+             "export found; run scripts/db2grew.py first" \
+             "(see doc/grew-match.md)" >&2
+        exit 1
+      fi
+      grew_corpora="web/db/grew_corpora.json"
+    elif [ ${#candidates[@]} -eq 1 ]; then
+      grew_corpora="${candidates[0]}"
+    else
+      # several grammars are exported: serve them all from one instance
+      grew_corpora="web/db/grew_corpora.json"
+      echo "Merging ${#candidates[@]} grew exports into ${grew_corpora}"
+      python3 scripts/merge_grew_corpora.py "$grew_corpora" "${candidates[@]}"
+    fi
+  fi
+  if [ ! -f "$grew_corpora" ]; then
+    echo "No such corpora description: $grew_corpora" >&2
+    exit 1
+  fi
+
+  # clone/build the stack and precompile the corpora (no-op when already
+  # done); runs before the takeover below so a setup failure leaves any
+  # old server in place
+  bash scripts/setup-grew-match.sh "$grew_corpora"
+
+  # take over the ports: an already-running instance keeps the corpora
+  # and LTDB_BASE_URL from its own startup, so serving our corpora means
+  # stopping it (grew_match_quick refuses to start on busy ports anyway)
+  stop_grew_match_servers
+
+  # grew_match_quick.py runs dune (and grew) itself, so the opam switch
+  # must be on PATH in the shell that launches it
+  source scripts/opam-env.sh
+
+  local gmq_log=grew_match_quick/local_files/gmq.log
+  echo "Starting grew-match for ${grew_corpora} (log: ${gmq_log})"
+  # Run under the project venv so gmq's python deps (requests) are
+  # guaranteed regardless of what the system python has.  gmq ends in an
+  # interactive input() loop, so keep its stdin open via sleep — on a
+  # closed stdin it crashes with EOFError right after startup (the
+  # servers survive, but the traceback in the log misleads).
+  setsid bash -c "sleep infinity | uv run python3 \
+      grew_match_quick/grew_match_quick.py '${grew_corpora}' \
+      --frontend_port '${gm_front_port}' --backend_port '${gm_back_port}'" \
+      </dev/null >"$gmq_log" 2>&1 &
+  gmq_pid=$!
+
+  # ping 127.0.0.1 explicitly (not localhost, which may resolve to ::1)
+  # and bypass any http_proxy: this is always a loopback request
+  local up=""
+  for _ in $(seq 30); do
+    if curl -s -m 2 --noproxy '*' -X POST \
+        "http://127.0.0.1:${gm_back_port}/ping" >/dev/null 2>&1; then
+      up=1
+      break
+    fi
+    sleep 2
+  done
+  if [ -z "$up" ]; then
+    echo "grew-match backend did not come up; last ping attempt:" >&2
+    curl -sS -m 2 --noproxy '*' -X POST \
+        "http://127.0.0.1:${gm_back_port}/ping" >&2 || true
+    echo "recent ${gmq_log}:" >&2
+    tail -n 20 "$gmq_log" >&2 || true
+    local backend_err=grew_match_quick/local_files/log/backend.stderr
+    if [ -s "$backend_err" ]; then
+      echo "--- ${backend_err}: ---" >&2
+      tail -n 20 "$backend_err" >&2
+    fi
+    exit 1
+  fi
+
+  # the corpora were compiled by setup-grew-match.sh before the backend
+  # started, so it reads the compiled status on startup
+
+  # point the snippet pane at the LTDB queries in etc/grew_snippets and
+  # brand the frontend (grew_match_quick rewrites both files on every
+  # start, so this has to happen after each start too)
+  uv run python - <<'PY'
+import json
+import os
+
+frontend_dir = "grew_match_quick/local_files/grew_match"
+
+config_path = f"{frontend_dir}/config.json"
+with open(config_path) as f:
+    cfg = json.load(f)
+cfg["snippets_url"] = "snippets/"
+# "top_project" is grew_match's own generic branding slot (logo + link
+# in the navbar, "About"/"Cite" menu entries, and now an "LTDB" entry
+# in the help menu -- see etc/grew_match.patch); point it at DELPH-IN
+# instead of leaving it unset
+for instance_cfg in cfg.get("instances", {}).values():
+    instance_cfg["top_project"] = {
+        "website": "https://delph-in.github.io/docs/home/Home/",
+        "logo": "https://github.com/delph-in.png",
+        "ltdb_url": os.environ.get("LTDB_BASE_URL", ""),
+    }
+with open(config_path, "w") as f:
+    json.dump(cfg, f, indent=2)
+
+# the corpus dropdown label is otherwise just the corpora.json
+# filename's stem (e.g. "grew_corpora")
+instance_path = f"{frontend_dir}/instances/gmq_instance.json"
+with open(instance_path) as f:
+    groups = json.load(f)
+for group in groups:
+    group["id"] = "DELPH-IN Grammary Corpora"
+with open(instance_path, "w") as f:
+    json.dump(groups, f, indent=2)
+PY
+  echo "grew-match ready on http://localhost:${gm_front_port}"
+}
+
 uv sync
+
 port=$(
   uv run python3 - <<'PY'
 import socket
@@ -20,5 +243,17 @@ else:
     raise SystemExit("No free localhost port found in 5000-5099")
 PY
 )
+
+if [ -n "$grew_match" ]; then
+  # the backend expands relative url metas with this base, so
+  # grew-match results link back to the LTDB instance started below
+  export LTDB_BASE_URL="http://127.0.0.1:${port}"
+  start_grew_match
+  export LTDB_GREW_MATCH_URL="http://localhost:${gm_front_port}"
+fi
+
 echo "Starting LTDB development server on http://127.0.0.1:${port}"
-uv run flask --app wsgi:app run --host 127.0.0.1 --port "${port}" --debug
+setsid uv run flask --app wsgi:app run --host 127.0.0.1 --port "${port}" \
+    --debug </dev/null &
+flask_pid=$!
+wait "$flask_pid"

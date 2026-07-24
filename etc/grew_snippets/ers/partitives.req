@@ -1,0 +1,8 @@
+% Noun phrases without an overt head noun whose referent is a subset of the
+% entities given by an of-PP (some of the dogs) introduce the 'part_of'
+% relation between subset and set.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_Partitives/):
+%   part_of[ARG0 x1, ARG1 x2]
+
+pattern { P [pred="part_of"]; P -[1=ARG1]-> X }

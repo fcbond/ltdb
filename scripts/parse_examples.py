@@ -7,14 +7,24 @@ For each typed example tag in a grammar's TDL docstrings:
   <mex> : same check as <ex> (grammatical for the grammar via a mal-rule)
 
 Usage:
-    python parse_examples.py <ace-config> <grammar.dat> <output-dir>
-        [--ace-bin PATH] [--no-profile]
+    python parse_examples.py <ace-config> <grammar.dat> <profile-dir>
+        [--no-profile] [--db GRAMMAR.db] [--report FILE]
+        [-j N] [--ace-bin PATH]
+
+A [incr tsdb()] profile of the parse results is written to
+<profile-dir> by default (--no-profile skips it, the directory is
+then ignored).  A per-type report always goes to stdout; --report
+also writes it to a file, and --db stores the verdicts in the
+doctest table of a grammar database.
 """
 import argparse
 import logging
+import os
 import sys
+import threading
 from collections import defaultdict
 from pathlib import Path
+from queue import Empty, Queue
 from typing import NamedTuple
 
 from delphin import ace, itsdb
@@ -278,73 +288,43 @@ def _parse_doc(typ: str, docstring: str) -> list[tuple[str, str, int, str]]:
     return out
 
 
-def _build_lex_ids_for_type(
-    les: dict, hierarchy: list[tuple[str, str]]
+def _build_descendants_for_type(
+    types: dict, hierarchy: list[tuple[str, str]]
 ) -> dict[str, set[str]]:
     """
-    Map every type to the set of lex-entry ids that inherit from it.
+    Map every identifier to the set of identifiers that inherit from it
+    (including itself), across the whole grammar: types, rules, lex-rules,
+    lex-types, and lex-entries alike.
 
-    Uses a BFS upward through the type hierarchy so that lex entries reached
-    via multi-level inheritance are still attributed to their ancestor types.
+    Uses a BFS upward through the type hierarchy from every declared
+    identifier, so a descendant reached via multi-level inheritance is
+    still attributed to all of its ancestors.  This lets an abstract
+    supertype documented in a docstring (e.g. an abstract rule with no
+    direct instances) be matched by any concrete descendant that actually
+    fires in a derivation, not just by lexical entries.
     """
     parents_of: dict[str, set[str]] = defaultdict(set)
     for child, parent in hierarchy:
         parents_of[child].add(parent)
 
-    lex_ids_for_type: dict[str, set[str]] = defaultdict(set)
-    for lexid in les:
+    descendants_for_type: dict[str, set[str]] = defaultdict(set)
+    for identifier in types:
         visited: set[str] = set()
-        queue = [lexid]
+        queue = [identifier]
         while queue:
             t = queue.pop()
             if t in visited:
                 continue
             visited.add(t)
-            lex_ids_for_type[t].add(lexid)
+            descendants_for_type[t].add(identifier)
             queue.extend(parents_of.get(t, set()))
-    return dict(lex_ids_for_type)
-
-
-def _build_subtypes_for_type(
-    example_types: set[str], hierarchy: list[tuple[str, str]]
-) -> dict[str, set[str]]:
-    """
-    Map each example type to all its transitive descendant types.
-
-    Only computed for types that actually have examples, so the BFS cost is
-    proportional to the number of distinct example types rather than the full
-    grammar hierarchy.
-
-    Args:
-        example_types: types for which descendants are needed
-        hierarchy:     list of (child, parent) pairs from the TDL grammar
-
-    Returns:
-        dict mapping each example type to the set of all types that inherit
-        from it (directly or transitively), not including itself
-    """
-    children_of: dict[str, set[str]] = defaultdict(set)
-    for child, parent in hierarchy:
-        children_of[parent].add(child)
-
-    result: dict[str, set[str]] = {}
-    for typ in example_types:
-        visited: set[str] = set()
-        queue = list(children_of.get(typ, ()))
-        while queue:
-            t = queue.pop()
-            if t in visited:
-                continue
-            visited.add(t)
-            queue.extend(children_of.get(t, ()))
-        result[typ] = visited
-    return result
+    return dict(descendants_for_type)
 
 
 def extract_examples(
     cfg: dict,
     log,
-) -> tuple[list[Example], dict[str, list[str]], dict[str, set[str]], dict[str, set[str]]]:
+) -> tuple[list[Example], dict[str, list[str]], dict[str, set[str]]]:
     """
     Read TDL files and return all examples plus type metadata.
 
@@ -353,17 +333,16 @@ def extract_examples(
         log: writable log stream
 
     Returns:
-        (examples, types, lex_ids_for_type, subtypes_for_type) where:
-          examples          — ordered list of Example objects
-          types             — maps type identifier → list of TDL environment statuses
-          lex_ids_for_type  — maps type → all lex-entry ids that inherit from it
-                              (transitively, for detecting lex-type usage in trees)
-          subtypes_for_type — maps each example type → all descendant type names
-                              (for matching non-leaf rule/lex-rule types in trees)
+        (examples, types, descendants_for_type) where:
+          examples        — ordered list of Example objects
+          types           — maps type identifier → list of TDL environment statuses
+          descendants_for_type — maps identifier → all identifiers (of any
+                             status) that inherit from it, transitively,
+                             including itself
     """
     tdls, types, hierarchy, les = read_grm(cfg, log)
 
-    lex_ids_for_type = _build_lex_ids_for_type(les, hierarchy)
+    descendants_for_type = _build_descendants_for_type(types, hierarchy)
 
     examples: list[Example] = []
     seen: set[tuple[str, str, str]] = set()
@@ -379,20 +358,28 @@ def extract_examples(
             i_id += 1
             examples.append(Example(i_id, text, t, wf, kind))
 
-    example_types = {ex.typ for ex in examples}
-    subtypes_for_type = _build_subtypes_for_type(example_types, hierarchy)
-
-    return examples, dict(types), lex_ids_for_type, subtypes_for_type
+    return examples, dict(types), descendants_for_type
 
 
 # ── Type-in-derivation check ─────────────────────────────────────────────────
 
 
-def _entities(deriv) -> tuple[set[str], set[str]]:
-    """Return (internal_entities, preterminal_entities) from a derivation."""
+def _entities(deriv) -> tuple[set[str], set[str], set[str]]:
+    """Return (internal entities, preterminal entities, node types).
+
+    Node types are the ``@type`` annotations ACE adds under ``--udx=all``:
+    the lexical type of each preterminal and the phrase type of each
+    internal node.
+    """
+    internals = list(deriv.internals())
+    preterminals = list(deriv.preterminals())
+    node_types = {
+        t for n in internals + preterminals if (t := getattr(n, "type", None))
+    }
     return (
-        {n.entity for n in deriv.internals()},
-        {n.entity for n in deriv.preterminals()},
+        {n.entity for n in internals},
+        {n.entity for n in preterminals},
+        node_types,
     )
 
 
@@ -400,29 +387,32 @@ def type_in_results(
     typ: str,
     type_statuses: list[str],
     results: list,
-    lex_ids_for_type: dict[str, set[str]],
-    subtypes_for_type: dict[str, set[str]] | None = None,
+    descendants_for_type: dict[str, set[str]],
 ) -> bool:
     """
-    Return True if *typ* (or any descendant) appears in any parse result's derivation.
+    Return True if *typ* (or a concrete descendant of it) appears in any
+    parse result's derivation.
 
-    Three checks are tried for each derivation and either is sufficient:
+    A single check, tried against every derivation node's entity name and
+    its ``--udx=all`` ``@type`` annotation: does the node identify one of
+    *typ*'s descendants-or-self in the grammar's type hierarchy?
+    *descendants_for_type* already includes *typ* itself, so this covers:
 
-    1. Direct entity match — *typ* appears as an entity name in an internal
-       or preterminal node.  This covers leaf rules and lexical rules.
-    2. Lex-entry descendant match — a preterminal entity is a lex-entry id
-       that inherits from *typ* (via *lex_ids_for_type*).  This covers
-       lex-types, regardless of the TDL environment status string.
-    3. Subtype match — a descendant type of *typ* appears as an internal or
-       preterminal entity (via *subtypes_for_type*).  This covers non-leaf
-       (abstract) rule and lex-rule types whose concrete subtypes fire in the
-       parse tree instead.
+    - direct instantiation (*typ* is a rule, lex-rule, or lex-entry that
+      fires as-is);
+    - an abstract supertype documented with no direct instances, matched
+      via any concrete rule, lex-rule, or lexical descendant that fires
+      (e.g. a documented abstract head-complement rule matched by the
+      concrete subtype that actually applies);
+    - a lexical type matched via an inheriting lex-entry that appears as a
+      preterminal, or directly via the udx type annotation on that
+      preterminal.
 
-    ``type_statuses`` is retained for API compatibility but is no longer used
-    to distinguish rule vs. lex-type.
+    ``type_statuses`` is retained for API compatibility but no longer
+    used; the type hierarchy in *descendants_for_type* drives matching
+    uniformly across rules, lex-rules, and lex-types.
     """
-    lex_ids = lex_ids_for_type.get(typ, set())
-    subtypes = subtypes_for_type.get(typ, set()) if subtypes_for_type else set()
+    descendants = descendants_for_type.get(typ, {typ})
 
     for result in results:
         try:
@@ -431,12 +421,8 @@ def type_in_results(
             continue
         if deriv is None:
             continue
-        internals, preterminals = _entities(deriv)
-        if typ in internals or typ in preterminals:
-            return True
-        if lex_ids and lex_ids & preterminals:
-            return True
-        if subtypes and (subtypes & internals or subtypes & preterminals):
+        internals, preterminals, node_types = _entities(deriv)
+        if descendants & (internals | preterminals | node_types):
             return True
     return False
 
@@ -501,14 +487,41 @@ def make_test_suite(
 # ── Parsing ───────────────────────────────────────────────────────────────────
 
 
+# rough peak memory per ACE worker on a large grammar (ERG-sized):
+# ~2 GiB to parse plus ~2 GiB to unpack
+_ACE_WORKER_MEM_KIB = 4 * 1024 * 1024
+
+
+def default_jobs() -> int:
+    """Return a job count fitted to this machine.
+
+    One ACE process per CPU, capped by available memory at roughly
+    4 GiB per worker (what a large grammar like the ERG can need at
+    peak: ~2 GiB to parse plus ~2 GiB to unpack).  Falls back to
+    min(cpus, 8) when available memory cannot be determined (e.g. no
+    /proc/meminfo on non-Linux systems).
+    """
+    cpus = os.cpu_count() or 1
+    try:
+        with open("/proc/meminfo") as f:
+            mem_kib = next(
+                int(line.split()[1])
+                for line in f
+                if line.startswith("MemAvailable:")
+            )
+    except (OSError, StopIteration, ValueError, IndexError):
+        return max(1, min(cpus, 8))
+    return max(1, min(cpus, mem_kib // _ACE_WORKER_MEM_KIB))
+
+
 def run_examples(
     examples: list[Example],
     dat: str,
     ace_bin: str,
     types: dict[str, list[str]],
-    lex_ids_for_type: dict[str, set[str]],
+    descendants_for_type: dict[str, set[str]],
     ts: itsdb.TestSuite | None = None,
-    subtypes_for_type: dict[str, set[str]] | None = None,
+    jobs: int = 1,
 ) -> list[Verdict]:
     """
     Parse every example with ACE and return verdicts.
@@ -522,21 +535,24 @@ def run_examples(
     If *ts* is provided, parse and result tables are written to it.
 
     Args:
-        examples:           list of Example objects (already in *ts* if provided)
-        dat:                path to compiled ACE grammar (.dat)
-        ace_bin:            path to ACE binary
-        types:              maps type name → list of TDL environment statuses
-        lex_ids_for_type:   maps type → all lex-entry ids that inherit from it
-        ts:                 optional TestSuite to write parse results into
-        subtypes_for_type:  maps type → all descendant type names; enables
-                            non-leaf type matching in derivations
+        examples:             list of Example objects (already in *ts* if provided)
+        dat:                  path to compiled ACE grammar (.dat)
+        ace_bin:              path to ACE binary
+        types:                maps type name → list of TDL environment statuses
+        descendants_for_type: maps identifier → all identifiers that
+                               inherit from it, including itself
+        ts:                   optional TestSuite to write parse results into
+        jobs:                 number of parallel ACE processes per batch
 
     Returns:
         list of Verdict objects in the same order as *examples*.
     """
     verdicts_by_id: dict[int, Verdict] = {}
+    responses_by_id: dict[int, object] = {}
     fm = itsdb.FieldMapper() if ts is not None else None
-    base_cmdargs = ["--rooted-derivations"]
+    # --udx=all annotates nodes with their types so lex-types and phrase
+    # types can be matched directly in the derivation
+    base_cmdargs = ["--rooted-derivations", "--udx=all"]
 
     # Root-condition types need a separate ACE invocation with -r <root>
     # so that ACE is forced to use that root; without it root_gen, root_frag
@@ -549,24 +565,70 @@ def run_examples(
         else:
             normal.append(ex)
 
+    def _process(parser, ex: Example) -> None:
+        response = parser.process_item(ex.text, keys={"i-id": ex.i_id})
+        results = response.results()
+        found = type_in_results(
+            ex.typ, types.get(ex.typ, ["type"]), results, descendants_for_type
+        )
+        verdicts_by_id[ex.i_id] = Verdict(ex, len(results), found)
+        if fm is not None:
+            responses_by_id[ex.i_id] = response
+
     def _run_batch(exs: list[Example], cmdargs: list[str]) -> None:
         # Pass a copy: ACEParser mutates its cmdargs list in-place (appending
         # tsdb flags), which would corrupt the caller's list on reuse.
-        with ace.ACEParser(dat, executable=ace_bin, cmdargs=list(cmdargs)) as parser:
+        n_workers = max(1, min(jobs, len(exs)))
+        if n_workers == 1:
+            with ace.ACEParser(
+                dat, executable=ace_bin, cmdargs=list(cmdargs)
+            ) as parser:
+                for ex in exs:
+                    _process(parser, ex)
+        else:
+            # one ACE process per worker, all pulling from a shared queue;
+            # the parsing happens in the subprocesses, so threads suffice
+            print(
+                f"  parsing {len(exs)} examples with {n_workers}"
+                " ACE processes …",
+                file=sys.stderr,
+            )
+            pending: Queue[Example] = Queue()
             for ex in exs:
-                response = parser.process_item(ex.text, keys={"i-id": ex.i_id})
-                results = response.results()
-                found = type_in_results(
-                    ex.typ,
-                    types.get(ex.typ, ["type"]),
-                    results,
-                    lex_ids_for_type,
-                    subtypes_for_type,
-                )
-                verdicts_by_id[ex.i_id] = Verdict(ex, len(results), found)
-                if fm is not None:
-                    for tablename, data in fm.map(response):
-                        ts[tablename].append(data)
+                pending.put(ex)
+            failures: list[BaseException] = []
+
+            def _worker() -> None:
+                try:
+                    with ace.ACEParser(
+                        dat, executable=ace_bin, cmdargs=list(cmdargs)
+                    ) as parser:
+                        while True:
+                            try:
+                                ex = pending.get_nowait()
+                            except Empty:
+                                return
+                            _process(parser, ex)
+                except BaseException as exc:
+                    failures.append(exc)
+
+            threads = [
+                threading.Thread(target=_worker) for _ in range(n_workers)
+            ]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            if failures:
+                raise failures[0]
+        # write profile rows in stable example order (FieldMapper is not
+        # thread-safe and assigns parse ids sequentially)
+        if fm is not None:
+            for ex in exs:
+                for tablename, data in fm.map(responses_by_id.pop(ex.i_id)):
+                    ts[tablename].append(
+                        _tsdb.make_record(data, ts.schema[tablename])
+                    )
 
     _run_batch(normal, base_cmdargs)
 
@@ -579,7 +641,7 @@ def run_examples(
 
     if fm is not None:
         for tablename, data in fm.cleanup():
-            ts[tablename].append(data)
+            ts[tablename].append(_tsdb.make_record(data, ts.schema[tablename]))
         ts.commit()
 
     return [verdicts_by_id[ex.i_id] for ex in examples]
@@ -776,7 +838,8 @@ def main() -> None:
     parser.add_argument(
         "output_dir",
         type=Path,
-        help="Directory for the itsdb output profile",
+        help="Directory for the itsdb profile of the results "
+             "(written by default; ignored with --no-profile)",
     )
     parser.add_argument(
         "--ace-bin",
@@ -786,7 +849,7 @@ def main() -> None:
     parser.add_argument(
         "--no-profile",
         action="store_true",
-        help="Skip writing the itsdb profile; print summary only",
+        help="Skip writing the itsdb profile (--db/--report still work)",
     )
     parser.add_argument(
         "--report",
@@ -799,6 +862,15 @@ def main() -> None:
         type=Path,
         metavar="FILE",
         help="Write results into the doctest table of this grammar SQLite DB",
+    )
+    parser.add_argument(
+        "-j",
+        "--jobs",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Number of parallel ACE processes; 0 = auto from CPUs and "
+             "available memory (default: 1)",
     )
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Log TDL parsing warnings"
@@ -818,16 +890,15 @@ def main() -> None:
     cfg = read_cfg(str(args.config))
 
     print(f"Reading TDL from {cfg['grammar_file']} …", file=sys.stderr)
-    examples, types, lex_ids_for_type, subtypes_for_type = extract_examples(
-        cfg, sys.stderr
-    )
+    examples, types, descendants_for_type = extract_examples(cfg, sys.stderr)
     print(f"  {len(examples)} examples extracted.", file=sys.stderr)
 
     ts = None if args.no_profile else make_test_suite(args.output_dir, examples)
 
     print(f"Parsing with {args.dat} …", file=sys.stderr)
     verdicts = run_examples(
-        examples, str(args.dat), ace_bin, types, lex_ids_for_type, ts, subtypes_for_type
+        examples, str(args.dat), ace_bin, types, descendants_for_type, ts,
+        jobs=args.jobs or default_jobs(),
     )
 
     if ts is not None:

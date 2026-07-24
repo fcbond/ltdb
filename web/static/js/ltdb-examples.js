@@ -203,6 +203,15 @@
         }
       }
     }, true);
+
+    // details that are open on page load (e.g. the sentence page) never
+    // fire a user toggle, so render them now
+    document.querySelectorAll(
+      "details.ltdb-tree-details[open], details.ltdb-mrs-details[open], " +
+      "details.ltdb-dmrs-details[open]"
+    ).forEach((details) => {
+      details.dispatchEvent(new Event("toggle"));
+    });
   });
 
   window.LTDBExamples = {

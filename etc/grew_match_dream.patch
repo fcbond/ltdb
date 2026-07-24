@@ -1,0 +1,96 @@
+diff --git a/src/gmd_main.ml b/src/gmd_main.ml
+index 29ef9e8..4df1f57 100644
+--- a/src/gmd_main.ml
++++ b/src/gmd_main.ml
+@@ -567,19 +567,32 @@ let save param =
+   with Not_found -> raise (Error (`Assoc [("message", `String "save service: not connected")]))
+ 
+ (* ============================================================================================================================ *)
++(* corpusbank entries may carry a relative "grammar_url" (LTDB's link
++   back to the grammar's own page, e.g. "/?grm=ERG_2025.db"); expand it
++   the same way graph-level url metas are expanded in save_dep/save_dot *)
++let expand_corpus_desc json =
++  match json with
++  | `Assoc fields ->
++    `Assoc (List.map
++      (fun (k, v) -> match (k, v) with
++        | ("grammar_url", `String s) -> (k, `String (expand_url s))
++        | _ -> (k, v))
++      fields)
++  | other -> other
++
+ let get_corpora_desc param =
+   let open Yojson.Basic.Util in
+   let groups = param |> member "instance_desc" |> to_list in
+   let new_groups =
+-    List.map 
+-    (fun group -> 
++    List.map
++    (fun group ->
+       let corpora_list = group |> member "corpora" |> to_list |> List.map to_string in
+       let new_corpora_list =
+         List.map
+         (fun corpus_id ->
+           begin
+             match String_map.find_opt corpus_id !Global.corpora_map with
+-            | Some (corpus_desc, _) -> Corpus_desc.to_json corpus_desc
++            | Some (corpus_desc, _) -> expand_corpus_desc (Corpus_desc.to_json corpus_desc)
+             | None -> `Assoc [("id", `String corpus_id); ("error", `String "No description found")]
+           end
+         ) corpora_list in
+diff --git a/src/gmd_utils.ml b/src/gmd_utils.ml
+index eae37e3..b9ba4b7 100644
+--- a/src/gmd_utils.ml
++++ b/src/gmd_utils.ml
+@@ -258,12 +258,27 @@ end
+ 
+ 
+ 
++(* ============================================================================================================================ *)
++(* relative url metas (starting with "/") get the LTDB base URL from the
++   environment, so corpora need not be re-exported when the address changes *)
++let ltdb_base_url = CCOption.get_or ~default:"" (Sys.getenv_opt "LTDB_BASE_URL")
++
++let expand_url s =
++  if String.length s > 0 && s.[0] = '/'
++  then ltdb_base_url ^ s
++  else s
++
+ (* ============================================================================================================================ *)
+ let save_dep uuid ~config ?audio_info rtl base sent_id deco graph sentence meta =
+   try 
+     let folder = datadir uuid in
+     let filename = sprintf "%s.svg" base in
+-    let dep = Graph.to_dep ~filter:Draw_config.filter ~pid:(!Draw_config.current).pid ~deco ~config graph in
++    (* our graphs label nodes with a "pred" feature (DMRS predicates) or
++       a "cat"/"lexid" feature (constituency trees); grewlib's default
++       main-feature order tries "lemma" ahead of "pred", so without this
++       override a predicate with a lemma displays as its lemma instead
++       of the pred value grew-match is meant to show as the node name *)
++    let dep = Graph.to_dep ~filter:Draw_config.filter ~pid:(!Draw_config.current).pid ~main_feat:"pred" ~deco ~config graph in
+     let _ = Dep2pictlib.save_svg ~filename:(Filename.concat folder filename) (Dep2pictlib.from_dep ~rtl dep) in
+     let shift = Dep2pictlib.highlight_shift () in
+     let data = `Assoc (CCList.filter_map CCFun.id [
+@@ -271,7 +286,9 @@ let save_dep uuid ~config ?audio_info rtl base sent_id deco graph sentence meta
+         Some ("filename", `String (Filename.concat uuid filename));
+         Some ("sent_id", `String sent_id);
+         Some ("sentence", `String sentence);
+-        Some ("meta", `Assoc (List.map (fun (k,v) -> (k, `String v)) meta));
++        Some ("meta", `List (List.map (fun (k,v) -> `Assoc [("key", `String k); ("value", `String v); ("sub", `Assoc [])]) meta));
++        Some ("code", match Graph.get_meta_opt "code" graph with Some s -> `String s | None -> `Null);
++        Some ("url", match Graph.get_meta_opt "url" graph with Some s -> `String (expand_url s) | None -> `Null);
+         CCOption.map (fun v -> ("shift", `Float v)) shift;
+         CCOption.map (fun s -> ("audio", `String s)) audio_info;
+       ]) in 
+@@ -292,9 +309,9 @@ let save_dot uuid ~config base sent_id deco graph sentence meta =
+       ("filename", `String (Filename.concat uuid filename));
+       ("sent_id", `String sent_id);
+       ("sentence", `String sentence);
+-      ("meta", `Assoc (List.map (fun (k,v) -> (k, `String v)) meta));
++      ("meta", `List (List.map (fun (k,v) -> `Assoc [("key", `String k); ("value", `String v); ("sub", `Assoc [])]) meta));
+       ("code", match Graph.get_meta_opt "code" graph with Some s -> `String s | None -> `Null);
+-      ("url", match Graph.get_meta_opt "url" graph with Some s -> `String s | None -> `Null);
++      ("url", match Graph.get_meta_opt "url" graph with Some s -> `String (expand_url s) | None -> `Null);
+     ] in
+   data
+ 

@@ -98,7 +98,24 @@
       return { name: String(node || ""), leaf: true };
     }
     if (!node.daughters) {
-      return { name: node.form || node.entity || "", form: node.form || null, leaf: true };
+      // preterminal: pydelphin flattens the surface token into `form`;
+      // rebuild the lex-type > lex-entry > form chain so the lexical
+      // entry and its type stay visible in the tree
+      const form = node.form || node.entity || "";
+      let tree = { name: form, form, leaf: true };
+      if (node.entity && node.entity !== form) {
+        tree = { name: node.entity, entity: node.entity, children: [tree] };
+      }
+      if (node.type) {
+        tree = {
+          name: node.type,
+          entity: node.type,
+          type: node.type,
+          isLexType: true,
+          children: [tree],
+        };
+      }
+      return tree;
     }
     return {
       name: node.entity || "",
@@ -208,6 +225,9 @@
   function classifyNode(node) {
     if (node.leaf) {
       return "lemma";
+    }
+    if (node.isLexType) {
+      return "lex-type";
     }
     if (
       node.children &&

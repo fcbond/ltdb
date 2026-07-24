@@ -12,8 +12,7 @@ import tempfile
 from pathlib import Path
 
 import toml
-from delphin import itsdb
-from gold2db import process_tsdb
+from gold2db import cpu_jobs, process_tsdb
 from tdl2db import intodb, read_cfg, read_grm
 
 if sys.version_info < (3, 8):
@@ -31,7 +30,12 @@ def read_metadata(metadata_path):
 
 
 def make_db(dbdir, db):
-    conn = sqlite3.connect(os.path.join(dbdir, db))  # loads dbfile as con
+    dbfile = os.path.join(dbdir, db)
+    # always build from scratch: tables.sql cannot be applied on top of an
+    # existing database, so a leftover file from an earlier run must go
+    if os.path.exists(dbfile):
+        os.remove(dbfile)
+    conn = sqlite3.connect(dbfile)
     c = conn.cursor()
 
     # Get the script directory to find tables.sql
@@ -171,37 +175,6 @@ def compile_ace(cfg_path, out_path, log_path, ace_bin=None):
         raise
 
 
-
-def make_ex_profile(exdir, examples, md):
-    """Write a parseable itsdb profile from docstring examples.
-
-    Copies etc/Relations into exdir and writes an item file with one
-    row per (text, typ, wf) triple.  The profile can then be processed
-    directly with delphin.itsdb or fed to parse_examples.py.
-    """
-    exdir.mkdir(parents=True, exist_ok=True)
-    script_dir = Path(__file__).parent.absolute()
-    shutil.copyfile(script_dir / "../etc/Relations", exdir / "relations")
-    with open(exdir / "item", "w") as out:
-        iid = 10
-        for text, typ, wf in examples:
-            row = [
-                iid,       # i-id
-                "ltdb",    # i-origin
-                "", "", "",
-                typ,       # i-category (type name)
-                text,      # i-input
-                "", "", "",
-                wf,        # i-wf
-                len(text.split()),
-                "",
-                md.get("Version", ""),
-                "today",
-            ]
-            print("@".join(str(x) for x in row), file=out)
-            iid += 10
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="grm2db",
@@ -229,6 +202,28 @@ if __name__ == "__main__":
         action="store_true",
         help="Parse TDL docstring examples and store results in the doctest table "
              "(requires --ace or a pre-existing .dat next to the db)",
+    )
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Parallel workers for treebank processing, docstring testing, "
+             "and --grew export; 0 = auto from CPUs (ACE workers under "
+             "--doctest are further capped by available memory) "
+             "(default: 1)",
+    )
+    parser.add_argument(
+        "--grew",
+        action="store_true",
+        help="Also export the gold trees and DMRS as grew JSON corpora "
+             "next to the database (see doc/grew-match.md)",
+    )
+    parser.add_argument(
+        "--ltdb-url",
+        help="With --grew: bake this absolute LTDB base URL into the "
+             "exported link metas (default: relative links, expanded from "
+             "$LTDB_BASE_URL by the grew-match backend at serve time)",
     )
     parser.add_argument("metadata", type=Path, help="METADATA file for the grammar")
 
@@ -277,7 +272,10 @@ if __name__ == "__main__":
             if profiles is not None:
                 print(f"If they are in {profiles}")
             if os.path.isdir(golddir):
-                process_tsdb(conn, cfg["ver"], args.checkgrm, golddir, log, profiles)
+                process_tsdb(
+                    conn, cfg["ver"], args.checkgrm, golddir, log, profiles,
+                    jobs=args.jobs or cpu_jobs(),
+                )
 
     post_process_corpus(conn)
     conn.close()
@@ -294,6 +292,7 @@ if __name__ == "__main__":
 
     if args.doctest:
         from parse_examples import (
+            default_jobs,
             extract_examples,
             run_examples,
             write_to_db,
@@ -314,15 +313,31 @@ if __name__ == "__main__":
             except FileNotFoundError as exc:
                 print(f"--doctest skipped: {exc}", file=sys.stderr)
             else:
-                print(f"Running docstring tests for {nam} …")
+                print(f"Running docstring tests for {nam} …", file=sys.stderr)
                 cfg_path = os.path.join(
                     os.path.dirname(args.metadata), md["ACE_CONFIG_FILE"]
                 )
                 doctest_cfg = read_cfg(cfg_path)
                 with open(log_path, "a") as log:
-                    examples, ex_types, lex_ids = extract_examples(doctest_cfg, log)
+                    examples, ex_types, descendants = extract_examples(
+                        doctest_cfg, log
+                    )
                 verdicts = run_examples(
-                    examples, dat_path, ace_bin_resolved, ex_types, lex_ids
+                    examples, dat_path, ace_bin_resolved, ex_types, descendants,
+                    jobs=args.jobs or default_jobs(),
                 )
                 write_to_db(verdicts, db_path)
-                print(f"Docstring tests done for {nam}")
+                print(f"Docstring tests done for {nam}", file=sys.stderr)
+
+    if args.grew:
+        from db2grew import main as db2grew_main
+
+        grew_argv = [os.path.join(out_dir, dbname)]
+        if args.ltdb_url:
+            grew_argv += ["--ltdb-url", args.ltdb_url]
+        grew_argv += ["--jobs", str(args.jobs or cpu_jobs())]
+        print(f"Exporting grew corpora for {nam} …")
+        try:
+            db2grew_main(grew_argv)
+        except SystemExit as exc:
+            print(f"--grew export skipped: {exc}", file=sys.stderr)

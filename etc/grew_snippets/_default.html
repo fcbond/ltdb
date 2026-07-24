@@ -1,0 +1,192 @@
+<style>
+  /* #snippets' max-height is kept in sync with #console (the search
+     column) by the script at the bottom of this file, so a long tab
+     (ERS: 26 entries) scrolls instead of stretching the page. */
+  #snippets { overflow-y: auto; }
+  /* ERS has by far the most entries; lay them out in two columns so
+     fewer of them need the scrollbar above. */
+  #step3 ul { column-count: 2; column-gap: 24px; margin: 0; }
+  #step3 ul li { break-inside: avoid; }
+</style>
+
+<div class="navbar" id="right-navbar">
+  <div class="navbar-inner">
+    <ul class="nav nav-pills">
+      <li class="active"><a class="grew-label" href="#step1" data-toggle="tab">DMRS</a></li>
+      <li><a class="grew-label" href="#step2" data-toggle="tab">Trees</a></li>
+      <li><a class="grew-label" href="#step3" data-toggle="tab">ERS</a></li>
+      <li><a class="grew-label" href="#step4" data-toggle="tab">Metadata</a></li>
+    </ul>
+  </div>
+</div>
+<div class="tab-content" id="snippets">
+
+  <div class="tab-pane active" id="step1">
+    <b style="font-size: 125%;">Requests on DMRS graphs (<code>*_dmrs</code> corpora):</b>
+    <ul>
+      <li><a href="#" snippet-file="dmrs/search_pred.req" class="inter">Search for a <code>pred</code>icate</a></li>
+      <li><a href="#" snippet-file="dmrs/search_lemma.req" class="inter">Search predicates by exact <code>lemma</code></a></li>
+      <li><a href="#" snippet-file="dmrs/search_lemma_regex.req" class="inter">Search predicates by word (regex)</a></li>
+      <li><a href="#" snippet-file="dmrs/ad_hoc.req" class="inter">Predicate with a regex-escaped character (<code>ad+hoc</code>)</a></li>
+      <li><a href="#" snippet-file="dmrs/knock_v_up.req" class="inter">Particle verb, particle in the sense slot (<code>knock_v_up</code>)</a></li>
+      <li><a href="#" snippet-file="dmrs/arg1.req" class="inter">X connected to Y through <code>ARG1</code></a></li>
+      <li><a href="#" snippet-file="dmrs/named_arg1.req" class="inter">Predicates whose <code>ARG1</code> is a named entity</a></li>
+      <li><a href="#" snippet-file="dmrs/reflexive.req" class="inter">Same node as <code>ARG1</code> and <code>ARG2</code></a></li>
+      <li><a href="#" snippet-file="dmrs/quantifier.req" class="inter">Quantifier restriction (<code>RSTR/H</code>)</a></li>
+      <li><a href="#" snippet-file="dmrs/modifier.req" class="inter">Shared-label modification (<code>post=EQ</code>)</a></li>
+    </ul>
+  </div>
+
+  <div class="tab-pane" id="step2">
+    <b style="font-size: 125%;">Requests on derivation trees (<code>*_trees</code> corpora):</b>
+    <ul>
+      <li><a href="#" snippet-file="trees/search_rule.req" class="inter">Search for a grammar rule (<code>cat</code>)</a></li>
+      <li><a href="#" snippet-file="trees/search_lextype.req" class="inter">Search for a lexical type (<code>lextype</code>)</a></li>
+      <li><a href="#" snippet-file="trees/search_lexid.req" class="inter">Search for a lexical entry (<code>lexid</code>)</a></li>
+      <li><a href="#" snippet-file="trees/search_form.req" class="inter">Search for a surface <code>form</code></a></li>
+      <li><a href="#" snippet-file="trees/daughter.req" class="inter">Rule with a specific <i>n</i>-th daughter</a></li>
+      <li><a href="#" snippet-file="trees/adjacent_not_complement.req" class="inter">Adjacent words, excluding a construction (<code>all the</code>)</a></li>
+    </ul>
+  </div>
+
+  <div class="tab-pane" id="step3">
+    <b style="font-size: 125%;">ERG Semantics Documentation (ESD) phenomena, as DMRS queries:</b>
+    <p>
+      The <a href="https://delph-in.github.io/docs/erg/ErgSemantics_Inventory/" target="_blank">ESD</a>
+      catalogues recurring semantic constructions in the ERG, each
+      identified by a DMRS "fingerprint". Every snippet below runs one
+      phenomenon's fingerprint as a live query, with its description
+      and fingerprint as a comment above the query itself; follow the
+      link above for the full writeup of each construction.
+    </p>
+    <ul>
+      <!-- BEGIN GENERATED: doc/esd-phenomena/gen_snippets.py -->
+      <li><a href="#" snippet-file="ers/apposition.req" class="inter">apposition</a></li>
+      <li><a href="#" snippet-file="ers/comparatives.req" class="inter">comparatives</a></li>
+      <li><a href="#" snippet-file="ers/compounding.req" class="inter">compounding</a></li>
+      <li><a href="#" snippet-file="ers/conditionals.req" class="inter">conditionals</a></li>
+      <li><a href="#" snippet-file="ers/control-relations.req" class="inter">control relations</a></li>
+      <li><a href="#" snippet-file="ers/coordination.req" class="inter">coordination</a></li>
+      <li><a href="#" snippet-file="ers/ellipsis.req" class="inter">ellipsis</a></li>
+      <li><a href="#" snippet-file="ers/foreign-expressions.req" class="inter">foreign expressions</a></li>
+      <li><a href="#" snippet-file="ers/fragments.req" class="inter">fragments</a></li>
+      <li><a href="#" snippet-file="ers/identity-copulae.req" class="inter">identity copulae</a></li>
+      <li><a href="#" snippet-file="ers/imperatives.req" class="inter">imperatives</a></li>
+      <li><a href="#" snippet-file="ers/implicit-locatives.req" class="inter">implicit locatives</a></li>
+      <li><a href="#" snippet-file="ers/implicit-nominals.req" class="inter">implicit nominals</a></li>
+      <li><a href="#" snippet-file="ers/implicit-quantifiers.req" class="inter">implicit quantifiers</a></li>
+      <li><a href="#" snippet-file="ers/instrumental-relatives.req" class="inter">instrumental relatives</a></li>
+      <li><a href="#" snippet-file="ers/measure-phrases.req" class="inter">measure phrases</a></li>
+      <li><a href="#" snippet-file="ers/nominalization.req" class="inter">nominalization</a></li>
+      <li><a href="#" snippet-file="ers/non-adverbial-clausal-modifiers.req" class="inter">non adverbial clausal modifiers</a></li>
+      <li><a href="#" snippet-file="ers/number-sequences.req" class="inter">number sequences</a></li>
+      <li><a href="#" snippet-file="ers/parentheticals.req" class="inter">parentheticals</a></li>
+      <li><a href="#" snippet-file="ers/partitives.req" class="inter">partitives</a></li>
+      <li><a href="#" snippet-file="ers/propositional-arguments.req" class="inter">propositional arguments</a></li>
+      <li><a href="#" snippet-file="ers/quasi-modal-infinitivals.req" class="inter">quasi modal infinitivals</a></li>
+      <li><a href="#" snippet-file="ers/relational-nouns.req" class="inter">relational nouns</a></li>
+      <li><a href="#" snippet-file="ers/time-expressions.req" class="inter">time expressions</a></li>
+      <li><a href="#" snippet-file="ers/vocatives.req" class="inter">vocatives</a></li>
+      <!-- END GENERATED -->
+    </ul>
+  </div>
+
+  <div class="tab-pane" id="step4">
+    <ul>
+      <li><a href="#" snippet-file="global/text.req" class="inter">Search in the sentence text (regexp)</a></li>
+      <li><a href="#" snippet-file="global/profile.req" class="inter">Restrict to one treebank profile</a></li>
+    </ul>
+  </div>
+</div>
+
+<script>
+(function () {
+  // This file is re-fetched and re-injected into #right-pane on every
+  // corpus change (see update_corpus() in grew_match's js/main.js), so
+  // this script re-runs then too -- which is what makes both syncs
+  // below "just work" without a grew_match patch. `app` (grew_match's
+  // Vue instance) is a top-level `let` in js/main.js, not a `window`
+  // property, but it is still visible here: this script and main.js
+  // are both plain (non-module) <script>s sharing one global scope.
+
+  // Keep #snippets' height matched to #console (the search column) so
+  // a long tab (ERS: 26 entries) scrolls within its own pane instead
+  // of stretching the whole page. Re-observing on every reload would
+  // accumulate observers (the DOM node being observed, #console,
+  // isn't itself destroyed/recreated -- only #right-pane's content
+  // is), so disconnect whichever one this script's last run created.
+  if (window.__ltdbHeightObserver) window.__ltdbHeightObserver.disconnect();
+  var consoleEl = document.getElementById('console');
+  var snippetsEl = document.getElementById('snippets');
+  if (consoleEl && snippetsEl && window.ResizeObserver) {
+    var syncHeight = function () {
+      snippetsEl.style.maxHeight = consoleEl.offsetHeight + 'px';
+    };
+    syncHeight();
+    window.__ltdbHeightObserver = new ResizeObserver(syncHeight);
+    window.__ltdbHeightObserver.observe(consoleEl);
+  }
+
+  // #step1 DMRS and #step3 ERS both want a DMRS corpus (ERS phenomena
+  // are DMRS queries -- see doc/esd-phenomena); #step2 Trees wants a
+  // trees corpus; #step4 Metadata fits either and is left out here.
+  var KIND = {'#step1': '_dmrs', '#step2': '_trees', '#step3': '_dmrs'};
+
+  // Whole re-injected pane always starts with #step1 marked active in
+  // the static HTML, so remembering "the user was actually on ERS"
+  // across a corpus-triggered reload needs a real global -- this
+  // script's own closure gets torn down and rebuilt every time too.
+  $('.nav-pills a[data-toggle="tab"]').on('shown.bs.tab', function () {
+    window.__ltdbSnippetTab = $(this).attr('href');
+  });
+
+  // Corpus selected -> matching snippet tab, but only if the
+  // remembered tab doesn't already fit the new corpus (so switching
+  // between two DMRS-kind corpora doesn't bounce ERS back to DMRS).
+  var cid = typeof app !== 'undefined' && app.current_corpus_id;
+  var wantedTab = window.__ltdbSnippetTab;
+  var wantedKind = wantedTab && KIND[wantedTab];
+  if (cid && wantedKind && !cid.endsWith(wantedKind)) {
+    wantedTab = cid.endsWith('_dmrs') ? '#step1'
+              : cid.endsWith('_trees') ? '#step2'
+              : null;
+  }
+  if (wantedTab) $('.nav-pills a[href="' + wantedTab + '"]').tab('show');
+
+  // Tab (or snippet) picked -> matching corpus: if the current corpus
+  // is not already the wanted kind, switch to the sibling corpus from
+  // the same grammar when one exists (same id with the suffix
+  // swapped), else warn. Shared by both the DMRS/Trees tab headers
+  // (clicked directly, before picking any particular snippet) and the
+  // individual .inter snippet links below.
+  function trySwitchCorpus(wantSuffix) {
+    if (typeof app === 'undefined' || !app.current_corpus_id) return;
+    if (app.current_corpus_id.endsWith(wantSuffix)) return;
+    var stem = app.current_corpus_id.replace(/_(dmrs|trees)$/, '');
+    var wantedId = stem + wantSuffix;
+    var corpora = app.current_group && app.current_group.corpora;
+    var match = corpora && corpora.find(function (c) {
+      return c !== 'divider' && c.id === wantedId;
+    });
+    if (match) {
+      app.current_corpus_id = wantedId;
+    } else if (typeof direct_warning === 'function') {
+      direct_warning(
+        'No `' + wantedId + '` corpus is available for the current ' +
+        'grammar -- pick one from the corpus list.'
+      );
+    }
+  }
+
+  // ERS phenomena are all DMRS queries (see doc/esd-phenomena), so the
+  // ERS tab wants a DMRS corpus too
+  $('.nav-pills a[href="#step1"], .nav-pills a[href="#step3"]').on('click', function () { trySwitchCorpus('_dmrs'); });
+  $('.nav-pills a[href="#step2"]').on('click', function () { trySwitchCorpus('_trees'); });
+
+  $('.inter').on('click', function () {
+    var file = this.getAttribute('snippet-file') || '';
+    if (file.startsWith('dmrs/') || file.startsWith('ers/')) trySwitchCorpus('_dmrs');
+    else if (file.startsWith('trees/')) trySwitchCorpus('_trees');
+  });
+})();
+</script>

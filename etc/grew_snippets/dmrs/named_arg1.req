@@ -1,0 +1,3 @@
+% Predicates whose ARG1 is a named entity
+
+pattern { V -[1=ARG1]-> X; X [pred="named"] }

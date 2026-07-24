@@ -1,0 +1,9 @@
+% Sequences of foreign words get no internal linguistic structure; they are
+% represented by a 'fw_seq' relation combining the parts.
+%
+% ERS fingerprint (https://delph-in.github.io/docs/erg/ErgSemantics_ForeignExpressions/):
+%   h0:fw_seq[ARG1 i1, ARG2 i2]
+%   h0:[ARG0 i1]
+%   h0:[ARG0 i2]
+
+pattern { F [pred="fw_seq"] }
