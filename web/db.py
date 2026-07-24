@@ -782,6 +782,9 @@ def get_short_summary(current_directory, grammars):
     lexicon: number of entries
     trees: number of trees
     license: url
+    CAN_GENERATE: '1' if the ACE config has generation-roots, else absent
+      (whether the demo can actually parse/generate also needs a compiled
+      .dat file, which callers check separately via dat_path_for)
     """
     summ = dict()
     for grm in grammars:
@@ -797,7 +800,7 @@ def get_short_summary(current_directory, grammars):
             c.execute("""
             SELECT att, val
             FROM meta
-            WHERE att IN ('GRAMMAR_NAME', 'WEBSITE', 'LICENSE')
+            WHERE att IN ('GRAMMAR_NAME', 'WEBSITE', 'LICENSE', 'CAN_GENERATE')
             UNION
             select 'RULES', count(*) from types
             where status in ('rule', 'lex-rule')

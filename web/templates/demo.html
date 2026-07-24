@@ -101,6 +101,7 @@
 <script src="{{ url_for('static', filename='js/ltdb-latex.js') }}"></script>
 <script>
   const _allExamples = {{ examples | tojson }};
+  const _canGenerate = {{ can_generate | tojson }};
   const _MAX_HISTORY = 20;
 
   function _historyKey(grm) { return 'ltdb-demo-history-' + grm; }
@@ -372,7 +373,7 @@
         }
       }
 
-      if (result.mrs) {
+      if (result.mrs && _canGenerate[grm]) {
         const genBtn = $('<button class="btn btn-outline-success btn-sm ms-2">Generate</button>');
         const genOut = $('<div class="mt-2" style="display:none">');
         body.append(genOut);

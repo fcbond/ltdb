@@ -249,6 +249,8 @@ if __name__ == "__main__":
     cfg = read_cfg(os.path.join(os.path.dirname(args.metadata), ace_config))
 
     md["Version"] = cfg["ver"]
+    if cfg.get("generation-roots"):
+        md["CAN_GENERATE"] = "1"
 
     raw_ver = cfg["ver"].replace(" ", "_")
     m = re.search(r'\(([^)]+)\)$', raw_ver)

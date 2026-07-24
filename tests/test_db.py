@@ -436,7 +436,7 @@ class TestGetPhenomenaByCx:
 
 
 class TestGetShortSummary:
-    def _make_grammar_db(self, base, name, doctests=0):
+    def _make_grammar_db(self, base, name, doctests=0, can_generate=False):
         """(Re)create a minimal on-disk grammar db under base/db/."""
         db_dir = base / "db"
         db_dir.mkdir(exist_ok=True)
@@ -449,6 +449,8 @@ class TestGetShortSummary:
         """)
         conn.execute("INSERT INTO meta VALUES ('GRAMMAR_NAME', 'Testish')")
         conn.execute("INSERT INTO types VALUES ('noun-le', 'lex-entry')")
+        if can_generate:
+            conn.execute("INSERT INTO meta VALUES ('CAN_GENERATE', '1')")
         if doctests:
             conn.execute("CREATE TABLE doctest (typ TEXT)")
             conn.executemany(
@@ -467,6 +469,16 @@ class TestGetShortSummary:
         summ = get_short_summary(str(tmp_path), ["doc_1.0.db"])
         assert summ["doc_1.0.db"]["DOCTESTS"] == 3
         assert summ["doc_1.0.db"]["LEXICON"] == 1
+
+    def test_can_generate_absent_by_default(self, tmp_path):
+        self._make_grammar_db(tmp_path, "nogen_1.0.db")
+        summ = get_short_summary(str(tmp_path), ["nogen_1.0.db"])
+        assert "CAN_GENERATE" not in summ["nogen_1.0.db"]
+
+    def test_can_generate_exposed_when_set(self, tmp_path):
+        self._make_grammar_db(tmp_path, "gen_1.0.db", can_generate=True)
+        summ = get_short_summary(str(tmp_path), ["gen_1.0.db"])
+        assert summ["gen_1.0.db"]["CAN_GENERATE"] == "1"
 
     def test_rebuilt_db_is_reread(self, tmp_path):
         """A rebuilt db file must not be served stale from the cache."""

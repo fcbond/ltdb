@@ -69,6 +69,9 @@
         <th class="text-end">Lexicon</th>
         <th class="text-end">Rules</th>
         <th class="text-end">Trees</th>
+        {% if not is_static_mirror %}
+        <th class="text-center" title="Interactive demo: parses (&#8202;&#8594;&#8202;) / parses and generates (&#8202;&#8596;&#8202;)">Demo</th>
+        {% endif %}
         {% if any_doctests %}
         <th class="text-end" title="docstring tests">&lt;ex&gt;</th>
         {% endif %}
@@ -87,6 +90,17 @@
         <td class="text-end">{{ "{:,}".format(s.get('LEXICON', 0)) }}</td>
         <td class="text-end">{{ "{:,}".format(s.get('RULES', 0)) }}</td>
         <td class="text-end">{{ "{:,}".format(s.get('TREES', 0)) if s.get('TREES', 0) else '' }}</td>
+        {% if not is_static_mirror %}
+        {% set parses = can_parse.get(grammar, False) %}
+        {% set generates = parses and s.get('CAN_GENERATE') %}
+        <td class="text-center">
+          {% if generates %}
+          <span title="Parses and generates (interactive demo available)">&#8596;</span>
+          {% elif parses %}
+          <span title="Parses (interactive demo available)">&#8594;</span>
+          {% endif %}
+        </td>
+        {% endif %}
         {% if any_doctests %}
         <td class="text-end" title="docstring tests">{{ "{:,}".format(s.get('DOCTESTS', 0)) if s.get('DOCTESTS', 0) else '' }}</td>
         {% endif %}
@@ -120,11 +134,21 @@
 
 {% block scripts %}
 <script>
+  // The click handler below leaves the loading overlay active while the
+  // form's POST/redirect navigates away; if the browser then restores this
+  // page from bfcache (e.g. pressing Back), that stale "active" state comes
+  // back with it, so the overlay must be cleared on every pageshow.
+  window.addEventListener('pageshow', function () {
+    document.getElementById('loadingOverlay').classList.remove('active');
+  });
+
+  {% set ex_col = 5 + (0 if is_static_mirror else 1) %}
+  {% set website_col = ex_col + (1 if any_doctests else 0) + 1 %}
   $('#grammarTable').DataTable({
     pageLength: 25,
     columnDefs: [
-      { targets: [2, 3, 4{{ ', 5' if any_doctests }}], className: 'dt-right', type: 'num-fmt' },
-      { targets: [{{ 7 if any_doctests else 6 }}], orderable: false }
+      { targets: [2, 3, 4{{ ', ' + ex_col|string if any_doctests }}], className: 'dt-right', type: 'num-fmt' },
+      { targets: [{{ website_col }}], orderable: false }
     ],
     language: { search: 'Filter:' }
   });

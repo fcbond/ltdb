@@ -398,12 +398,16 @@ def home():
     if request.args.get("grm") and session.get("grm"):
         return redirect(url_for("grammar"))
     page = "index"
+    # not cached with summ: a .dat can be (re)compiled without the .db
+    # changing, so this must reflect the current filesystem state
+    can_parse = {g: dat_path_for(g) is not None for g in grammars}
     return render_template(
         "index.html",
         page=page,
         title="LTDB",
         grammars=grammars,
         summ=summ,
+        can_parse=can_parse,
         any_doctests=any(s.get("DOCTESTS") for s in summ.values()),
         grm=session.get("grm", None),
     )
@@ -738,19 +742,21 @@ def demo():
         grm = grammars_with_dat[0] if grammars_with_dat else None
 
     examples = {}
+    can_generate = {}
     for g in grammars_with_dat:
         dbpath = os.path.join(current_directory, "db", g)
         with sqlite3.connect(dbpath) as conn:
-            row = conn.execute(
-                "SELECT val FROM meta WHERE att = 'EXAMPLES'"
-            ).fetchone()
-        if row:
-            try:
-                examples[g] = json.loads(row[0])
-            except (json.JSONDecodeError, TypeError):
-                examples[g] = []
-        else:
+            rows = dict(
+                conn.execute(
+                    "SELECT att, val FROM meta "
+                    "WHERE att IN ('EXAMPLES', 'CAN_GENERATE')"
+                )
+            )
+        try:
+            examples[g] = json.loads(rows.get("EXAMPLES", "[]"))
+        except (json.JSONDecodeError, TypeError):
             examples[g] = []
+        can_generate[g] = bool(rows.get("CAN_GENERATE"))
 
     return render_template(
         "demo.html",
@@ -759,6 +765,7 @@ def demo():
         grammars=grammars_with_dat,
         max_parse_chars=MAX_PARSE_CHARS,
         examples=examples,
+        can_generate=can_generate,
     )
 
 

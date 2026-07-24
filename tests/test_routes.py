@@ -325,6 +325,43 @@ class TestDemoPage:
     def test_demo_returns_200(self, client):
         assert client.get("/demo").status_code == 200
 
+    def test_can_generate_reflects_meta_flag(self, client):
+        """The Generate button is gated client-side on _canGenerate, which
+        must be True only for grammars with a CAN_GENERATE meta row."""
+        import web.routes as routes_mod
+
+        db_dir = os.path.join(routes_mod.current_directory, "db")
+        dbfile = os.path.join(db_dir, "test-grammar_1.0.db")
+        dat = os.path.join(db_dir, "test-grammar_1.0.dat")
+        conn = sqlite3.connect(dbfile)
+        with conn:
+            conn.execute("INSERT INTO meta VALUES ('CAN_GENERATE', '1')")
+        conn.close()
+        with open(dat, "w") as f:
+            f.write("x")
+        try:
+            data = client.get("/demo").data.decode()
+            assert '"test-grammar_1.0.db": true' in data
+        finally:
+            conn = sqlite3.connect(dbfile)
+            with conn:
+                conn.execute("DELETE FROM meta WHERE att = 'CAN_GENERATE'")
+            conn.close()
+            os.unlink(dat)
+
+    def test_can_generate_false_without_meta_flag(self, client):
+        import web.routes as routes_mod
+
+        db_dir = os.path.join(routes_mod.current_directory, "db")
+        dat = os.path.join(db_dir, "test-grammar_1.0.dat")
+        with open(dat, "w") as f:
+            f.write("x")
+        try:
+            data = client.get("/demo").data.decode()
+            assert '"test-grammar_1.0.db": false' in data
+        finally:
+            os.unlink(dat)
+
 
 class TestSummaryCache:
     def test_cache_invalidates_on_new_db(self, flask_app, tmp_path):

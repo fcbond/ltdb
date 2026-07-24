@@ -17,8 +17,11 @@ def read_cfg(ace_config):
     cfg = dict()
     with open(ace_config) as fh:
         for line in fh:
-            for attr in ["version", "grammar-top", "orth-path"]:
-                match = re.findall(rf'{attr}\s+:=\s+"?([^"]+)"?.', line.strip())
+            line = line.strip()
+            if line.startswith(";"):
+                continue
+            for attr in ["version", "grammar-top", "orth-path", "generation-roots"]:
+                match = re.findall(rf'{attr}\s+:=\s+"?([^"]+)"?.', line)
                 if match:
                     cfg[attr] = match[0]
     cfg["grammar_file"] = os.path.normpath(
