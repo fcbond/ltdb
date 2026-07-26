@@ -1,0 +1,30 @@
+# Example Apache reverse proxy for grew-match: the frontend (static
+# files) and backend (dream/OCaml API), both started by
+# grew-match.service.example. See "Production deployment" in
+# doc/grew-match.md for the full explanation.
+#
+# Install:
+#   sudo cp grew-match-apache.conf.example /etc/apache2/conf-available/grew-match.conf
+#   # replace REPLACE_WITH_FRONTEND_PORT / REPLACE_WITH_BACKEND_PORT
+#   # below with the ports grew-match.service.example uses
+#   # (GREW_FRONTEND_PORT / GREW_BACKEND_PORT, default 8000 / 8899)
+#   sudo a2enconf grew-match
+#   sudo systemctl reload apache2
+#
+# Requires mod_proxy + mod_proxy_http (see Install.md) and mod_alias
+# (for RedirectMatch; enabled by default).
+#
+# The path here ("/grew-match") is only an example — match it to
+# GREW_PUBLIC_BACKEND_URL in your systemd unit, and to how you set
+# LTDB_GREW_MATCH_URL in ltdb's own .env so the LTDB navbar links here.
+
+# canonicalize /grew-match -> /grew-match/: the frontend's HTML uses
+# relative asset paths (css/, js/, ...), which only resolve correctly
+# when the browser's address bar has the trailing slash
+RedirectMatch permanent "^/grew-match$" "/grew-match/"
+
+ProxyPass        "/grew-match/" "http://localhost:REPLACE_WITH_FRONTEND_PORT/"
+ProxyPassReverse "/grew-match/" "http://localhost:REPLACE_WITH_FRONTEND_PORT/"
+
+ProxyPass        "/grew-match-api/" "http://localhost:REPLACE_WITH_BACKEND_PORT/"
+ProxyPassReverse "/grew-match-api/" "http://localhost:REPLACE_WITH_BACKEND_PORT/"

@@ -92,6 +92,13 @@ cd /var/www/ltdb && source .venv/bin/activate
 python scripts/setup_ace.py
 ```
 
+## Grew-match (structural search)
+
+Optional, and deployed separately from the steps above — see
+`doc/grew-match.md`, in particular its "Production deployment" section
+(§7), plus `grew-match.service.example` and
+`grew-match-apache.conf.example`.
+
 ## Updating the app
 
 ```bash

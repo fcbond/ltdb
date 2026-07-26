@@ -486,3 +486,86 @@ become a `window` property, though it is still visible from any other
 plain `<script>` sharing the page (confirmed live: `typeof window.app`
 is `"object"` — some unrelated browser global — while `app` is the
 real Vue instance).
+
+## 7. Production deployment
+
+`run.sh --grew-match` (section 3) is a dev runner: it binds to
+localhost, and its ports are meant to be reached over an SSH tunnel or
+from the same machine. Running grew-match as a public, always-on
+service — alongside ltdb's own gunicorn/Apache setup (see `Install.md`)
+— needs a few things `run.sh` doesn't handle, each discovered the hard
+way while first deploying this:
+
+**`config.json`'s host-keyed instance lookup.** `grew_match_quick.py`
+rewrites `grew_match/config.json` on every start, always keying its
+`instances` map by `"localhost:<frontend_port>"` — it has no notion of
+a public domain. The frontend's own JS looks itself up by
+`instances[window.location.host]` (an *exact* match, no fallback), so
+a browser visiting the real domain gets `instances[undefined]` and the
+page breaks. There is no way to make `grew_match_quick.py` itself
+write the right key, since it doesn't know what domain it will be
+proxied behind — so a production run has to start it, wait for the
+backend to come up, then patch `config.json` to add an entry keyed by
+the real public host, pointing at a *publicly reachable* backend URL
+(not `localhost`). `scripts/run-grew-match-prod.sh` does exactly this;
+see its header comment for the environment variables it needs.
+
+**`LTDB_BASE_URL` is not just branding.** The patched
+`grew_match_dream` backend (section 6) reads this env var directly
+(`Sys.getenv_opt "LTDB_BASE_URL"`, defaulting to `""`) to expand the
+*relative* sentence and grammar-page links it embeds in every search
+result. Miss this and every link in results is silently broken —
+degrading to a bare path with no host at all, which 404s outside the
+one dev context (`run.sh`'s own ephemeral localhost port) where a
+relative link happens to still resolve. `run.sh` exports it for the
+dev backend; a production unit must export it too, not just pass the
+same value to `run-grew-match-prod.sh` for the frontend's `top_project`
+branding link.
+
+**The backend may bind IPv6 loopback only.** On some hosts, the
+compiled `main.exe` backend listens on `[::1]` but not `127.0.0.1`.
+`grew_match_quick.py`'s own readiness check uses `localhost` (so it
+resolves whichever loopback address actually works) and succeeds; a
+readiness probe hardcoded to `127.0.0.1` gets a connection refused
+indefinitely even though the backend is genuinely up.
+`run-grew-match-prod.sh`'s own probe uses `localhost` for this reason
+— don't hardcode `127.0.0.1` if adapting it.
+
+**The frontend needs its trailing slash.** Its HTML uses relative
+asset paths (`css/`, `js/`, ...), so `https://example.com/grew-match`
+(no trailing slash) resolves them relative to `/`, not
+`/grew-match/`, and the page loads broken. Redirect the bare path to
+the slash-terminated one (see `grew-match-apache.conf.example`).
+
+**Putting it together:**
+
+1. Install opam + grew (section 2) as whatever user will run the
+   service — no `sudo` needed if using opam's standalone installer to
+   a user-writable `bin` directory (`scripts/opam-env.sh` already
+   expects `~/.local/bin/opam`), *except* the system libraries several
+   packages need (`dep2pictlib` → Cairo, `lwt` → libev, `zarith` →
+   GMP, `dream`'s TLS stack → OpenSSL): `libcairo2-dev libev-dev
+   libgmp-dev libssl-dev pkg-config`. That one step does need `sudo
+   apt-get install`.
+2. Export the grew corpora (section 1) and merge them
+   (`scripts/merge_grew_corpora.py`) into one `corpora.json`. If
+   building the export on a different machine than the one serving
+   it, note that each corpus's `directory` field is an *absolute
+   filesystem path* baked in at export time (`db2grew.py`) — copying
+   the raw export directories to a new machine means rewriting that
+   path prefix in every `corpora.json` before merging, not just
+   copying the merged file.
+3. `bash scripts/setup-grew-match.sh <merged-corpora.json>` — clones,
+   patches, and builds the stack once (section 2's backend patches are
+   applied here).
+4. Copy `grew-match.service.example` and
+   `grew-match-apache.conf.example` to their real locations, replacing
+   every `REPLACE_*` placeholder, and install per the comments in each
+   file.
+5. Set `LTDB_GREW_MATCH_URL` in ltdb's own `.env` (see `Install.md`)
+   to the same public grew-match URL, and restart `ltdb`, so its
+   navbar links to it.
+
+Verify end to end with a real query before considering it done — e.g.
+`pattern { N [pred=re"_dog_.*"] }` against an ERG DMRS corpus, matching
+the count in section 4's worked example.

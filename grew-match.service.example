@@ -1,0 +1,36 @@
+# Example systemd unit for grew-match (structural search over LTDB
+# treebanks), running scripts/run-grew-match-prod.sh. See "Production
+# deployment" in doc/grew-match.md for the full explanation and
+# grew-match-apache.conf.example for the matching reverse-proxy rules.
+#
+# Replace every REPLACE_* placeholder for your deployment, then:
+#   sudo cp grew-match.service.example /etc/systemd/system/grew-match.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now grew-match
+#   sudo systemctl status grew-match --no-pager
+
+[Unit]
+Description=grew-match (structural search over LTDB treebanks)
+After=network.target
+
+[Service]
+Type=simple
+User=REPLACE_WITH_USER
+Group=REPLACE_WITH_USER
+WorkingDirectory=/REPLACE/WITH/path/to/ltdb
+Environment=HOME=/home/REPLACE_WITH_USER
+Environment=PATH=/home/REPLACE_WITH_USER/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+# See scripts/run-grew-match-prod.sh's own header for what each of
+# these means and why LTDB_BASE_URL matters beyond branding.
+Environment=GREW_CORPORA=/REPLACE/WITH/path/to/grew_corpora.json
+Environment=GREW_PUBLIC_HOST=REPLACE_WITH_YOUR.DOMAIN
+Environment=GREW_PUBLIC_BACKEND_URL=https://REPLACE_WITH_YOUR.DOMAIN/grew-match-api/
+Environment=LTDB_BASE_URL=https://REPLACE_WITH_YOUR.DOMAIN/ltdb
+
+ExecStart=/REPLACE/WITH/path/to/ltdb/scripts/run-grew-match-prod.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
