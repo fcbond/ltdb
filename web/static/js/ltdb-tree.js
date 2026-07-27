@@ -121,6 +121,10 @@
       name: node.entity || "",
       entity: node.entity || "",
       type: node.type || null,
+      // word-index span, when the source dict carries one (see toTree
+      // below for where these come from on the raw-sexp parsing path)
+      start: node.start,
+      end: node.end,
       children: node.daughters.map(fromDict),
     };
   }
@@ -137,14 +141,30 @@
         return { name: node[0], form: node[0], leaf: true };
       }
       const children = visibleChildren(node, 1);
-      return { name: node[0], entity: node[0], children };
+      // the outermost root wraps a single UDF-header child with no
+      // start/end of its own (it's just a bare category name); derive
+      // its span as the envelope of its children's, so root-status
+      // constructions can be span-highlighted too
+      const starts = children.map((c) => c.start).filter((v) => v !== undefined);
+      const ends = children.map((c) => c.end).filter((v) => v !== undefined);
+      const start = starts.length ? Math.min(...starts) : undefined;
+      const end = ends.length ? Math.max(...ends) : undefined;
+      return { name: node[0], entity: node[0], children, start, end };
     }
     const name = String(node[1] || node[0] || "");
     const children = visibleChildren(node, 2);
+    // UDF header shape: (id entity score start end daughter...) -- start/end
+    // is the node's word-index span, the same 0-based half-open scheme
+    // typind.kara/made and sent.wid already use elsewhere in the app.
+    // visibleChildren's Array.isArray filter already drops these scalar
+    // fields when collecting children regardless of the slice start
+    // index, so pulling them out here doesn't disturb that.
+    const start = Number.isFinite(Number(node[3])) ? Number(node[3]) : undefined;
+    const end = Number.isFinite(Number(node[4])) ? Number(node[4]) : undefined;
     if (!children.length) {
-      return { name, leaf: true };
+      return { name, leaf: true, start, end };
     }
-    return { name, entity: name, children };
+    return { name, entity: name, children, start, end };
   }
 
   function maxLeafDepth(node, depth) {
@@ -250,9 +270,16 @@
   }
 
   function isHighlightedNode(node, options) {
+    if (!options) return false;
+    // a specific occurrence, by word-index span (e.g. a deep link from a
+    // type's sentence list or the standalone sentence page) -- takes
+    // precedence over, and does not fall back to, highlightType below
+    if (options.highlightSpan) {
+      const { from, to } = options.highlightSpan;
+      return node.start === from && node.end === to;
+    }
     return Boolean(
-      options &&
-        options.highlightType &&
+      options.highlightType &&
         (node.name === options.highlightType || node.entity === options.highlightType)
     );
   }

@@ -114,6 +114,48 @@ def deriv_to_dict(deriv_str):
         return None
 
 
+_TFS_FROM_RE = re.compile(r'\+FROM\s+\\?"(-?\d+)\\?"')
+_TFS_TO_RE = re.compile(r'\+TO\s+\\?"(-?\d+)\\?"')
+
+
+def deriv_word_span_to_char_span(deriv_str, start, end):
+    """Translate a [start, end) word-index span to a (cfrom, cto) char span.
+
+    Word indices are the same 0-based, half-open scheme already used by
+    typind.kara/made and sent.wid. Returns None if the derivation can't
+    be parsed, or any preterminal in range lacks a PET token feature
+    structure with +FROM/+TO — true for LKB-sourced grammars, which
+    carry no character-offset data at all, so this is an expected,
+    silent "unavailable" rather than an error.
+
+    +FROM/+TO are searched independently, not as one fixed-order pair:
+    real PET token FSes are not consistent about which comes first (a
+    single derivation can have some tokens serialized "+FROM ... +TO
+    ..." and others "+TO ... +FROM ...").
+    """
+    if not deriv_str:
+        return None
+    try:
+        d = _derivation.from_string(deriv_str)
+    except Exception:
+        return None
+    cfrom = cto = None
+    for pt in d.preterminals():
+        if pt.start >= end or pt.end <= start:
+            continue
+        for term in pt.terminals():
+            for tok in term.tokens:
+                tfs = tok.tfs or ""
+                fm = _TFS_FROM_RE.search(tfs)
+                tom = _TFS_TO_RE.search(tfs)
+                if not fm or not tom:
+                    return None
+                f, t = int(fm.group(1)), int(tom.group(1))
+                cfrom = f if cfrom is None else min(cfrom, f)
+                cto = t if cto is None else max(cto, t)
+    return (cfrom, cto) if cfrom is not None else None
+
+
 def mrs_to_dicts(mrs_str):
     """Convert a simplemrs string to (mrs_dict, dmrs_dict).
 

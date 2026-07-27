@@ -471,13 +471,19 @@
       .ltdb-mrs-v.hl-h{background:#dbeafe;box-shadow:0 0 0 2px #3b82f6}
       .ltdb-mrs-v.hl-h2{background:#eff6ff;box-shadow:0 0 0 2px #93c5fd}
       .ltdb-mrs-ep.hl-ep{background:#eff6ff;border-color:#93c5fd}
+      .ltdb-mrs-ep.hl-target{background:#dff5df;border-color:#25853a}
     `;
     document.head.appendChild(s);
   }
 
-  function renderMrs(container, mrs) {
+  function spanOverlaps(lnk, from, to) {
+    return Boolean(lnk) && lnk.from < to && lnk.to > from;
+  }
+
+  function renderMrs(container, mrs, options) {
     ensureMrsStyles();
     const vs = mrs.variables || {};
+    const hlSpan = options && options.highlightSpan;
 
     let head = "";
     if (mrs.top) {
@@ -510,8 +516,14 @@
             }).join("")}</div>`
           : "";
         const lblAttr = ep.label ? ` data-lbl="${esc(ep.label)}"` : "";
+        // "hl-target", not "hl-ep" -- clearHl() (below) resets .hl-ep on
+        // every click, and this deep-link highlight must survive the
+        // user then clicking around to explore variables
+        const targetClass = hlSpan && spanOverlaps(ep.lnk, hlSpan.from, hlSpan.to)
+          ? " hl-target"
+          : "";
         return (
-          `<div class="ltdb-mrs-ep"${lblAttr}>` +
+          `<div class="ltdb-mrs-ep${targetClass}"${lblAttr}>` +
           `<div><span class="ltdb-mrs-pred">${esc(ep.predicate)}</span>${lnk}${lbl}${a0}</div>` +
           restHtml +
           `</div>`
@@ -674,6 +686,7 @@
       .ltdb-dmrs-wrap{overflow-x:auto;max-width:100%}
       .ltdb-dmrs-svg{overflow:visible;font:12px sans-serif}
       .ltdb-dmrs-box{fill:#fff;stroke:#61748a;stroke-width:1.25}
+      .ltdb-dmrs-box.hl-target{fill:#dff5df;stroke:#25853a;stroke-width:2}
       .ltdb-dmrs-txt{fill:#222;text-anchor:middle;dominant-baseline:central;pointer-events:none}
       .ltdb-dmrs-arc{fill:none;stroke-width:1.1}
       .ltdb-dmrs-arc.h{stroke:#7b35c9}
@@ -704,8 +717,9 @@
     document.head.appendChild(s);
   }
 
-  function renderDmrs(container, mrs) {
+  function renderDmrs(container, mrs, options) {
     ensureDmrsStyles();
+    const hlSpan = options && options.highlightSpan;
     container.textContent = "";
     let dmrs;
     try {
@@ -867,9 +881,12 @@
     sorted.forEach((n) => {
       const { cx, w } = pos[n.nodeid];
       const g = svgEl("g", {});
+      const boxClass = hlSpan && spanOverlaps(n.lnk, hlSpan.from, hlSpan.to)
+        ? "ltdb-dmrs-box hl-target"
+        : "ltdb-dmrs-box";
       g.appendChild(
         svgEl("rect", {
-          class: "ltdb-dmrs-box",
+          class: boxClass,
           x: cx - w / 2, y: nodeY,
           width: w, height: NH,
           rx: 3,
