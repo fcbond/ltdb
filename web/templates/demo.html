@@ -287,8 +287,16 @@
           if (hasLabels) anyLabels = true;
           window.LTDBTree.renderTree(viz[0], parsed, {
             showLabels: showLabels && hasLabels,
-            typeHref: (typ) =>
-              '/type/' + encodeURIComponent(typ) + '?grm=' + encodeURIComponent(grm),
+            // layout.html's data-type-href-template is a server-rendered
+            // url_for(...), so this stays correct when reverse-proxied
+            // under a mount prefix (e.g. "/ltdb") -- a hardcoded "/type/"
+            // string here would silently drop that prefix
+            typeHref: (typ) => {
+              const template = document.body.dataset.typeHrefTemplate;
+              return template
+                ? template.replace('__TYPE__', encodeURIComponent(typ))
+                : '/type/' + encodeURIComponent(typ) + '?grm=' + encodeURIComponent(grm);
+            },
           });
         } catch (e) {
           viz.html('<p class="text-muted small">Tree unavailable: ' + escHtml(e.message) + '</p>');

@@ -156,6 +156,15 @@
             highlightType: examples ? examples.dataset.type : "",
             typeHref: (typ) => {
               if (!grammar) {
+                // live app (not the static mirror): layout.html renders a
+                // server-side url_for(...) template with a placeholder, so
+                // this correctly includes the app's mount prefix (e.g.
+                // "/ltdb") when reverse-proxied -- a bare client-built path
+                // like "/type/" + typ would silently drop that prefix
+                const template = document.body.dataset.typeHrefTemplate;
+                if (template) {
+                  return template.replace("__TYPE__", encodeURIComponent(typ));
+                }
                 return encodeURIComponent(typ);
               }
               const base = window.location.pathname.endsWith("/type.html")

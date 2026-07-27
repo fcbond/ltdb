@@ -307,3 +307,65 @@ class TestHomeBlurbRendering:
         monkeypatch.setattr(routes, "HOME_BLURB_HTML", "")
         html = client.get("/").data.decode()
         assert "home-blurb" not in html
+
+
+# ---------------------------------------------------------------------------
+# data-type-href-template: shift-clicking a rendered tree node navigates to
+# its type page. On the static mirror that's built from data-grammar/-type
+# attributes on an .ltdb-examples ancestor, but on the live app (sent.html,
+# type.html's own inline trees, demo.html) there is no such ancestor, and
+# the JS used to fall back to a bare client-built "/type/..." path -- which
+# silently dropped the app's mount prefix (e.g. "/ltdb") when reverse-proxied,
+# since only server-side url_for() (via ProxyFix + X-Forwarded-Prefix, see
+# wsgi.py) knows about it. layout.html now renders a server-built url_for()
+# template with a placeholder for the JS to substitute into instead.
+# ---------------------------------------------------------------------------
+
+class TestTypeHrefTemplate:
+    # web/routes.py binds its @app.route(...) decorators via `from flask
+    # import current_app as app`, i.e. to whichever Flask instance is
+    # active the *first* time the module is imported -- since Python only
+    # imports a module once, a *second*, separate create_app() call (as
+    # wsgi.py's own module-level `app = create_app()` would be here) never
+    # gets any routes registered on it. So this reuses the existing,
+    # already-routed `app`/`client` fixtures rather than importing wsgi:app,
+    # and simulates ProxyFix's effect (translating an X-Forwarded-Prefix
+    # header into the WSGI SCRIPT_NAME variable) directly via
+    # environ_overrides -- SCRIPT_NAME-aware url_for() is core
+    # Werkzeug/Flask behavior, not something ProxyFix itself implements.
+    def _get(self, app, tmp_path, monkeypatch, script_name=""):
+        import sqlite3
+
+        import web.routes as routes
+        db_dir = tmp_path / "db"
+        db_dir.mkdir(exist_ok=True)
+        conn = sqlite3.connect(db_dir / "test.db")
+        conn.execute(
+            "CREATE TABLE gold (profile TEXT, sid INTEGER, deriv TEXT, "
+            "mrs TEXT, sent TEXT)"
+        )
+        conn.commit()
+        conn.close()
+        monkeypatch.setattr(routes, "current_directory", str(tmp_path))
+        app.config["SECRET_KEY"] = "test"
+        with app.test_client() as c:
+            with c.session_transaction() as sess:
+                sess["grm"] = "test.db"
+            return c.get(
+                "/sent/gold/1", environ_overrides={"SCRIPT_NAME": script_name}
+            ).data.decode()
+
+    def test_template_has_no_prefix_when_accessed_directly(
+        self, app, tmp_path, monkeypatch
+    ):
+        html = self._get(app, tmp_path, monkeypatch)
+        assert 'data-type-href-template="/type/__TYPE__?grm=test.db"' in html
+
+    def test_template_carries_mount_prefix_behind_reverse_proxy(
+        self, app, tmp_path, monkeypatch
+    ):
+        # SCRIPT_NAME="/ltdb" is what ProxyFix's x_prefix=1 (wsgi.py) sets
+        # from Apache's X-Forwarded-Prefix header in the live deployment
+        # at compling.upol.cz/ltdb
+        html = self._get(app, tmp_path, monkeypatch, script_name="/ltdb")
+        assert 'data-type-href-template="/ltdb/type/__TYPE__?grm=test.db"' in html

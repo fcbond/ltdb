@@ -14,7 +14,7 @@
     {% block css %}{% endblock %}
 </head>
 
-<body>
+<body{% if grm is defined and grm %} data-type-href-template="{{ url_for('type', query='__TYPE__', grm=grm) }}"{% endif %}>
 {% include 'navigation.html' %}
   <main class="app-shell">
     {% block content %}{% endblock %}
