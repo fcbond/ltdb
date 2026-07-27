@@ -55,6 +55,34 @@ def get_surface_form(terminal, surf_str):
         return terminal.form
 
 
+def align_span(surf, sentence, cursor):
+    """Find `surf` in `sentence` at or after `cursor`, for grammars whose
+    tokens carry no +FROM/+TO (extract_span returns None) -- e.g. older
+    LKB-sourced grammars, which have no character-offset data at all.
+
+    A plain, monotonic left-to-right search: since words are processed
+    in sentence order, advancing the cursor past each match (rather
+    than searching from 0 every time) is what correctly finds the
+    *next* occurrence of a repeated word instead of always the first.
+    Tries an exact match first, falling back to case-insensitive (a
+    terminal's surface form is sometimes citation-cased, e.g.
+    lowercased, differently than how it appears in the raw sentence).
+
+    Returns (cfrom, cto, new_cursor), or None if `surf` isn't found
+    from `cursor` onward at all -- a mismatch between the tokenization
+    and the raw sentence text, in which case the caller should treat
+    the span as unavailable for this word, same as extract_span's own
+    None.
+    """
+    idx = sentence.find(surf, cursor)
+    if idx == -1:
+        idx = sentence.lower().find(surf.lower(), cursor)
+    if idx == -1:
+        return None
+    end = idx + len(surf)
+    return idx, end, end
+
+
 def ver_match(ver, profile, log):
     """
     returns True iff the version matches the runs
@@ -93,7 +121,7 @@ def process_results(root):
     """
     lexind = dd(lambda: dd(set))  # lexind[type][(profile, sid)]((frm, to), ...)
     typind = dd(lambda: dd(set))  # typind[type][(profile, sid)]((frm, to), ...)
-    sent = dd(list)  # sent[(profile, sid)][(surf, lexid)]
+    sent = dd(list)  # sent[(profile, sid)][(surf, lexid, cfrom, cto)]
     gold = list()
     log_lines = []
 
@@ -126,6 +154,10 @@ def process_results(root):
             )
             ### get the nodes
             if deriv:
+                # cursor: rightmost char position matched so far in this
+                # sentence, so align_span's fallback finds the *next*
+                # occurrence of a repeated word rather than always the first
+                cursor = 0
                 for preterminal, terminal in zip(
                     deriv.preterminals(), deriv.terminals()
                 ):
@@ -133,8 +165,17 @@ def process_results(root):
                     surf = get_surface_form(terminal, response["i-input"])
                     start = preterminal.start
                     end = preterminal.end
-                    ### get cfrom cto
-                    sent[(profile, sid)].append((surf, lexid))
+                    span = extract_span(terminal)
+                    if span:
+                        cfrom, cto = span
+                        cursor = max(cursor, cto)
+                    else:
+                        aligned = align_span(surf, response["i-input"], cursor)
+                        if aligned:
+                            cfrom, cto, cursor = aligned
+                        else:
+                            cfrom = cto = None
+                    sent[(profile, sid)].append((surf, lexid, cfrom, cto))
                     lexind[lexid][(profile, sid)].add((start, end))
                 ### internal node (store as type)
                 for node in deriv.internals():
@@ -164,12 +205,12 @@ def gold2db(conn, gold, log):
 def sent2db(conn, sent, log):
     c = conn.cursor()
     for p, s in sent:
-        for i, (w, lexid) in enumerate(sent[(p, s)]):
+        for i, (w, lexid, cfrom, cto) in enumerate(sent[(p, s)]):
             try:
                 c.execute(
-                    """INSERT INTO sent (profile, sid, wid, word, lexid)
-                VALUES (?,?,?,?,?)""",
-                    (p, s, i, w, lexid),
+                    """INSERT INTO sent (profile, sid, wid, word, lexid, cfrom, cto)
+                VALUES (?,?,?,?,?,?,?)""",
+                    (p, s, i, w, lexid, cfrom, cto),
                 )
             except sqlite3.Error as e:
                 log.write(f"ERROR:   ({e}) of type ({type(e).__name__}), {p} {s}\n")

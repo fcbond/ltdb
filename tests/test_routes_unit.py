@@ -369,3 +369,187 @@ class TestTypeHrefTemplate:
         # at compling.upol.cz/ltdb
         html = self._get(app, tmp_path, monkeypatch, script_name="/ltdb")
         assert 'data-type-href-template="/ltdb/type/__TYPE__?grm=test.db"' in html
+
+
+# ---------------------------------------------------------------------------
+# Span highlighting on the type page: a lex-type's occurrence should carry
+# its word-index span (data-hl-kara/made, for the tree) and, when the
+# derivation supplies character offsets, the translated char span
+# (data-hl-cfrom/cto, for MRS/DMRS) onto the rendered sentence's divs.
+# ---------------------------------------------------------------------------
+
+class TestTypePageSpanHighlighting:
+    # a real ERG derivation/MRS pair (build/DBS/ERG_2025.db, ws203/1000001800010),
+    # trimmed and re-indexed to word position 2 (third word) of a
+    # synthetic 3-word test sentence "It is cross-platform"
+    DERIV = (
+        '(root_inffrag (0 np_frg_c 0 2 3 (0 hdn_bnp_c 0 2 3 '
+        '(0 n_ms_ilr 0 2 3 (0 cross_platform_n1 0 2 3 '
+        '("cross-platform" 30 "token [ +FORM \\"cross-platform\\" '
+        '+FROM \\"10\\" +TO \\"24\\" ]"))))))'
+    )
+    MRS = (
+        "[ TOP: h0 INDEX: e2 [ e SF: prop ] "
+        "RELS: < [ _cross-platform_n_1<10:24> LBL: h1 ARG0: x4 ] > "
+        "HCONS: < h0 qeq h1 > ]"
+    )
+
+    def _make_db(self, tmp_path):
+        import sqlite3
+
+        db_dir = tmp_path / "db"
+        db_dir.mkdir(exist_ok=True)
+        db = db_dir / "test.db"
+        conn = sqlite3.connect(db)
+        conn.executescript("""
+            CREATE TABLE types (typ TEXT PRIMARY KEY, parents TEXT, children TEXT,
+                cat TEXT, val TEXT, cont TEXT, definition TEXT, status TEXT,
+                arity INTEGER, head INTEGER, lname TEXT, description TEXT,
+                criteria TEXT, reference TEXT, todo TEXT);
+            CREATE TABLE tdl (typ TEXT, src TEXT, line INTEGER, kind TEXT,
+                tdl TEXT, docstring TEXT);
+            CREATE TABLE lex (lexid TEXT PRIMARY KEY, typ TEXT, orth TEXT,
+                pred TEXT, altpred TEXT, carg TEXT, altcarg TEXT, docstring TEXT);
+            CREATE TABLE meta (att TEXT, val TEXT);
+            CREATE TABLE doctest (typ TEXT NOT NULL, sent TEXT NOT NULL,
+                kind TEXT NOT NULL, wf INTEGER NOT NULL, n_parses INTEGER,
+                type_found INTEGER, pass INTEGER NOT NULL, verdict TEXT NOT NULL);
+            CREATE TABLE lexfreq (lexid TEXT, word TEXT, freq INTEGER);
+            CREATE TABLE typfreq (typ TEXT, freq INTEGER);
+            CREATE TABLE gold (sid INTEGER, profile TEXT, sent TEXT, comment TEXT,
+                deriv TEXT, pst TEXT, mrs TEXT, flags TEXT, rule_count INTEGER,
+                UNIQUE(profile, sid));
+            CREATE TABLE sent (sid INTEGER, profile TEXT, wid INTEGER,
+                word TEXT, lexid TEXT, UNIQUE(profile, sid, wid));
+            CREATE TABLE typind (typ TEXT, profile TEXT, sid INTEGER,
+                kara INTEGER, made INTEGER);
+            CREATE TABLE hie (child TEXT, parent TEXT);
+            INSERT INTO meta VALUES ('GRAMMAR_NAME', 'Test Grammar');
+            INSERT INTO types VALUES ('cross_platform_n1', 'n_ms_ilr', '', '', '',
+                '', '', 'lex-type', 0, 0, '', '', '', '', '');
+        """)
+        conn.execute(
+            "INSERT INTO lex VALUES (?,?,?,?,?,?,?,?)",
+            ("cp1", "cross_platform_n1", "cross-platform",
+             "_cross-platform_n_1", None, None, None, None),
+        )
+        for wid, word in enumerate(["It", "is", "cross-platform"]):
+            conn.execute(
+                "INSERT INTO sent VALUES (?,?,?,?,?)",
+                (1, "ws203", wid, word, "cp1" if wid == 2 else None),
+            )
+        conn.execute(
+            "INSERT INTO gold VALUES (?,?,?,?,?,?,?,?,?)",
+            (1, "ws203", "It is cross-platform.", None,
+             self.DERIV, None, self.MRS, None, 3),
+        )
+        conn.commit()
+        conn.close()
+        return tmp_path
+
+    def test_tree_gets_word_span_attributes(self, app, tmp_path, monkeypatch):
+        import web.routes as routes
+        self._make_db(tmp_path)
+        monkeypatch.setattr(routes, "current_directory", str(tmp_path))
+        app.config["SECRET_KEY"] = "test"
+        with app.test_client() as c:
+            with c.session_transaction() as sess:
+                sess["grm"] = "test.db"
+            html = c.get("/type/cross_platform_n1").data.decode()
+        assert 'data-hl-kara="2"' in html
+        assert 'data-hl-made="3"' in html
+
+    def test_mrs_dmrs_get_translated_char_span_attributes(
+        self, app, tmp_path, monkeypatch
+    ):
+        import web.routes as routes
+        self._make_db(tmp_path)
+        monkeypatch.setattr(routes, "current_directory", str(tmp_path))
+        app.config["SECRET_KEY"] = "test"
+        with app.test_client() as c:
+            with c.session_transaction() as sess:
+                sess["grm"] = "test.db"
+            html = c.get("/type/cross_platform_n1").data.decode()
+        assert 'data-hl-cfrom="10"' in html
+        assert 'data-hl-cto="24"' in html
+
+
+# ---------------------------------------------------------------------------
+# Span highlighting on the standalone /sent/ page, driven by the same
+# optional ?kara=&made= query params type.html's sentence-list link (see
+# TestTypePageSpanHighlighting above) now points here with.
+# ---------------------------------------------------------------------------
+
+class TestSentPageSpanHighlighting:
+    DERIV = (
+        '(root_inffrag (0 np_frg_c 0 2 3 (0 hdn_bnp_c 0 2 3 '
+        '(0 n_ms_ilr 0 2 3 (0 cross_platform_n1 0 2 3 '
+        '("cross-platform" 30 "token [ +FORM \\"cross-platform\\" '
+        '+FROM \\"10\\" +TO \\"24\\" ]"))))))'
+    )
+    MRS = (
+        "[ TOP: h0 INDEX: e2 [ e SF: prop ] "
+        "RELS: < [ _cross-platform_n_1<10:24> LBL: h1 ARG0: x4 ] > "
+        "HCONS: < h0 qeq h1 > ]"
+    )
+
+    def _make_db(self, tmp_path):
+        import sqlite3
+
+        db_dir = tmp_path / "db"
+        db_dir.mkdir(exist_ok=True)
+        db = db_dir / "test.db"
+        conn = sqlite3.connect(db)
+        conn.executescript("""
+            CREATE TABLE meta (att TEXT, val TEXT);
+            CREATE TABLE gold (sid INTEGER, profile TEXT, sent TEXT, comment TEXT,
+                deriv TEXT, pst TEXT, mrs TEXT, flags TEXT, rule_count INTEGER,
+                UNIQUE(profile, sid));
+            CREATE TABLE sent (sid INTEGER, profile TEXT, wid INTEGER,
+                word TEXT, lexid TEXT, UNIQUE(profile, sid, wid));
+            INSERT INTO meta VALUES ('GRAMMAR_NAME', 'Test Grammar');
+        """)
+        conn.execute(
+            "INSERT INTO gold VALUES (?,?,?,?,?,?,?,?,?)",
+            (1, "ws203", "It is cross-platform.", None,
+             self.DERIV, None, self.MRS, None, 3),
+        )
+        for wid, word in enumerate(["It", "is", "cross-platform"]):
+            conn.execute(
+                "INSERT INTO sent VALUES (?,?,?,?,?)",
+                (1, "ws203", wid, word, None),
+            )
+        conn.commit()
+        conn.close()
+        return tmp_path
+
+    def _get(self, app, tmp_path, monkeypatch, query=""):
+        import web.routes as routes
+        self._make_db(tmp_path)
+        monkeypatch.setattr(routes, "current_directory", str(tmp_path))
+        app.config["SECRET_KEY"] = "test"
+        with app.test_client() as c:
+            with c.session_transaction() as sess:
+                sess["grm"] = "test.db"
+            return c.get(f"/sent/ws203/1{query}").data.decode()
+
+    def test_without_params_reproduces_page_unchanged(self, app, tmp_path, monkeypatch):
+        html = self._get(app, tmp_path, monkeypatch)
+        assert "data-hl-kara" not in html
+        assert "data-hl-cfrom" not in html
+        assert "text-success" not in html
+        # sentence text still renders, word-reconstructed same as type.html
+        assert "cross-platform" in html
+
+    def test_kara_made_highlight_word_and_tree(self, app, tmp_path, monkeypatch):
+        html = self._get(app, tmp_path, monkeypatch, "?kara=2&made=3")
+        assert '<span class=\'text-success\'>cross-platform</span>' in html
+        assert 'data-hl-kara="2"' in html
+        assert 'data-hl-made="3"' in html
+
+    def test_kara_made_translates_to_char_span_for_mrs_dmrs(
+        self, app, tmp_path, monkeypatch
+    ):
+        html = self._get(app, tmp_path, monkeypatch, "?kara=2&made=3")
+        assert 'data-hl-cfrom="10"' in html
+        assert 'data-hl-cto="24"' in html

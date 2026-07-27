@@ -8,23 +8,38 @@
   <h1>Sentence {{profile}} #{{sid}} not found in this grammar</h1>
   {% else %}
   {% set g = gold[(profile, sid)] %}
-  <h1>{{ g['item'] }}</h1>
+  <h1>
+    {% if sents.get((profile, sid)) %}
+      {% for wid in sents[(profile, sid)] %}
+        {% if kara is not none and wid >= kara and wid < made %}
+          <span class='text-success'>{{ sents[(profile, sid)][wid] }}</span>
+        {% else %}
+          {{ sents[(profile, sid)][wid] }}
+        {% endif %}
+      {% endfor %}
+    {% else %}
+      {{ g['item'] }}
+    {% endif %}
+  </h1>
   <p class="text-muted">{{profile}} #{{sid}}</p>
 
   {% if g['deriv'] %}
   <details class="mt-2 ltdb-tree-details" open>
     <summary>Tree</summary>
-    <div class="ltdb-tree" data-deriv="{{ g['deriv']|e }}"></div>
+    <div class="ltdb-tree" data-deriv="{{ g['deriv']|e }}"
+         {% if kara is not none %}data-hl-kara="{{ kara }}" data-hl-made="{{ made }}"{% endif %}></div>
   </details>
   {% endif %}
   {% if g['mrs'] %}
   <details class="mt-1 ltdb-dmrs-details" open>
     <summary>DMRS</summary>
-    <div class="ltdb-dmrs-view" data-mrs="{{ g['mrs']|e }}"></div>
+    <div class="ltdb-dmrs-view" data-mrs="{{ g['mrs']|e }}"
+         {% if hl_cfrom is not none %}data-hl-cfrom="{{ hl_cfrom }}" data-hl-cto="{{ hl_cto }}"{% endif %}></div>
   </details>
   <details class="mt-2 ltdb-mrs-details">
     <summary>MRS</summary>
-    <div class="ltdb-mrs-view" data-mrs="{{ g['mrs']|e }}"></div>
+    <div class="ltdb-mrs-view" data-mrs="{{ g['mrs']|e }}"
+         {% if hl_cfrom is not none %}data-hl-cfrom="{{ hl_cfrom }}" data-hl-cto="{{ hl_cto }}"{% endif %}></div>
   </details>
   {% endif %}
   {% endif %}

@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from web.ltdb import docstring2html, munge_desc, sanitize_grm
+from web.ltdb import (
+    deriv_word_span_to_char_span,
+    docstring2html,
+    munge_desc,
+    sanitize_grm,
+)
 
 
 class TestMungeDesc:
@@ -110,3 +115,60 @@ class TestSanitizeGrm:
     ])
     def test_invalid_names_return_none(self, inp):
         assert sanitize_grm(inp) is None
+
+
+class TestDerivWordSpanToCharSpan:
+    """deriv_word_span_to_char_span translates a [start, end) word-index
+    span (the same scheme typind.kara/made and sent.wid already use) into
+    a (cfrom, cto) character span, by unioning the +FROM/+TO offsets PET
+    embeds in each preterminal's token feature structure — present for
+    ACE/PET-parsed grammars like the ERG, absent for older LKB-sourced
+    ones like Jacy, which carry no character-offset data at all.
+    """
+
+    # a real ERG derivation excerpt (build/DBS/ERG_2025.db, ws203/1000001800010),
+    # trimmed to the token feature structure's relevant +FROM/+TO fields
+    ERG_DERIV = (
+        '(root_inffrag (0 np_frg_c 0 0 1 (0 hdn_bnp_c 0 0 1 '
+        '(0 n_ms_ilr 0 0 1 (0 cross_platform_n1 0 0 1 '
+        '("cross-platform" 30 "token [ +FORM \\"cross-platform\\" '
+        '+FROM \\"2\\" +TO \\"16\\" ]"))))))'
+    )
+
+    # a real Jacy derivation excerpt (build/DBS/Jacy_2020.07.20.db):
+    # bare terminals, no token feature structure at all
+    JACY_DERIV = (
+        "(utterance-root (923 rule -1.5 0 2 "
+        '(11 kare 0 0 1 ("kare")) (21 narg 0.4 1 2 ("ni"))))'
+    )
+
+    def test_erg_style_span_found(self):
+        assert deriv_word_span_to_char_span(self.ERG_DERIV, 0, 1) == (2, 16)
+
+    def test_jacy_style_returns_none(self):
+        """Older LKB-sourced grammars carry no +FROM/+TO at all."""
+        assert deriv_word_span_to_char_span(self.JACY_DERIV, 0, 1) is None
+        assert deriv_word_span_to_char_span(self.JACY_DERIV, 1, 2) is None
+
+    def test_empty_deriv_returns_none(self):
+        assert deriv_word_span_to_char_span("", 0, 1) is None
+        assert deriv_word_span_to_char_span(None, 0, 1) is None
+
+    def test_unparsable_deriv_returns_none(self):
+        assert deriv_word_span_to_char_span("not a derivation (((", 0, 1) is None
+
+    # a real GG (German Grammar, PET-parsed) derivation excerpt
+    # (etc/ltdb/web/db/GG_1311.db, mrs/78): PET's token FS is not
+    # consistent about +FROM/+TO order -- this token has +TO before
+    # +FROM, unlike the ERG example above
+    GG_REVERSED_ORDER_DERIV = (
+        '(1037 pos-es -1.3 0 1 '
+        '(86 es-expl 0.17 0 1 ("es" 66 "token [ +PRED predsort '
+        '+TO \\"2\\" +FROM \\"0\\" ]")))'
+    )
+
+    def test_reversed_from_to_order_still_found(self):
+        """PET serializes some tokens as \"+TO ... +FROM ...\", not just
+        \"+FROM ... +TO ...\" -- both orders must resolve to the same span.
+        """
+        assert deriv_word_span_to_char_span(self.GG_REVERSED_ORDER_DERIV, 0, 1) == (0, 2)

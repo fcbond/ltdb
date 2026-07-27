@@ -53,7 +53,12 @@ from .db import (
     get_wrds_by_ltypes,
     search_for,
 )
-from .ltdb import docstring2html, render_markdown, sanitize_grm
+from .ltdb import (
+    deriv_word_span_to_char_span,
+    docstring2html,
+    render_markdown,
+    sanitize_grm,
+)
 
 _tdl_formatter = HtmlFormatter(style="friendly")
 PYGMENTS_CSS = _tdl_formatter.get_style_defs(".highlight")
@@ -645,6 +650,20 @@ def _render_type(grm, query):
         "mrsj": "[MRS]",
     }
 
+    # Best-effort word-span -> char-span translation for each sentence
+    # occurrence, so its MRS/DMRS rendering can highlight the matching
+    # EPs/nodes alongside the tree (which highlights by word-span
+    # directly, needing no translation). None when the derivation can't
+    # supply character offsets (e.g. older LKB-sourced grammars) — the
+    # MRS/DMRS views then render unhighlighted, same as before this.
+    hl_char_spans = {}
+    for (p, s), spans in (phenomena.items() if isinstance(phenomena, dict) else []):
+        deriv = gold.get((p, s), {}).get("deriv")
+        for kara, made in spans:
+            hl_char_spans[(p, s, kara, made)] = deriv_word_span_to_char_span(
+                deriv, kara, made
+            )
+
     doctest_summary, doctest_examples = get_doctest(conn, query)
 
     return render_template(
@@ -661,6 +680,7 @@ def _render_type(grm, query):
         phenomena=phenomena,
         sents=sents,
         gold=gold,
+        hl_char_spans=hl_char_spans,
         results=results,
         doctest_summary=doctest_summary,
         doctest_examples=doctest_examples,
@@ -690,14 +710,39 @@ def sent(profile, sid):
 
     Deep links (e.g. from grew-match results) select the grammar with
     ?grm=<db>, which is handled by _apply_grm_param.
+
+    ?kara=&made=&typ= (all optional) highlight a specific occurrence —
+    the same word-index span type.html's own sentence list already
+    computes per occurrence, now carried over via the link it points
+    here with. Omitting them reproduces the page exactly as before.
     """
     grm = session.get("grm")
     if not grm:
         return redirect(url_for("home"))
     conn = get_db(current_directory, grm)
     gold = get_gold(conn, [(profile, sid)], convert=False)
+    sents = get_sents(conn, [(profile, sid)])
+    kara = request.args.get("kara", type=int)
+    made = request.args.get("made", type=int)
+    typ = request.args.get("typ", "")
+    hl_cfrom = hl_cto = None
+    if kara is not None and made is not None:
+        deriv = gold.get((profile, sid), {}).get("deriv")
+        span = deriv_word_span_to_char_span(deriv, kara, made)
+        if span:
+            hl_cfrom, hl_cto = span
     return render_template(
-        "sent.html", grm=grm, profile=profile, sid=sid, gold=gold
+        "sent.html",
+        grm=grm,
+        profile=profile,
+        sid=sid,
+        gold=gold,
+        sents=sents,
+        kara=kara,
+        made=made,
+        typ=typ,
+        hl_cfrom=hl_cfrom,
+        hl_cto=hl_cto,
     )
 
 

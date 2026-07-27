@@ -86,7 +86,9 @@
     <ul>
       {% for p, s in phenomena %}
 	{% for (kara, made) in phenomena[p,s] %}
-	  <li><div><a title='{{p}}, {{s}}'>🗩</a>
+	  {% set char_span = hl_char_spans.get((p, s, kara, made)) %}
+	  <li><div><a href="{{ url_for('sent', profile=p, sid=s, grm=grm, kara=kara, made=made, typ=query) }}"
+	              title='{{p}}, {{s}}'>🗩</a>
 	    {% for wid in sents[(p,s)] %}
 	      {% if wid >= kara and wid < made %}
 		<span class = 'text-success'>{{sents[(p,s)][wid]}}</span>
@@ -97,17 +99,20 @@
 	    {% if gold[(p,s)]['mrs'] %}
 	    <details class="mt-2 ltdb-mrs-details">
 	      <summary>MRS</summary>
-	      <div class="ltdb-mrs-view" data-mrs="{{ gold[(p,s)]['mrs']|e }}"></div>
+	      <div class="ltdb-mrs-view" data-mrs="{{ gold[(p,s)]['mrs']|e }}"
+	           {% if char_span %}data-hl-cfrom="{{ char_span[0] }}" data-hl-cto="{{ char_span[1] }}"{% endif %}></div>
 	    </details>
 	    <details class="mt-1 ltdb-dmrs-details">
 	      <summary>DMRS</summary>
-	      <div class="ltdb-dmrs-view" data-mrs="{{ gold[(p,s)]['mrs']|e }}"></div>
+	      <div class="ltdb-dmrs-view" data-mrs="{{ gold[(p,s)]['mrs']|e }}"
+	           {% if char_span %}data-hl-cfrom="{{ char_span[0] }}" data-hl-cto="{{ char_span[1] }}"{% endif %}></div>
 	    </details>
 	    {% endif %}
 	    {% if gold[(p,s)]['deriv'] %}
 	    <details class="mt-2 ltdb-tree-details">
 	      <summary>Tree</summary>
-	      <div class="ltdb-tree" data-deriv="{{ gold[(p,s)]['deriv']|e }}"></div>
+	      <div class="ltdb-tree" data-deriv="{{ gold[(p,s)]['deriv']|e }}"
+	           data-hl-kara="{{ kara }}" data-hl-made="{{ made }}"></div>
 	    </details>
 	    {% endif %}
 	    </div>

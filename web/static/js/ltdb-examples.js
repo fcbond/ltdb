@@ -152,8 +152,16 @@
           const parsed = window.LTDBTree.parseDerivation(tree.dataset.deriv);
           const examples = tree.closest(".ltdb-examples");
           const grammar = examples ? examples.dataset.grammar : "";
+          // a specific occurrence (from a type/rule's sentence list, or
+          // the standalone sentence page) takes precedence over the
+          // static-mirror's by-name highlightType, same as ltdb-tree.js's
+          // isHighlightedNode itself prioritizes them
+          const highlightSpan = (tree.dataset.hlKara !== undefined && tree.dataset.hlMade !== undefined)
+            ? { from: Number(tree.dataset.hlKara), to: Number(tree.dataset.hlMade) }
+            : null;
           window.LTDBTree.renderTree(tree, parsed, {
             highlightType: examples ? examples.dataset.type : "",
+            highlightSpan,
             typeHref: (typ) => {
               if (!grammar) {
                 // live app (not the static mirror): layout.html renders a
@@ -188,7 +196,10 @@
         if (!view || view.dataset.rendered) return;
         try {
           const mrs = window.LTDBMrs.parseMrs(view.dataset.mrs);
-          window.LTDBMrs.renderMrs(view, mrs);
+          const highlightSpan = (view.dataset.hlCfrom !== undefined && view.dataset.hlCto !== undefined)
+            ? { from: Number(view.dataset.hlCfrom), to: Number(view.dataset.hlCto) }
+            : null;
+          window.LTDBMrs.renderMrs(view, mrs, { highlightSpan });
           view.dataset.rendered = "true";
         } catch (error) {
           view.innerHTML = `<pre>${escapeHtml(view.dataset.mrs || "")}</pre>`;
@@ -202,7 +213,10 @@
         if (!view || view.dataset.rendered) return;
         try {
           const mrs = window.LTDBMrs.parseMrs(view.dataset.mrs);
-          window.LTDBMrs.renderDmrs(view, mrs);
+          const highlightSpan = (view.dataset.hlCfrom !== undefined && view.dataset.hlCto !== undefined)
+            ? { from: Number(view.dataset.hlCfrom), to: Number(view.dataset.hlCto) }
+            : null;
+          window.LTDBMrs.renderDmrs(view, mrs, { highlightSpan });
           view.dataset.rendered = "true";
         } catch (error) {
           view.innerHTML = `<p class="text-muted" style="font-size:12px">DMRS unavailable: ${escapeHtml(

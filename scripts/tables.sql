@@ -31,6 +31,15 @@ CREATE TABLE sent (sid INTEGER,
 		   wid INTEGER,
 		   word TEXT,
 		   lexid TEXT,
+		   -- character offsets of this word in gold.sent, for
+		   -- highlighting sentence text alongside a matching
+		   -- tree/MRS/DMRS node. From the grammar's own PET
+		   -- token feature structure when available, otherwise
+		   -- found by aligning the word against gold.sent
+		   -- (scripts/gold2db.py's align_span); NULL if neither
+		   -- succeeds (a genuine tokenization/text mismatch)
+		   cfrom INTEGER,
+		   cto INTEGER,
 		   UNIQUE(profile, sid, wid) );
 -- Information from the gold profiles; JSON is built on the fly from deriv/mrs
 CREATE TABLE gold (sid INTEGER,

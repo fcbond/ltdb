@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from gold2db import extract_span, get_surface_form
+from gold2db import align_span, extract_span, get_surface_form
 
 # Real ACE token strings (trimmed) as seen in a UDF derivation, keyed by
 # +FROM/+TO like the ones gold2db.py's regex expects.
@@ -51,3 +51,36 @@ class TestGetSurfaceForm:
     def test_falls_back_to_terminal_form_without_span(self):
         term = _terminal([], form="or what")
         assert get_surface_form(term, "Are you kiasi or what?") == "or what"
+
+
+class TestAlignSpan:
+    """align_span is the fallback used when extract_span finds no
+    +FROM/+TO at all (e.g. older LKB-sourced grammars, which carry no
+    character-offset data in their tokens whatsoever) -- it locates a
+    word by searching the raw sentence text directly instead.
+    """
+
+    def test_finds_word_from_cursor(self):
+        assert align_span("dog", "The dog barks.", 0) == (4, 7, 7)
+
+    def test_advances_cursor_to_end_of_match(self):
+        _, _, cursor = align_span("The", "The dog barks.", 0)
+        assert cursor == 3
+
+    def test_repeated_word_finds_next_occurrence_not_first(self):
+        # a naive search-from-0 would find the first "the" again;
+        # advancing the cursor past each match finds the second one
+        sentence = "The dog chased the cat."
+        _, _, cursor = align_span("The", sentence, 0)
+        assert align_span("the", sentence, cursor) == (15, 18, 18)
+
+    def test_case_insensitive_fallback(self):
+        # citation form is lowercase; sentence has it capitalized
+        assert align_span("the", "The dog barks.", 0) == (0, 3, 3)
+
+    def test_not_found_returns_none(self):
+        assert align_span("cat", "The dog barks.", 0) is None
+
+    def test_not_found_after_cursor_returns_none(self):
+        # "The" exists, but not at or after this cursor position
+        assert align_span("The", "The dog barks.", 5) is None
