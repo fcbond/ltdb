@@ -340,9 +340,11 @@ class TestTypeHrefTemplate:
         db_dir = tmp_path / "db"
         db_dir.mkdir(exist_ok=True)
         conn = sqlite3.connect(db_dir / "test.db")
-        conn.execute(
+        conn.executescript(
             "CREATE TABLE gold (profile TEXT, sid INTEGER, deriv TEXT, "
-            "mrs TEXT, sent TEXT)"
+            "mrs TEXT, sent TEXT);"
+            "CREATE TABLE sent (profile TEXT, sid INTEGER, wid INTEGER, "
+            "word TEXT, lexid TEXT);"
         )
         conn.commit()
         conn.close()
