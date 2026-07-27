@@ -4,17 +4,24 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from gold2db import align_span, extract_span, get_surface_form
+from gold2db import align_span, extract_span, get_surface_form, preterminal_rows
 
 # Real ACE token strings (trimmed) as seen in a UDF derivation, keyed by
 # +FROM/+TO like the ones gold2db.py's regex expects.
 _TOK_OR = r'token [ +FORM \"or\" +FROM \"14\" +TO \"16\" ]'
 _TOK_WHAT = r'token [ +FORM \"what\" +FROM \"17\" +TO \"21\" ]'
 _TOK_ARE = r'token [ +FORM \"are\" +FROM \"0\" +TO \"3\" ]'
+_TOK_HIKERS = r'token [ +FORM \"hikers\" +FROM \"11\" +TO \"17\" ]'
+_TOK_APOS = r'token [ +FORM \"\'\" +FROM \"17\" +TO \"18\" ]'
+_TOK_HUT = r'token [ +FORM \"hut\" +FROM \"19\" +TO \"22\" ]'
 
 
 def _terminal(tokens, form=""):
     return SimpleNamespace(tokens=tokens, form=form)
+
+
+def _preterminal(entity, start, end):
+    return SimpleNamespace(entity=entity, start=start, end=end)
 
 
 class TestExtractSpan:
@@ -84,3 +91,59 @@ class TestAlignSpan:
     def test_not_found_after_cursor_returns_none(self):
         # "The" exists, but not at or after this cursor position
         assert align_span("The", "The dog barks.", 5) is None
+
+
+class TestPreterminalRows:
+    """Regression coverage for the sent.wid / typind.kara,made indexing
+    mismatch: a preterminal's row must be keyed by its own `start`
+    (pydelphin's raw-token index, matching typind/lexind), not by its
+    position in the preterminal/terminal list -- which undercounts by
+    one for every multiword entry already seen, since multiword
+    entries take up more than one raw-token slot but only one list
+    position.
+    """
+
+    def test_single_token_entries_are_contiguous(self):
+        # baseline: without any multiword entry, start values are the
+        # same as a plain enumerate() position would have been
+        pairs = [
+            (_preterminal("are_v1", 0, 1), _terminal([("1", _TOK_ARE)], "are")),
+            (_preterminal("what_q", 1, 2), _terminal([("2", _TOK_WHAT)], "what")),
+        ]
+        rows = preterminal_rows(pairs, "Are what?")
+        assert [r[0] for r in rows] == [0, 1]
+
+    def test_multiword_entry_creates_gap_in_start_index(self):
+        # mirrors real ERG data: "...before the hikers' hut..." --
+        # "hikers'" is one lexical entry (hikers_a2) spanning two raw
+        # tokens (14, 16); the *next* entry, "hut", must start at 16,
+        # not 15 as a naive position-based count would give it
+        sentence = "before the hikers' hut"
+        pairs = [
+            (
+                _preterminal("hikers_a2", 14, 16),
+                _terminal([("1", _TOK_HIKERS), ("2", _TOK_APOS)], "hikers'"),
+            ),
+            (
+                _preterminal("hut_n1", 16, 17),
+                _terminal([("3", _TOK_HUT)], "hut"),
+            ),
+        ]
+        rows = preterminal_rows(pairs, sentence)
+        assert [r[0] for r in rows] == [14, 16]
+        hikers_row, hut_row = rows
+        assert hikers_row == (14, 16, "hikers'", "hikers_a2", 11, 18)
+        assert hut_row == (16, 17, "hut", "hut_n1", 19, 22)
+
+    def test_falls_back_to_align_span_without_tfs_offsets(self):
+        # grammars with no +FROM/+TO at all (e.g. LKB-sourced) still
+        # get a correct, gap-preserving start index from the
+        # preterminal itself -- align_span only supplies cfrom/cto
+        pairs = [
+            (_preterminal("hikers_a2", 14, 16), _terminal([], "hikers'")),
+            (_preterminal("hut_n1", 16, 17), _terminal([], "hut")),
+        ]
+        rows = preterminal_rows(pairs, "before the hikers' hut")
+        assert [r[0] for r in rows] == [14, 16]
+        assert rows[0][4:] == (11, 18)  # cfrom, cto for "hikers'"
+        assert rows[1][4:] == (19, 22)  # cfrom, cto for "hut"

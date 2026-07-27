@@ -84,6 +84,9 @@ INSERT INTO sent VALUES (1, 'gold', 0, 'The',  NULL);
 INSERT INTO sent VALUES (1, 'gold', 1, 'dog',  'dog_n1');
 INSERT INTO sent VALUES (1, 'gold', 2, 'barks', 'bark_v1');
 
+INSERT INTO lexind VALUES ('dog_n1',  'gold', 1, 1, 2);
+INSERT INTO lexind VALUES ('bark_v1', 'gold', 1, 2, 3);
+
 INSERT INTO gold VALUES (1, 'gold', 'The dog barks.', NULL, NULL, NULL, NULL, NULL, 5);
 """
 

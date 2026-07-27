@@ -425,6 +425,8 @@ class TestTypePageSpanHighlighting:
                 word TEXT, lexid TEXT, UNIQUE(profile, sid, wid));
             CREATE TABLE typind (typ TEXT, profile TEXT, sid INTEGER,
                 kara INTEGER, made INTEGER);
+            CREATE TABLE lexind (lexid TEXT, profile TEXT, sid INTEGER,
+                kara INTEGER, made INTEGER);
             CREATE TABLE hie (child TEXT, parent TEXT);
             INSERT INTO meta VALUES ('GRAMMAR_NAME', 'Test Grammar');
             INSERT INTO types VALUES ('cross_platform_n1', 'n_ms_ilr', '', '', '',
@@ -440,6 +442,10 @@ class TestTypePageSpanHighlighting:
                 "INSERT INTO sent VALUES (?,?,?,?,?)",
                 (1, "ws203", wid, word, "cp1" if wid == 2 else None),
             )
+        conn.execute(
+            "INSERT INTO lexind VALUES (?,?,?,?,?)",
+            ("cp1", "ws203", 1, 2, 3),
+        )
         conn.execute(
             "INSERT INTO gold VALUES (?,?,?,?,?,?,?,?,?)",
             (1, "ws203", "It is cross-platform.", None,

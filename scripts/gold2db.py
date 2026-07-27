@@ -83,6 +83,36 @@ def align_span(surf, sentence, cursor):
     return idx, end, end
 
 
+def preterminal_rows(preterminal_terminal_pairs, sentence):
+    """Build one row per preterminal: (start, end, surf, lexid, cfrom, cto).
+
+    `start`/`end` are the raw-token indices pydelphin itself assigns to
+    the preterminal (its `.start`/`.end`) -- the same scheme used by
+    typind/lexind and the derivation tree's own nodes. A multiword
+    preterminal (e.g. one covering two input tokens) advances `start`
+    by more than one, so the next preterminal's `start` can be greater
+    than this one's `start` + 1: callers must key rows by `start`
+    itself, not by their position in this list.
+    """
+    rows = []
+    cursor = 0
+    for preterminal, terminal in preterminal_terminal_pairs:
+        lexid = preterminal.entity
+        surf = get_surface_form(terminal, sentence)
+        span = extract_span(terminal)
+        if span:
+            cfrom, cto = span
+            cursor = max(cursor, cto)
+        else:
+            aligned = align_span(surf, sentence, cursor)
+            if aligned:
+                cfrom, cto, cursor = aligned
+            else:
+                cfrom = cto = None
+        rows.append((preterminal.start, preterminal.end, surf, lexid, cfrom, cto))
+    return rows
+
+
 def ver_match(ver, profile, log):
     """
     returns True iff the version matches the runs
@@ -121,7 +151,7 @@ def process_results(root):
     """
     lexind = dd(lambda: dd(set))  # lexind[type][(profile, sid)]((frm, to), ...)
     typind = dd(lambda: dd(set))  # typind[type][(profile, sid)]((frm, to), ...)
-    sent = dd(list)  # sent[(profile, sid)][(surf, lexid, cfrom, cto)]
+    sent = dd(list)  # sent[(profile, sid)][(wid, surf, lexid, cfrom, cto)]
     gold = list()
     log_lines = []
 
@@ -154,28 +184,22 @@ def process_results(root):
             )
             ### get the nodes
             if deriv:
-                # cursor: rightmost char position matched so far in this
-                # sentence, so align_span's fallback finds the *next*
-                # occurrence of a repeated word rather than always the first
-                cursor = 0
-                for preterminal, terminal in zip(
-                    deriv.preterminals(), deriv.terminals()
+                pairs = list(zip(deriv.preterminals(), deriv.terminals()))
+                # wid = start, not this loop's own position: matches
+                # typind/lexind's raw-token indexing (below, and in
+                # deriv.internals() just after) so a word-index span
+                # from any of the three means the same thing. A plain
+                # enumerate() position instead would count *lexical
+                # entries*, silently diverging from the tree's own
+                # indexing after the first multiword entry (e.g. one
+                # sentence has a lexind span of (14, 16) for a 2-token
+                # entry at what would otherwise be counted as "wid 14",
+                # while the very next lexical entry -- an unrelated
+                # word -- would wrongly land on "wid 15" instead of 16)
+                for start, end, surf, lexid, cfrom, cto in preterminal_rows(
+                    pairs, response["i-input"]
                 ):
-                    lexid = preterminal.entity
-                    surf = get_surface_form(terminal, response["i-input"])
-                    start = preterminal.start
-                    end = preterminal.end
-                    span = extract_span(terminal)
-                    if span:
-                        cfrom, cto = span
-                        cursor = max(cursor, cto)
-                    else:
-                        aligned = align_span(surf, response["i-input"], cursor)
-                        if aligned:
-                            cfrom, cto, cursor = aligned
-                        else:
-                            cfrom = cto = None
-                    sent[(profile, sid)].append((surf, lexid, cfrom, cto))
+                    sent[(profile, sid)].append((start, surf, lexid, cfrom, cto))
                     lexind[lexid][(profile, sid)].add((start, end))
                 ### internal node (store as type)
                 for node in deriv.internals():
@@ -205,12 +229,12 @@ def gold2db(conn, gold, log):
 def sent2db(conn, sent, log):
     c = conn.cursor()
     for p, s in sent:
-        for i, (w, lexid, cfrom, cto) in enumerate(sent[(p, s)]):
+        for wid, w, lexid, cfrom, cto in sent[(p, s)]:
             try:
                 c.execute(
                     """INSERT INTO sent (profile, sid, wid, word, lexid, cfrom, cto)
                 VALUES (?,?,?,?,?,?,?)""",
-                    (p, s, i, w, lexid, cfrom, cto),
+                    (p, s, wid, w, lexid, cfrom, cto),
                 )
             except sqlite3.Error as e:
                 log.write(f"ERROR:   ({e}) of type ({type(e).__name__}), {p} {s}\n")

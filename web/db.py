@@ -422,7 +422,7 @@ def get_phenomena_by_lexids(conn, lexids):
 
     Returns:
         Tuple of (total_count, phenomena) where phenomena maps
-        (profile, sid) → list of (from, to) highlight spans.
+        (profile, sid) → list of (kara, made) highlight spans.
     """
     if not lexids:
         return 0, dd(list)
@@ -432,7 +432,7 @@ def get_phenomena_by_lexids(conn, lexids):
         f"""SELECT COUNT(*)
         FROM (
             SELECT DISTINCT profile, sid
-            FROM sent
+            FROM lexind
             WHERE lexid IN ({holders(lexids)})
         )""",
         lexids,
@@ -447,9 +447,10 @@ def get_phenomena_by_lexids(conn, lexids):
     )
     phenomena = dd(list)
     c.execute(
-        f"""SELECT a.profile, a.sid, MIN(a.wid) AS kw_wid,
+        f"""SELECT a.profile, a.sid,
+               MIN(a.kara) AS kara, MAX(a.made) AS made,
                {gdex} AS gdex_score
-        FROM sent AS a
+        FROM lexind AS a
         LEFT JOIN sent AS b
             ON a.profile = b.profile AND a.sid = b.sid
         LEFT JOIN gold AS g
@@ -460,8 +461,8 @@ def get_phenomena_by_lexids(conn, lexids):
         LIMIT ?""",
         lexids + [sentlim],
     )
-    for profile, sid, wid, _score in c:
-        phenomena[profile, sid].append((wid, wid + 1))
+    for profile, sid, kara, made, _score in c:
+        phenomena[profile, sid].append((kara, made))
     return maxp, phenomena
 
 

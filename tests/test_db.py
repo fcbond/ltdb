@@ -368,6 +368,7 @@ class TestGetPhenomenaByLexids:
         """A sentence in the optimal length range outranks a very short one."""
         mem_conn.executescript("""
             INSERT INTO sent VALUES (2, 'gold', 0, 'Kim', 'dog_n1');
+            INSERT INTO lexind VALUES ('dog_n1', 'gold', 2, 0, 1);
             INSERT INTO gold VALUES (2, 'gold', 'Kim', NULL, NULL, NULL, NULL, NULL, 1);
             INSERT INTO sent VALUES (3, 'gold', 0, 'The',   NULL);
             INSERT INTO sent VALUES (3, 'gold', 1, 'big',   NULL);
@@ -376,6 +377,7 @@ class TestGetPhenomenaByLexids:
             INSERT INTO sent VALUES (3, 'gold', 4, 'runs',  NULL);
             INSERT INTO sent VALUES (3, 'gold', 5, 'fast',  NULL);
             INSERT INTO sent VALUES (3, 'gold', 6, 'now',   NULL);
+            INSERT INTO lexind VALUES ('dog_n1', 'gold', 3, 3, 4);
             INSERT INTO gold VALUES (3, 'gold', 'The big brown dog runs fast now.',
                 NULL, NULL, NULL, NULL, NULL, 3);
         """)
@@ -383,6 +385,25 @@ class TestGetPhenomenaByLexids:
         first_key = next(iter(phenom))
         # Sentence 3 (7 words, in optimal 6-12 range) scores highest
         assert first_key == ("gold", 3)
+
+    def test_multiword_lexid_span_matches_lexind(self, mem_conn):
+        # a multiword lexical entry (e.g. "hikers'" spanning two raw
+        # tokens) must return its real lexind span, not (wid, wid+1) --
+        # sent has only one row for the whole entry (wid=1, the
+        # preterminal's start), so a naive (wid, wid+1) would wrongly
+        # give a width-1 span instead of the real (1, 3)
+        mem_conn.executescript("""
+            INSERT INTO sent VALUES (4, 'gold', 0, 'the', NULL);
+            INSERT INTO sent VALUES (4, 'gold', 1, "hikers'", 'hikers_a2');
+            INSERT INTO sent VALUES (4, 'gold', 3, 'hut', 'hut_n1');
+            INSERT INTO lexind VALUES ('hikers_a2', 'gold', 4, 1, 3);
+            INSERT INTO lexind VALUES ('hut_n1', 'gold', 4, 3, 4);
+            INSERT INTO gold VALUES (4, 'gold', "the hikers' hut",
+                NULL, NULL, NULL, NULL, NULL, 3);
+        """)
+        maxp, phenom = get_phenomena_by_lexids(mem_conn, ["hikers_a2"])
+        assert maxp == 1
+        assert phenom["gold", 4] == [(1, 3)]
 
 
 class TestGetPhenomenaByCx:
