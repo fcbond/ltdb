@@ -9,6 +9,11 @@
               line-height:1;cursor:pointer;transition:color .15s; }
   .copy-btn:hover { color:#0d6efd; }
   .copy-btn.copied { color:#198754; }
+  /* Cap the grammar dropdown's width so a long db filename (e.g. one with a
+     timestamp suffix) can't force the toolbar row to wrap; the full name is
+     still in the native dropdown list and the title attribute. */
+  #grammarSelect { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .help-hint { cursor: help; }
 </style>
 {% endblock %}
 
@@ -24,8 +29,8 @@
   {% else %}
 
   <form id="parseForm" class="mb-4">
-    <div class="row g-2 align-items-end mb-3">
-      <div class="col-md-6">
+    <div class="row g-2 align-items-end mb-3 flex-md-nowrap">
+      <div class="col-12 col-md">
         <label for="inputText" class="form-label">Input sentence</label>
         <div class="demo-input-wrap">
           <input type="text" id="inputText" name="input" class="form-control"
@@ -33,21 +38,21 @@
                  maxlength="{{ max_parse_chars }}" required>
           <button type="button" id="clearInput" tabindex="-1" title="Clear to browse history"
                   class="input-clear">&#215;</button>
-        </div>
-        <div class="demo-char-count">
-          <span id="charCount">0</span> / {{ max_parse_chars }}
+          <div class="demo-char-count">
+            <span id="charCount">0</span> / {{ max_parse_chars }}
+          </div>
         </div>
         <datalist id="exampleList"></datalist>
       </div>
-      <div class="col-md-3">
+      <div class="col-6 col-md-3">
         <label for="grammarSelect" class="form-label">Grammar</label>
-        <select id="grammarSelect" name="grm" class="form-select">
+        <select id="grammarSelect" name="grm" class="form-select" title="">
           {% for g in grammars %}
           <option value="{{ g }}" {% if g == grm %}selected{% endif %}>{{ g[:-3] }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-1">
+      <div class="col-3 col-md-1">
         <label for="numResults" class="form-label">Results</label>
         <select id="numResults" name="results" class="form-select">
           {% for n in [1, 2, 5, 10] %}
@@ -55,21 +60,23 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-2 d-flex align-items-end">
-        <button type="submit" class="btn btn-primary w-100">Parse</button>
+      <div class="col-3 col-md-auto d-flex align-items-end">
+        <button type="submit" class="btn btn-primary btn-sm w-100">Parse</button>
       </div>
     </div>
 
-    <div class="d-flex gap-3">
+    <div class="d-flex gap-3 flex-wrap">
       <div class="form-check">
         <input class="form-check-input" type="checkbox" id="wantTree" checked>
         <label class="form-check-label" for="wantTree">Tree</label>
-        <small class="text-muted ms-1" title="Click a node to collapse/expand; shift-click to open its type page">(?)</small>
+        <small class="text-muted ms-1 help-hint" tabindex="0" role="button"
+               data-bs-toggle="popover" data-bs-trigger="focus" data-bs-content="Click a node to collapse/expand; shift-click to open its type page">(?)</small>
       </div>
       <div class="form-check" id="labelToggleWrap" style="display:none">
         <input class="form-check-input" type="checkbox" id="showLabels">
         <label class="form-check-label" for="showLabels">Labels</label>
-        <small class="text-muted ms-1" title="Show linguistic category labels (NP, VP…) instead of grammar rule names">(?)</small>
+        <small class="text-muted ms-1 help-hint" tabindex="0" role="button"
+               data-bs-toggle="popover" data-bs-trigger="focus" data-bs-content="Show linguistic category labels (NP, VP…) instead of grammar rule names">(?)</small>
       </div>
       <div class="form-check">
         <input class="form-check-input" type="checkbox" id="wantMRS" checked>
@@ -79,10 +86,11 @@
         <input class="form-check-input" type="checkbox" id="wantDMRS" checked>
         <label class="form-check-label" for="wantDMRS">DMRS</label>
       </div>
-      <div class="form-check" id="analyzeToggleWrap">
+      <div class="form-check" id="analyzeToggleWrap" style="display:none">
         <input class="form-check-input" type="checkbox" id="wantAnalyze" checked>
-        <label class="form-check-label" for="wantAnalyze">Analyze</label>
-        <small class="text-muted ms-1" title="Run this grammar's morphological analyzer / segmenter (e.g. MeCab, jieba, FreeLing, KARMA) on the input before parsing. Uncheck to parse already-segmented input as typed.">(?)</small>
+        <label class="form-check-label" for="wantAnalyze">Preprocess</label>
+        <small class="text-muted ms-1 help-hint" id="analyzeHelp" tabindex="0" role="button"
+               data-bs-toggle="popover" data-bs-trigger="focus" data-bs-content="Run this grammar's morphological analyzer / segmenter on the input before parsing. Uncheck to parse already-segmented input as typed.">(?)</small>
       </div>
     </div>
   </form>
@@ -107,7 +115,38 @@
 <script>
   const _allExamples = {{ examples | tojson }};
   const _canGenerate = {{ can_generate | tojson }};
+  const _analyzerInfo = {{ analyzer_info | tojson }};
   const _MAX_HISTORY = 20;
+
+  // Click/focus-triggered help popovers for the (?) hints (plain `title`
+  // attributes only show on hover, which reads as "doing nothing" on click
+  // or on touch devices).
+  document.querySelectorAll('.help-hint[data-bs-toggle="popover"]').forEach(function (el) {
+    new bootstrap.Popover(el, { trigger: 'focus', placement: 'top' });
+  });
+
+  function _setPopoverContent(el, text) {
+    const existing = bootstrap.Popover.getInstance(el);
+    if (existing) existing.dispose();
+    el.setAttribute('data-bs-content', text);
+    new bootstrap.Popover(el, { trigger: 'focus', placement: 'top' });
+  }
+
+  // The "Preprocess" toggle only applies to -- and is only shown for --
+  // grammars with an analyzer that is actually installed on this server.
+  function _updateAnalyzerToggle(grm) {
+    const info = _analyzerInfo[grm];
+    const wrap = document.getElementById('analyzeToggleWrap');
+    if (info) {
+      wrap.style.display = '';
+      _setPopoverContent(
+        document.getElementById('analyzeHelp'),
+        info.description + ' Uncheck to parse already-segmented input as typed.'
+      );
+    } else {
+      wrap.style.display = 'none';
+    }
+  }
 
   function _historyKey(grm) { return 'ltdb-demo-history-' + grm; }
 
@@ -131,13 +170,23 @@
     dl.innerHTML = items.map(s => `<option value="${s.replace(/"/g, '&quot;')}">`).join('');
   }
 
+  function _updateGrammarTitle() {
+    // The select itself is CSS-truncated (see #grammarSelect above) so a
+    // long db filename can't force the toolbar to wrap; the title attribute
+    // keeps the full name available on hover.
+    const sel = document.getElementById('grammarSelect');
+    sel.title = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
+  }
+
   function _initGrammar(grm) {
+    _updateGrammarTitle();
     const history = _getHistory(grm);
     _updateDatalist(history);
     if (!$('#inputText').val() && history.length > 0) {
       $('#inputText').val(history[0]);
       $('#clearInput').show();
     }
+    _updateAnalyzerToggle(grm);
   }
 
   function _updateCharCount() {
@@ -405,16 +454,20 @@
         }
       }
 
-      if (result.mrs && _canGenerate[grm]) {
+      if (result.mrs_raw && _canGenerate[grm]) {
         const genBtn = $('<button class="btn btn-outline-success btn-sm ms-2">Generate</button>');
         const genOut = $('<div class="mt-2" style="display:none">');
         body.append(genOut);
         genBtn.on('click', function () {
           if (genOut.children().length > 0) { genOut.toggle(); return; }
           genBtn.prop('disabled', true).text('Generating…');
+          // mrs_raw, not mrs: generation needs ACE's own SimpleMRS string
+          // verbatim (predicates with their "_rel" suffix intact), not the
+          // mrsjson round-trip, which some grammars' semantic index can't
+          // match against (see generate_sentence's comment in routes.py).
           $.post('{{ url_for("generate_sentence") }}', {
             grm: grm,
-            mrs: JSON.stringify(result.mrs)
+            mrs: result.mrs_raw
           }).done(function (data) {
             genBtn.prop('disabled', false).text('Generate');
             if (data.error) {

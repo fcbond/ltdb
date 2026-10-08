@@ -85,6 +85,7 @@ class Analyzer(Protocol):
     """A morphological analyzer / segmenter backend."""
 
     name: str
+    description: str
 
     def available(self) -> bool:
         """Return True if the backing tool is installed and usable."""
@@ -104,6 +105,7 @@ class MeCabAnalyzer:
     """
 
     name = "MeCab"
+    description = "Segments Japanese input into words with MeCab before parsing."
 
     def __init__(self) -> None:
         self._bin = os.environ.get("MECAB_BIN", "mecab")
@@ -136,6 +138,7 @@ class JiebaAnalyzer:
     """
 
     name = "jieba"
+    description = "Segments Chinese input into words with jieba before parsing."
 
     def available(self) -> bool:
         """Return True if the jieba package is importable."""
@@ -165,6 +168,7 @@ class CommandAnalyzer:
 
     Args:
         name: Human-readable analyzer name (shown in the UI).
+        description: One-line, user-facing summary of what it does.
         env_cmd: Environment variable holding the command to run. The value is
             split on whitespace; the sentence is piped to the command's stdin.
         mode: ``"yy"`` for a YY lattice, ``"segment"`` for spaced tokens.
@@ -174,11 +178,13 @@ class CommandAnalyzer:
     def __init__(
         self,
         name: str,
+        description: str,
         env_cmd: str,
         mode: str = "yy",
         yy_rules: bool = False,
     ) -> None:
         self.name = name
+        self.description = description
         self._env_cmd = env_cmd
         self._mode = mode
         self._yy_rules = yy_rules
@@ -239,6 +245,10 @@ class KarmaAnalyzer:
     """
 
     name = "KARMA"
+    description = (
+        "Segments Kalaallisut input into morphemes with KARMA before parsing, "
+        "and normalises orthography to the grammar's underlying forms."
+    )
 
     def available(self) -> bool:
         """Return True if the karma package is importable."""
@@ -282,7 +292,14 @@ def _build_registry() -> dict[str, Analyzer]:
     return {
         "jpn": MeCabAnalyzer(),
         "cmn": JiebaAnalyzer(),
-        "spa": CommandAnalyzer("FreeLing", "SRG_YY_CMD", mode="yy", yy_rules=True),
+        "spa": CommandAnalyzer(
+            "FreeLing",
+            "Analyzes Spanish input with FreeLing (morphology + POS tags) "
+            "before parsing.",
+            "SRG_YY_CMD",
+            mode="yy",
+            yy_rules=True,
+        ),
         "kal": KarmaAnalyzer(),
     }
 
@@ -313,6 +330,29 @@ def iso_for(md: dict) -> str | None:
     return _SHORTNAME_ISO.get(short)
 
 
+def analyzer_for(md: dict) -> Analyzer | None:
+    """Return the registered analyzer for *md*'s grammar, or None.
+
+    Looks up an analyzer by ISO code / short name and checks it is not disabled
+    via ``$LTDB_ANALYZERS``. Does not check :meth:`Analyzer.available` -- callers
+    that need to know whether the backing tool is actually usable should call
+    that themselves.
+
+    Args:
+        md: Grammar metadata dict (as returned by ``web.db.get_md``).
+
+    Returns:
+        The matching :class:`Analyzer`, or None if none applies.
+    """
+    iso = iso_for(md)
+    if iso is None:
+        return None
+    enabled = _enabled_isos()
+    if enabled is not None and iso not in enabled:
+        return None
+    return REGISTRY[iso]
+
+
 def preprocess_for(md: dict, text: str) -> PreprocessResult:
     """Preprocess *text* for the grammar described by *md*.
 
@@ -328,15 +368,10 @@ def preprocess_for(md: dict, text: str) -> PreprocessResult:
     Returns:
         A :class:`PreprocessResult`.
     """
-    iso = iso_for(md)
-    if iso is None:
+    analyzer = analyzer_for(md)
+    if analyzer is None:
         return PreprocessResult(ace_input=text)
 
-    enabled = _enabled_isos()
-    if enabled is not None and iso not in enabled:
-        return PreprocessResult(ace_input=text)
-
-    analyzer = REGISTRY[iso]
     # Availability discovery (e.g. shutil.which, imports) can itself raise, so
     # it is inside the guard — any failure degrades to the raw input rather than
     # surfacing a 500. Notes are kept generic; details (which may include tool

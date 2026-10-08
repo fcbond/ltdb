@@ -128,6 +128,13 @@ a {
 }
 
 .demo-char-count {
+    /* Out of normal flow so it doesn't add height below the input box --
+       with the toolbar row's align-items-end, extra height here would push
+       the Grammar/Results controls in sibling columns down to match it. */
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
     font-size: 0.75rem;
     color: #9aa5b4;
     text-align: right;

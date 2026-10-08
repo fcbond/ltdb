@@ -1,6 +1,8 @@
 """Route declaration."""
 
+import concurrent.futures
 import json
+import logging
 import os
 import pathlib
 import re as _re
@@ -54,12 +56,15 @@ from .db import (
     search_for,
 )
 from .ltdb import (
+    clean_mrs_str,
     deriv_word_span_to_char_span,
     docstring2html,
     render_markdown,
     sanitize_grm,
 )
-from .preprocess import preprocess_for
+from .preprocess import analyzer_for, preprocess_for
+
+logger = logging.getLogger(__name__)
 
 _tdl_formatter = HtmlFormatter(style="friendly")
 PYGMENTS_CSS = _tdl_formatter.get_style_defs(".highlight")
@@ -241,6 +246,40 @@ MAX_PARSE_CHARS = 500
 MAX_GENERATE_MRS_CHARS = 10_000
 ACE_CONCURRENCY = 4
 _ace_slots = threading.Semaphore(ACE_CONCURRENCY)
+# pydelphin's ace.parse()/generate() have no timeout of their own, and ACE
+# can hang outright (not just run slow) on some grammar/input combinations --
+# seen in practice with a generate call that sat at 0% CPU for 13+ minutes.
+# Without a hard cutoff that kills the subprocess, a hang like that would
+# block its worker and permanently consume one of the ACE_CONCURRENCY slots.
+_ACE_TIMEOUT = 45  # seconds
+
+
+def _ace_interact_with_timeout(proc_cls, dat, datum, *, cmdargs=None, executable=None):
+    """Run one ACE parse/generate interaction with a hard timeout.
+
+    Mirrors what delphin.ace.parse()/generate() do internally (construct a
+    processor, interact() once, close it), but runs interact() in a worker
+    thread so a hang can be cut off: on timeout, force-kills the ACE
+    subprocess directly (there's no cooperative way to interrupt it) and
+    raises TimeoutError, which the caller's existing ACE-error handling
+    turns into a normal error response instead of a hung request.
+    """
+    proc = proc_cls(dat, cmdargs=cmdargs or [], executable=executable)
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(proc.interact, datum)
+            try:
+                return future.result(timeout=_ACE_TIMEOUT)
+            except concurrent.futures.TimeoutError:
+                proc._p.kill()
+                raise TimeoutError(
+                    f"ACE did not respond within {_ACE_TIMEOUT}s"
+                ) from None
+    finally:
+        try:
+            proc.close()
+        except Exception:
+            logger.exception("error closing ACE process after timeout")
 
 
 def _db_fingerprint(db_dir: str) -> frozenset:
@@ -460,6 +499,7 @@ def grammar():
         summ=summ,
         tsumm=tsumm,
         logs=_available_logs(grm),
+        analyzer=_installed_analyzer(md),
     )
 
 
@@ -481,7 +521,27 @@ def _render_grammar(grm):
         grm=grm,
         summ=summ,
         tsumm=tsumm,
+        analyzer=_installed_analyzer(md),
     )
+
+
+def _installed_analyzer(md):
+    """Return the grammar's analyzer if one is registered and available, else None.
+
+    Used by the grammar page to list its preprocessor only when it would
+    actually run (not just configured but missing its backing tool).
+    """
+    analyzer = analyzer_for(md)
+    if analyzer is None:
+        return None
+    # Availability discovery (e.g. shutil.which, imports) can itself raise
+    # (see preprocess_for's identical guard) -- treat that as "unavailable"
+    # rather than 500ing the grammar/demo page.
+    try:
+        return analyzer if analyzer.available() else None
+    except Exception:
+        logger.exception("analyzer %s availability check failed", analyzer.name)
+        return None
 
 
 @app.route("/log/<path:grm>/<kind>")
@@ -829,6 +889,7 @@ def demo():
 
     examples = {}
     can_generate = {}
+    analyzer_info = {}
     for g in grammars_with_dat:
         dbpath = os.path.join(current_directory, "db", g)
         with sqlite3.connect(dbpath) as conn:
@@ -838,11 +899,18 @@ def demo():
                     "WHERE att IN ('EXAMPLES', 'CAN_GENERATE')"
                 )
             )
+            md = get_md(conn)
         try:
             examples[g] = json.loads(rows.get("EXAMPLES", "[]"))
         except (json.JSONDecodeError, TypeError):
             examples[g] = []
         can_generate[g] = bool(rows.get("CAN_GENERATE"))
+        # Only grammars with an analyzer that is actually installed get the
+        # "Preprocess" toggle in the demo -- for everything else it would be
+        # inert clutter.
+        analyzer = _installed_analyzer(md)
+        if analyzer is not None:
+            analyzer_info[g] = {"name": analyzer.name, "description": analyzer.description}
 
     return render_template(
         "demo.html",
@@ -852,6 +920,7 @@ def demo():
         max_parse_chars=MAX_PARSE_CHARS,
         examples=examples,
         can_generate=can_generate,
+        analyzer_info=analyzer_info,
     )
 
 
@@ -908,7 +977,8 @@ def parse_sentence():
         # --udx=all annotates every node with its type (lexical type for
         # lexemes, phrase type for rules); --rooted-derivations puts the
         # matching root condition at the top of the tree
-        response = _ace.parse(
+        response = _ace_interact_with_timeout(
+            _ace.ACEParser,
             dat,
             pp.ace_input,
             executable=find_ace(),
@@ -937,11 +1007,29 @@ def parse_sentence():
 
         if want_mrs or want_dmrs:
             mrs_obj = None
+            raw_mrs = result.get("mrs")
+            # mrs_raw: ACE's own untouched SimpleMRS string, kept verbatim for
+            # the generate endpoint. pydelphin's simplemrs.decode() normalises
+            # away each predicate's trailing "_rel" (confirmed: even a bare
+            # decode()+encode() round-trip strips it, independent of mrsjson),
+            # but some grammars' compiled semantic index only recognises the
+            # "_rel"-suffixed form ACE itself emits -- generation against the
+            # normalised form then silently finds 0 realisations ("unknown in
+            # the semantic index"), even though the same MRS generates fine
+            # from a terminal. Round-tripping is fine for *display* (MRS/DMRS
+            # rendering doesn't care about "_rel"), just not for generation.
+            r["mrs_raw"] = raw_mrs if isinstance(raw_mrs, str) else None
             try:
-                mrs_obj = result.mrs()
+                # result.mrs() calls pydelphin's simplemrs.decode() on ACE's
+                # raw output with no cleanup; clean_mrs_str() works around an
+                # ACE output quirk it can't parse on its own (see its docstring).
+                mrs_obj = (
+                    _simplemrs.decode(clean_mrs_str(raw_mrs))
+                    if isinstance(raw_mrs, str)
+                    else result.mrs()
+                )
                 if want_mrs:
                     # mrs_str: simplemrs string for browser-side LTDBMrs rendering
-                    # mrs: mrsjson dict kept for the generate endpoint
                     r["mrs_str"] = _simplemrs.encode(mrs_obj)
                     r["mrs"] = json.loads(_mrsjson.encode(mrs_obj))
             except Exception as e:
@@ -992,19 +1080,27 @@ def generate_sentence():
     if not dat:
         return jsonify({"error": f"No compiled grammar (.dat) for {grm}"}), 400
 
-    mrs_json_str = request.form.get("mrs")
-    if not mrs_json_str:
+    # The SimpleMRS string as ACE itself emitted it from the parse that
+    # produced it (web/templates/demo.html's Generate button sends
+    # result.mrs_raw, not the mrsjson dict) -- generate() takes a string
+    # directly, with no pydelphin decode/re-encode round-trip in between.
+    # That round-trip normalises away each predicate's trailing "_rel",
+    # which some grammars' compiled semantic index requires verbatim for
+    # generation to find a match at all (see the comment in parse_sentence
+    # where mrs_raw is captured).
+    mrs_str = request.form.get("mrs")
+    if not mrs_str:
         return jsonify({"error": "No MRS provided"}), 400
-    if len(mrs_json_str) > MAX_GENERATE_MRS_CHARS:
+    if len(mrs_str) > MAX_GENERATE_MRS_CHARS:
         return jsonify({"error": f"MRS is too large (max {MAX_GENERATE_MRS_CHARS} characters)"}), 400
 
     if not _ace_slots.acquire(blocking=False):
         return jsonify({"error": "ACE is busy; please try again in a moment."}), 503
 
     try:
-        mrs_obj = _mrsjson.decode(mrs_json_str)
-        mrs_str = _simplemrs.encode(mrs_obj)
-        response = _ace.generate(dat, mrs_str, executable=find_ace())
+        response = _ace_interact_with_timeout(
+            _ace.ACEGenerator, dat, mrs_str, executable=find_ace()
+        )
         surfaces = [
             r.get("surface", "") for r in response.results() if r.get("surface")
         ]

@@ -137,7 +137,7 @@ def test_preprocess_command_empty_output_falls_back(monkeypatch):
 def test_command_analyzer_yy_mode(monkeypatch):
     # `cat` stands in for a YY producer: it echoes stdin to stdout.
     monkeypatch.setenv("SRG_YY_CMD", "cat")
-    a = pp.CommandAnalyzer("FreeLing", "SRG_YY_CMD", mode="yy", yy_rules=True)
+    a = pp.CommandAnalyzer("FreeLing", "desc", "SRG_YY_CMD", mode="yy", yy_rules=True)
     assert a.available() is True
     r = a.run('(1, 0, 1, <0:2>, 1, "el", ...)')
     assert r.yy is True
@@ -147,7 +147,7 @@ def test_command_analyzer_yy_mode(monkeypatch):
 
 def test_command_analyzer_segment_mode(monkeypatch):
     monkeypatch.setenv("KARMA_CMD", "cat")
-    a = pp.CommandAnalyzer("KARMA", "KARMA_CMD", mode="segment")
+    a = pp.CommandAnalyzer("KARMA", "desc", "KARMA_CMD", mode="segment")
     r = a.run("inuk pok")
     assert r.yy is False
     assert r.extra_cmdargs == []
@@ -156,14 +156,14 @@ def test_command_analyzer_segment_mode(monkeypatch):
 
 def test_command_analyzer_unset_is_unavailable(monkeypatch):
     monkeypatch.delenv("SRG_YY_CMD", raising=False)
-    a = pp.CommandAnalyzer("FreeLing", "SRG_YY_CMD")
+    a = pp.CommandAnalyzer("FreeLing", "desc", "SRG_YY_CMD")
     assert a.available() is False
 
 
 def test_command_analyzer_empty_output_raises(monkeypatch):
     # exit 0 with no stdout must not hand ACE an empty sentence + YY flags
     monkeypatch.setenv("SRG_YY_CMD", "true")
-    a = pp.CommandAnalyzer("FreeLing", "SRG_YY_CMD", mode="yy", yy_rules=True)
+    a = pp.CommandAnalyzer("FreeLing", "desc", "SRG_YY_CMD", mode="yy", yy_rules=True)
     import pytest
 
     with pytest.raises(ValueError):
@@ -173,7 +173,7 @@ def test_command_analyzer_empty_output_raises(monkeypatch):
 def test_command_analyzer_quoted_args(monkeypatch):
     # shlex.split keeps quoted arguments together
     monkeypatch.setenv("SRG_YY_CMD", 'printf "%s" "hi there"')
-    a = pp.CommandAnalyzer("FreeLing", "SRG_YY_CMD", mode="segment")
+    a = pp.CommandAnalyzer("FreeLing", "desc", "SRG_YY_CMD", mode="segment")
     assert a._command() == ["printf", "%s", "hi there"]
 
 

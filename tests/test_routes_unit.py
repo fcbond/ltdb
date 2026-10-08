@@ -56,6 +56,8 @@ class TestDatPathFor:
 # ---------------------------------------------------------------------------
 
 _RAW_MRS = "[ TOP: h0 INDEX: e2 [ e SF: prop ] RELS: < > HCONS: < h0 qeq e2 > ]"
+# Genuinely unparsable (truncated) even after clean_mrs_str()'s cleanup.
+_MALFORMED_MRS = "[ TOP: h0 INDEX"
 
 
 def _make_ace_result(*, mrs_raises=False, raw_mrs=None):
@@ -98,24 +100,25 @@ def _post_parse(client, *, grm="fake.db", sentence="test", mrs="json"):
 
 class TestMrsRawFallback:
     def test_fallback_sets_mrs_str_on_pydelphin_failure(self, client):
-        """When result.mrs() raises, the raw ACE string is used as mrs_str."""
-        mock_result = _make_ace_result(mrs_raises=True, raw_mrs=_RAW_MRS)
+        """When the raw ACE string is unparsable even after cleanup, the raw
+        string itself is still used as mrs_str (result.mrs()'s side effect is
+        irrelevant here since the route decodes result.get("mrs") directly --
+        see clean_mrs_str())."""
+        mock_result = _make_ace_result(mrs_raises=True, raw_mrs=_MALFORMED_MRS)
         mock_response = MagicMock()
         mock_response.results.return_value = [mock_result]
 
         with patch("delphin.ace.ACEParser") as MockParser, \
              patch("web.routes.find_ace", return_value="/bin/ace"):
-            MockParser.return_value.__enter__.return_value.interact.return_value = (
+            MockParser.return_value.interact.return_value = (
                 mock_response
             )
-            MockParser.return_value.__exit__.return_value = False
             r = _post_parse(client)
 
         data = r.get_json()
         assert r.status_code == 200
         assert len(data["errors"]) == 1
-        assert "MRSSyntaxError" in data["errors"][0]
-        assert data["results"][0].get("mrs_str") == _RAW_MRS
+        assert data["results"][0].get("mrs_str") == _MALFORMED_MRS
 
     def test_no_fallback_when_raw_mrs_absent(self, client):
         """When result.get('mrs') is None there is no mrs_str in the response."""
@@ -125,10 +128,9 @@ class TestMrsRawFallback:
 
         with patch("delphin.ace.ACEParser") as MockParser, \
              patch("web.routes.find_ace", return_value="/bin/ace"):
-            MockParser.return_value.__enter__.return_value.interact.return_value = (
+            MockParser.return_value.interact.return_value = (
                 mock_response
             )
-            MockParser.return_value.__exit__.return_value = False
             r = _post_parse(client)
 
         data = r.get_json()
@@ -148,10 +150,9 @@ class TestMrsRawFallback:
              patch("delphin.codecs.simplemrs.encode", return_value=_RAW_MRS), \
              patch("delphin.codecs.mrsjson.encode", return_value=mrsjson_encoded), \
              patch("web.routes.find_ace", return_value="/bin/ace"):
-            MockParser.return_value.__enter__.return_value.interact.return_value = (
+            MockParser.return_value.interact.return_value = (
                 mock_response
             )
-            MockParser.return_value.__exit__.return_value = False
             r = _post_parse(client)
 
         data = r.get_json()
@@ -613,10 +614,9 @@ class TestParsePreprocess:
             form["analyze"] = analyze
         with patch("delphin.ace.ACEParser") as MockParser, \
              patch("web.routes.find_ace", return_value="/bin/ace"):
-            MockParser.return_value.__enter__.return_value.interact.return_value = (
+            MockParser.return_value.interact.return_value = (
                 mock_response
             )
-            MockParser.return_value.__exit__.return_value = False
             r = client.post("/parse", data=form)
         return r, MockParser
 
@@ -634,7 +634,7 @@ class TestParsePreprocess:
         data = r.get_json()
         assert r.status_code == 200
         # the segmented string, not the raw input, reached ACE
-        interact = MockParser.return_value.__enter__.return_value.interact
+        interact = MockParser.return_value.interact
         assert interact.call_args.args[0] == "犬 は 猫"
         assert data["analyzer"] == "MeCab"
         assert data["ace_input"] == "犬 は 猫"
@@ -666,7 +666,7 @@ class TestParsePreprocess:
         )
         client = self._client(app, tmp_path, monkeypatch)
         r, MockParser = self._run_parse(client, sentence="犬は猫")
-        interact = MockParser.return_value.__enter__.return_value.interact
+        interact = MockParser.return_value.interact
         assert interact.call_args.args[0] == "犬は猫"  # raw text used
         assert MockParser.call_args.kwargs["cmdargs"][-1] == "--rooted-derivations"
 
@@ -681,7 +681,7 @@ class TestParsePreprocess:
         )
         client = self._client(app, tmp_path, monkeypatch)
         r, MockParser = self._run_parse(client, sentence="犬は猫", analyze="off")
-        interact = MockParser.return_value.__enter__.return_value.interact
+        interact = MockParser.return_value.interact
         assert interact.call_args.args[0] == "犬は猫"
         assert r.get_json()["analyzer"] is None
 
@@ -690,7 +690,7 @@ class TestParsePreprocess:
         self._make_grammar(tmp_path, "eng")
         client = self._client(app, tmp_path, monkeypatch)
         r, MockParser = self._run_parse(client, sentence="dogs bark")
-        interact = MockParser.return_value.__enter__.return_value.interact
+        interact = MockParser.return_value.interact
         assert interact.call_args.args[0] == "dogs bark"
         data = r.get_json()
         assert data["analyzer"] is None
