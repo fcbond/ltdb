@@ -971,8 +971,19 @@ def parse_sentence():
 
         if want_mrs or want_dmrs:
             mrs_obj = None
+            raw_mrs = result.get("mrs")
+            # mrs_raw: ACE's own untouched SimpleMRS string, kept verbatim for
+            # the generate endpoint. pydelphin's simplemrs.decode() normalises
+            # away each predicate's trailing "_rel" (confirmed: even a bare
+            # decode()+encode() round-trip strips it, independent of mrsjson),
+            # but some grammars' compiled semantic index only recognises the
+            # "_rel"-suffixed form ACE itself emits -- generation against the
+            # normalised form then silently finds 0 realisations ("unknown in
+            # the semantic index"), even though the same MRS generates fine
+            # from a terminal. Round-tripping is fine for *display* (MRS/DMRS
+            # rendering doesn't care about "_rel"), just not for generation.
+            r["mrs_raw"] = raw_mrs if isinstance(raw_mrs, str) else None
             try:
-                raw_mrs = result.get("mrs")
                 # result.mrs() calls pydelphin's simplemrs.decode() on ACE's
                 # raw output with no cleanup; clean_mrs_str() works around an
                 # ACE output quirk it can't parse on its own (see its docstring).
@@ -983,7 +994,6 @@ def parse_sentence():
                 )
                 if want_mrs:
                     # mrs_str: simplemrs string for browser-side LTDBMrs rendering
-                    # mrs: mrsjson dict kept for the generate endpoint
                     r["mrs_str"] = _simplemrs.encode(mrs_obj)
                     r["mrs"] = json.loads(_mrsjson.encode(mrs_obj))
             except Exception as e:
@@ -1034,18 +1044,24 @@ def generate_sentence():
     if not dat:
         return jsonify({"error": f"No compiled grammar (.dat) for {grm}"}), 400
 
-    mrs_json_str = request.form.get("mrs")
-    if not mrs_json_str:
+    # The SimpleMRS string as ACE itself emitted it from the parse that
+    # produced it (web/templates/demo.html's Generate button sends
+    # result.mrs_raw, not the mrsjson dict) -- generate() takes a string
+    # directly, with no pydelphin decode/re-encode round-trip in between.
+    # That round-trip normalises away each predicate's trailing "_rel",
+    # which some grammars' compiled semantic index requires verbatim for
+    # generation to find a match at all (see the comment in parse_sentence
+    # where mrs_raw is captured).
+    mrs_str = request.form.get("mrs")
+    if not mrs_str:
         return jsonify({"error": "No MRS provided"}), 400
-    if len(mrs_json_str) > MAX_GENERATE_MRS_CHARS:
+    if len(mrs_str) > MAX_GENERATE_MRS_CHARS:
         return jsonify({"error": f"MRS is too large (max {MAX_GENERATE_MRS_CHARS} characters)"}), 400
 
     if not _ace_slots.acquire(blocking=False):
         return jsonify({"error": "ACE is busy; please try again in a moment."}), 503
 
     try:
-        mrs_obj = _mrsjson.decode(mrs_json_str)
-        mrs_str = _simplemrs.encode(mrs_obj)
         response = _ace.generate(dat, mrs_str, executable=find_ace())
         surfaces = [
             r.get("surface", "") for r in response.results() if r.get("surface")

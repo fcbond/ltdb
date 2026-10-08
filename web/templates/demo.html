@@ -454,16 +454,20 @@
         }
       }
 
-      if (result.mrs && _canGenerate[grm]) {
+      if (result.mrs_raw && _canGenerate[grm]) {
         const genBtn = $('<button class="btn btn-outline-success btn-sm ms-2">Generate</button>');
         const genOut = $('<div class="mt-2" style="display:none">');
         body.append(genOut);
         genBtn.on('click', function () {
           if (genOut.children().length > 0) { genOut.toggle(); return; }
           genBtn.prop('disabled', true).text('Generating…');
+          // mrs_raw, not mrs: generation needs ACE's own SimpleMRS string
+          // verbatim (predicates with their "_rel" suffix intact), not the
+          // mrsjson round-trip, which some grammars' semantic index can't
+          // match against (see generate_sentence's comment in routes.py).
           $.post('{{ url_for("generate_sentence") }}', {
             grm: grm,
-            mrs: JSON.stringify(result.mrs)
+            mrs: result.mrs_raw
           }).done(function (data) {
             genBtn.prop('disabled', false).text('Generate');
             if (data.error) {
