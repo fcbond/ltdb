@@ -139,6 +139,10 @@ a {
     color: #9aa5b4;
     text-align: right;
     margin-top: 0.15rem;
+    /* Purely a read-only display -- being full-width and absolutely
+       positioned, it would otherwise sit on top of and swallow clicks meant
+       for #exampleHint just below it. */
+    pointer-events: none;
 }
 
 .demo-char-near-limit {

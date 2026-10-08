@@ -36,7 +36,7 @@
           <input type="text" id="inputText" name="input" class="form-control"
                  list="exampleList" placeholder="Type or choose an example…"
                  maxlength="{{ max_parse_chars }}" required>
-          <button type="button" id="clearInput" tabindex="-1" title="Clear to browse history"
+          <button type="button" id="clearInput" tabindex="-1"
                   class="input-clear">&#215;</button>
           <div class="demo-char-count">
             <span id="charCount">0</span> / {{ max_parse_chars }}
@@ -150,24 +150,61 @@
 
   function _historyKey(grm) { return 'ltdb-demo-history-' + grm; }
 
-  function _getHistory(grm) {
+  // The grammarian's EXAMPLES are merged in at read time, not stored in
+  // localStorage -- that way they always show up in the datalist (and can
+  // never get evicted by _MAX_HISTORY as the user tries their own
+  // sentences), and a METADATA change takes effect without stale
+  // already-stored history masking it.
+  function _mergeExamples(grm, items) {
+    const examples = _allExamples[grm] || [];
+    return [...items, ...examples.filter(e => !items.includes(e))];
+  }
+
+  function _storedHistory(grm) {
     const stored = localStorage.getItem(_historyKey(grm));
-    if (stored) return JSON.parse(stored);
-    const defaults = _allExamples[grm] || [];
-    localStorage.setItem(_historyKey(grm), JSON.stringify(defaults));
-    return defaults;
+    return stored ? JSON.parse(stored) : [];
+  }
+
+  function _getHistory(grm) {
+    return _mergeExamples(grm, _storedHistory(grm));
   }
 
   function _addToHistory(grm, sentence) {
-    const history = [sentence, ..._getHistory(grm).filter(s => s !== sentence)]
+    const history = [sentence, ..._storedHistory(grm).filter(s => s !== sentence)]
       .slice(0, _MAX_HISTORY);
     localStorage.setItem(_historyKey(grm), JSON.stringify(history));
-    _updateDatalist(history);
+    _updateDatalist(_mergeExamples(grm, history));
   }
+
+  let _currentItemCount = 0;
 
   function _updateDatalist(items) {
     const dl = document.getElementById('exampleList');
     dl.innerHTML = items.map(s => `<option value="${s.replace(/"/g, '&quot;')}">`).join('');
+    _currentItemCount = items.length;
+    _updateClearButton();
+  }
+
+  // #clearInput does double duty at the same spot inside the input: "x" to
+  // clear when there's text, or a "v" caret hinting there are more
+  // examples/history to browse when the box is empty -- a browser only
+  // shows an <input list=...> datalist's suggestions once the input has
+  // focus, and the box auto-fills with the most recent entry on grammar
+  // select (see _initGrammar), so without this there's no visible sign
+  // there's anything to browse at all, let alone how many.
+  function _updateClearButton() {
+    const btn = $('#clearInput');
+    const hasText = $('#inputText').val().length > 0;
+    if (hasText) {
+      btn.html('&#215;').attr('title', 'Clear to browse examples').show();
+    } else if (_currentItemCount > 0) {
+      const label = _currentItemCount === 1
+        ? '1 example available -- click to browse it'
+        : _currentItemCount + ' examples available -- click to browse them';
+      btn.html('&#9662;').attr('title', label).show();
+    } else {
+      btn.hide();
+    }
   }
 
   function _updateGrammarTitle() {
@@ -184,8 +221,8 @@
     _updateDatalist(history);
     if (!$('#inputText').val() && history.length > 0) {
       $('#inputText').val(history[0]);
-      $('#clearInput').show();
     }
+    _updateClearButton();
     _updateAnalyzerToggle(grm);
   }
 
@@ -198,14 +235,13 @@
   _updateCharCount();
 
   $('#inputText').on('input', function () {
-    const n = $(this).val().length;
-    $('#clearInput').toggle(n > 0);
+    _updateClearButton();
     _updateCharCount();
   });
 
   $('#clearInput').on('click', function () {
     $('#inputText').val('').focus();
-    $(this).hide();
+    _updateClearButton();
   });
 
   $('#grammarSelect').on('change', function () {

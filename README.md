@@ -39,14 +39,48 @@ parameter on any URL, which updates the session and is transparent to all
 routes.
 
 **Parse demo** — only grammars that have a compiled `.dat` file alongside
-their `.db` appear in the demo page.  Generate (`/generate`) additionally
-requires generation roots in the ACE config; grammars without them return a
-friendly error rather than failing silently.
+their `.db` appear in the demo page.  The Preprocess toggle (see
+"Morphological analyzers" below) only appears for grammars with an analyzer
+actually installed, not just configured.  Generate (`/generate`) additionally
+requires generation roots in the ACE config, but the demo doesn't reliably
+distinguish that from other causes of zero realisations -- ACE's "unknown in
+the semantic index" diagnostic isn't captured in `response.get("NOTES")`, so
+the friendly-error path that's meant to catch it rarely fires in practice.
+`generate_sentence()` sends ACE its own untouched SimpleMRS string (not a
+value round-tripped through pydelphin's mrsjson, which normalises away each
+predicate's "_rel" suffix -- some grammars' compiled semantic index needs it
+verbatim) via `parse_sentence()`'s `mrs_raw` field.
 
 **TDL rendering** — `web/ltdb.py` handles docstring parsing (`munge_desc`)
 and Markdown-to-HTML conversion (`docstring2html`).  `web/routes.py` handles
 TDL syntax highlighting with clickable type links (`tdl2html`) using
 `pygments` and `pydelphin`'s TDL lexer.
+
+## Morphological analyzers
+
+Some grammars delegate tokenization or morphology to an external analyzer
+and can't parse raw orthographic text in the demo.  `web/preprocess.py` is a
+small pluggable registry that runs one before ACE, matched by a grammar's
+`ISO_CODE` metadata field (falling back to `SHORT_GRAMMAR_NAME` for a few
+hardcoded cases) — see `_ISO_ALIASES`/`_SHORTNAME_ISO` in that module for the
+exact matching rules.  It's entirely optional: a grammar with no registered
+analyzer (e.g. the ERG) is unaffected, and one whose tool isn't installed
+degrades to parsing the raw input, with a note in the response explaining
+why.
+
+| ISO    | Analyzer | Install                                            | Config |
+|--------|----------|-----------------------------------------------------|--------|
+| `jpn`  | MeCab    | `apt install mecab mecab-ipadic-utf8`                | `MECAB_BIN` (default `mecab`) |
+| `cmn`  | jieba    | `pip install jieba` into the app's own venv          | — |
+| `kal`  | KARMA    | `pip install git+https://github.com/alexhsu-nlp/karma.git` into the app's own venv | — |
+| `spa`  | FreeLing | separate, heavier install; see `scripts/install_freeling.sh` in a grammary checkout | `SRG_YY_CMD` (shell command reading a sentence on stdin, writing ACE's `-y --yy-rules` YY lattice format on stdout) |
+
+Set `LTDB_ANALYZERS` to a comma-separated list of ISO codes to restrict which
+analyzers are active (e.g. `jpn,cmn,kal` to disable Spanish without
+uninstalling anything); unset means all registered analyzers are enabled
+(individually still gated on their tool actually being installed).  The
+demo's Preprocess toggle only appears for a grammar whose analyzer is both
+registered *and* available — see `_installed_analyzer()` in `web/routes.py`.
 
 ## Quick Start
 
@@ -98,10 +132,15 @@ Each grammar needs a TOML-formatted `METADATA` file. The fields recognised by lt
 | `ACE_CONFIG_FILE` | string | yes | Path to the ACE config file (relative to METADATA) |
 | `TSDB_ROOTS` | list of strings | | Directories containing treebank profiles (default: `["tsdb/gold/"]`) |
 | `PROFILES` | list of strings | | Specific profile names to include (default: all found under `TSDB_ROOTS`) |
-| `EXAMPLES` | list of strings | | Example sentences shown in the parse demo and used to seed input history |
+| `EXAMPLES` | list of strings | | Example sentences shown in the parse demo and always available in its history dropdown |
 
-The `EXAMPLES` field is especially useful for the demo page: sentences are pre-loaded
-into the input box and the browser history list, so users can try the grammar immediately.
+The `EXAMPLES` field is especially useful for the demo page: the most recent one is
+pre-loaded into the input box, and the full list stays in the browser-side history dropdown
+every time that grammar is selected -- merged in fresh client-side (not stored in
+`localStorage`), so it can never get evicted as the user tries their own sentences, and a
+METADATA change takes effect immediately. The input box's clear button doubles as a hint
+that there's more to see: a down-caret (rather than the usual "x") when the box is empty
+but there's a non-empty history/examples list for the selected grammar.
 
 Example `METADATA`:
 
