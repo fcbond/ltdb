@@ -1,6 +1,7 @@
 """Route declaration."""
 
 import json
+import logging
 import os
 import pathlib
 import re as _re
@@ -61,6 +62,8 @@ from .ltdb import (
     sanitize_grm,
 )
 from .preprocess import analyzer_for, preprocess_for
+
+logger = logging.getLogger(__name__)
 
 _tdl_formatter = HtmlFormatter(style="friendly")
 PYGMENTS_CSS = _tdl_formatter.get_style_defs(".highlight")
@@ -494,7 +497,16 @@ def _installed_analyzer(md):
     actually run (not just configured but missing its backing tool).
     """
     analyzer = analyzer_for(md)
-    return analyzer if analyzer is not None and analyzer.available() else None
+    if analyzer is None:
+        return None
+    # Availability discovery (e.g. shutil.which, imports) can itself raise
+    # (see preprocess_for's identical guard) -- treat that as "unavailable"
+    # rather than 500ing the grammar/demo page.
+    try:
+        return analyzer if analyzer.available() else None
+    except Exception:
+        logger.exception("analyzer %s availability check failed", analyzer.name)
+        return None
 
 
 @app.route("/log/<path:grm>/<kind>")
