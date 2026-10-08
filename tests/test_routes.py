@@ -255,7 +255,20 @@ class TestParseRoute:
             def results(self):
                 return [_FakeResult()]
 
-        monkeypatch.setattr(ace_mod, "parse", lambda *a, **kw: _FakeResponse())
+        class _FakeParser:
+            # _ace_interact_with_timeout() constructs ACEParser directly and
+            # calls .interact()/.close() itself (no "with ... as parser:"),
+            # so it can kill a hung subprocess on timeout.
+            def __init__(self, *a, **kw):
+                pass
+
+            def interact(self, datum):
+                return _FakeResponse()
+
+            def close(self):
+                pass
+
+        monkeypatch.setattr(ace_mod, "ACEParser", _FakeParser)
         monkeypatch.setattr("web.routes.dat_path_for", lambda grm: "/fake/path.dat")
         monkeypatch.setattr("web.routes.find_ace", lambda: "/fake/ace")
         resp = grm_client.post("/parse", data={"input": "The dog barks."})
@@ -286,11 +299,18 @@ class TestParseRoute:
 
         seen = {}
 
-        def fake_parse(dat, text, **kwargs):
-            seen.update(kwargs)
-            return _FakeResponse()
+        class _FakeParser:
+            def __init__(self, dat, cmdargs=None, executable=None):
+                seen["cmdargs"] = cmdargs
+                seen["executable"] = executable
 
-        monkeypatch.setattr(ace_mod, "parse", fake_parse)
+            def interact(self, datum):
+                return _FakeResponse()
+
+            def close(self):
+                pass
+
+        monkeypatch.setattr(ace_mod, "ACEParser", _FakeParser)
         monkeypatch.setattr("web.routes.dat_path_for", lambda grm: "/fake/path.dat")
         monkeypatch.setattr("web.routes.find_ace", lambda: "/fake/ace")
         resp = grm_client.post(

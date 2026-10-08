@@ -110,10 +110,9 @@ class TestMrsRawFallback:
 
         with patch("delphin.ace.ACEParser") as MockParser, \
              patch("web.routes.find_ace", return_value="/bin/ace"):
-            MockParser.return_value.__enter__.return_value.interact.return_value = (
+            MockParser.return_value.interact.return_value = (
                 mock_response
             )
-            MockParser.return_value.__exit__.return_value = False
             r = _post_parse(client)
 
         data = r.get_json()
@@ -129,10 +128,9 @@ class TestMrsRawFallback:
 
         with patch("delphin.ace.ACEParser") as MockParser, \
              patch("web.routes.find_ace", return_value="/bin/ace"):
-            MockParser.return_value.__enter__.return_value.interact.return_value = (
+            MockParser.return_value.interact.return_value = (
                 mock_response
             )
-            MockParser.return_value.__exit__.return_value = False
             r = _post_parse(client)
 
         data = r.get_json()
@@ -152,10 +150,9 @@ class TestMrsRawFallback:
              patch("delphin.codecs.simplemrs.encode", return_value=_RAW_MRS), \
              patch("delphin.codecs.mrsjson.encode", return_value=mrsjson_encoded), \
              patch("web.routes.find_ace", return_value="/bin/ace"):
-            MockParser.return_value.__enter__.return_value.interact.return_value = (
+            MockParser.return_value.interact.return_value = (
                 mock_response
             )
-            MockParser.return_value.__exit__.return_value = False
             r = _post_parse(client)
 
         data = r.get_json()
@@ -617,10 +614,9 @@ class TestParsePreprocess:
             form["analyze"] = analyze
         with patch("delphin.ace.ACEParser") as MockParser, \
              patch("web.routes.find_ace", return_value="/bin/ace"):
-            MockParser.return_value.__enter__.return_value.interact.return_value = (
+            MockParser.return_value.interact.return_value = (
                 mock_response
             )
-            MockParser.return_value.__exit__.return_value = False
             r = client.post("/parse", data=form)
         return r, MockParser
 
@@ -638,7 +634,7 @@ class TestParsePreprocess:
         data = r.get_json()
         assert r.status_code == 200
         # the segmented string, not the raw input, reached ACE
-        interact = MockParser.return_value.__enter__.return_value.interact
+        interact = MockParser.return_value.interact
         assert interact.call_args.args[0] == "犬 は 猫"
         assert data["analyzer"] == "MeCab"
         assert data["ace_input"] == "犬 は 猫"
@@ -670,7 +666,7 @@ class TestParsePreprocess:
         )
         client = self._client(app, tmp_path, monkeypatch)
         r, MockParser = self._run_parse(client, sentence="犬は猫")
-        interact = MockParser.return_value.__enter__.return_value.interact
+        interact = MockParser.return_value.interact
         assert interact.call_args.args[0] == "犬は猫"  # raw text used
         assert MockParser.call_args.kwargs["cmdargs"][-1] == "--rooted-derivations"
 
@@ -685,7 +681,7 @@ class TestParsePreprocess:
         )
         client = self._client(app, tmp_path, monkeypatch)
         r, MockParser = self._run_parse(client, sentence="犬は猫", analyze="off")
-        interact = MockParser.return_value.__enter__.return_value.interact
+        interact = MockParser.return_value.interact
         assert interact.call_args.args[0] == "犬は猫"
         assert r.get_json()["analyzer"] is None
 
@@ -694,7 +690,7 @@ class TestParsePreprocess:
         self._make_grammar(tmp_path, "eng")
         client = self._client(app, tmp_path, monkeypatch)
         r, MockParser = self._run_parse(client, sentence="dogs bark")
-        interact = MockParser.return_value.__enter__.return_value.interact
+        interact = MockParser.return_value.interact
         assert interact.call_args.args[0] == "dogs bark"
         data = r.get_json()
         assert data["analyzer"] is None

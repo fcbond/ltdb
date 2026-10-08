@@ -1,5 +1,6 @@
 """Route declaration."""
 
+import concurrent.futures
 import json
 import logging
 import os
@@ -245,6 +246,40 @@ MAX_PARSE_CHARS = 500
 MAX_GENERATE_MRS_CHARS = 10_000
 ACE_CONCURRENCY = 4
 _ace_slots = threading.Semaphore(ACE_CONCURRENCY)
+# pydelphin's ace.parse()/generate() have no timeout of their own, and ACE
+# can hang outright (not just run slow) on some grammar/input combinations --
+# seen in practice with a generate call that sat at 0% CPU for 13+ minutes.
+# Without a hard cutoff that kills the subprocess, a hang like that would
+# block its worker and permanently consume one of the ACE_CONCURRENCY slots.
+_ACE_TIMEOUT = 45  # seconds
+
+
+def _ace_interact_with_timeout(proc_cls, dat, datum, *, cmdargs=None, executable=None):
+    """Run one ACE parse/generate interaction with a hard timeout.
+
+    Mirrors what delphin.ace.parse()/generate() do internally (construct a
+    processor, interact() once, close it), but runs interact() in a worker
+    thread so a hang can be cut off: on timeout, force-kills the ACE
+    subprocess directly (there's no cooperative way to interrupt it) and
+    raises TimeoutError, which the caller's existing ACE-error handling
+    turns into a normal error response instead of a hung request.
+    """
+    proc = proc_cls(dat, cmdargs=cmdargs or [], executable=executable)
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(proc.interact, datum)
+            try:
+                return future.result(timeout=_ACE_TIMEOUT)
+            except concurrent.futures.TimeoutError:
+                proc._p.kill()
+                raise TimeoutError(
+                    f"ACE did not respond within {_ACE_TIMEOUT}s"
+                ) from None
+    finally:
+        try:
+            proc.close()
+        except Exception:
+            logger.exception("error closing ACE process after timeout")
 
 
 def _db_fingerprint(db_dir: str) -> frozenset:
@@ -942,7 +977,8 @@ def parse_sentence():
         # --udx=all annotates every node with its type (lexical type for
         # lexemes, phrase type for rules); --rooted-derivations puts the
         # matching root condition at the top of the tree
-        response = _ace.parse(
+        response = _ace_interact_with_timeout(
+            _ace.ACEParser,
             dat,
             pp.ace_input,
             executable=find_ace(),
@@ -1062,7 +1098,9 @@ def generate_sentence():
         return jsonify({"error": "ACE is busy; please try again in a moment."}), 503
 
     try:
-        response = _ace.generate(dat, mrs_str, executable=find_ace())
+        response = _ace_interact_with_timeout(
+            _ace.ACEGenerator, dat, mrs_str, executable=find_ace()
+        )
         surfaces = [
             r.get("surface", "") for r in response.results() if r.get("surface")
         ]
