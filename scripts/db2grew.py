@@ -512,10 +512,14 @@ def main(argv=None):
     # snippets key is the grammar's short name (version-independent), so one
     # etc/grew_snippets/<name>.html pane serves every release; fall back to the
     # (versioned) corpus id when the database has no SHORT_GRAMMAR_NAME.
-    row = conn.execute(
-        "SELECT val FROM meta WHERE att = 'SHORT_GRAMMAR_NAME'"
-    ).fetchone()
-    snippets = sanitize(row[0]) if row and row[0] else grm
+    try:
+        row = conn.execute(
+            "SELECT val FROM meta WHERE att = 'SHORT_GRAMMAR_NAME'"
+        ).fetchone()
+    except sqlite3.OperationalError:
+        row = None  # no meta table/column: fall back to the corpus id
+    # `or grm` also catches a name that sanitizes to empty (whitespace/punct only)
+    snippets = (sanitize(row[0]) if row and row[0] else "") or grm
     corpora = export(conn, out_dir, grm, args, snippets=snippets)
     conn.close()
 
