@@ -140,15 +140,22 @@ Each grammar needs a TOML-formatted `METADATA` file. The fields recognised by lt
 table row is a poor fit for prose, especially anything multi-paragraph); see
 `_grammar_description`/`_table_meta` in `web/routes.py`.
 
-The `EXAMPLES` field is especially useful for the demo page: the most recent one is
-pre-loaded into the input box, and the full list stays available via the input's native
-`<datalist>` suggestion popup every time that grammar is selected -- merged in fresh
-client-side (not stored in `localStorage`), so it can never get evicted as the user tries
-their own sentences, and a METADATA change takes effect immediately. A browser filters that
-popup to options matching whatever's already typed, so the input box's clear button doubles
-as a hint that there's more to see: a down-caret (rather than the usual "x") when the box is
-empty but there's a non-empty history/examples list for the selected grammar -- clicking it
-clears the box (an empty value matches everything, so the full list shows) and focuses it.
+The `EXAMPLES` field is especially useful for the demo page: on first ever visit to a
+grammar, the full list is the input box's history, in METADATA order; the most recent one is
+pre-loaded into the box, and a new sentence the user tries is pushed to the front. This list
+is merged in fresh client-side on every grammar switch (not stored in `localStorage`), so it
+can never get evicted as the user tries their own sentences, and a METADATA change takes
+effect immediately.
+
+The full list is shown by clicking the down-caret button inside the input box (only present
+when there's a non-empty history/examples list for the selected grammar), which opens a
+small self-built dropdown (`#exampleToggle`/`#exampleDropdown` in `web/templates/demo.html`)
+rather than relying on the input's native `<input list=...>` datalist suggestion popup (kept
+wired up too, just for plain keyboard typing/autocomplete, which it's reliably fine at): that
+popup only reliably opens on a *direct* user click on the input itself, not a script-triggered
+`.focus()` from a button, and filters its suggestions to options matching whatever's already
+typed -- both a bad fit here, since the box auto-fills with one *complete* example on grammar
+select.
 
 Example `METADATA`:
 
