@@ -79,6 +79,11 @@
         <input class="form-check-input" type="checkbox" id="wantDMRS" checked>
         <label class="form-check-label" for="wantDMRS">DMRS</label>
       </div>
+      <div class="form-check" id="analyzeToggleWrap">
+        <input class="form-check-input" type="checkbox" id="wantAnalyze" checked>
+        <label class="form-check-label" for="wantAnalyze">Analyze</label>
+        <small class="text-muted ms-1" title="Run this grammar's morphological analyzer / segmenter (e.g. MeCab, jieba, FreeLing, KARMA) on the input before parsing. Uncheck to parse already-segmented input as typed.">(?)</small>
+      </div>
     </div>
   </form>
 
@@ -172,6 +177,7 @@
       derivation: $('#wantTree').is(':checked') ? 'json' : 'null',
       mrs:        wantMrs ? 'json' : 'null',
       dmrs:       'null',
+      analyze:    $('#wantAnalyze').is(':checked') ? 'on' : 'off',
     };
 
     $('#results').empty();
@@ -239,11 +245,29 @@
       container.html($('<div class="alert alert-danger">').text(data.error));
       return;
     }
+
+    // Show how the input was analyzed (segmenter/morphology) and any hint
+    // (e.g. the analyzer is not installed on this server).
+    function analyzerBanner() {
+      if (data.note) {
+        return '<div class="alert alert-info py-2">' + escHtml(data.note) + '</div>';
+      }
+      if (data.analyzer && data.ace_input && data.ace_input !== data.input) {
+        const shown = (data.tokens && data.tokens.length)
+          ? data.tokens.join(' ') : data.ace_input;
+        return '<div class="alert alert-secondary py-2 small">Analyzed with <b>' +
+          escHtml(data.analyzer) + '</b>: <code>' + escHtml(shown) + '</code></div>';
+      }
+      return '';
+    }
+
     if (data.readings === 0) {
-      container.html('<div class="alert alert-warning">No parses found.</div>');
+      container.html(analyzerBanner() +
+        '<div class="alert alert-warning">No parses found.</div>');
       return;
     }
 
+    container.append(analyzerBanner());
     container.append(
       '<p>' + data.readings + ' result(s) for: <em>' +
       $('<span>').text(data.input).html() + '</em></p>'

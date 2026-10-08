@@ -59,6 +59,7 @@ from .ltdb import (
     render_markdown,
     sanitize_grm,
 )
+from .preprocess import preprocess_for
 
 _tdl_formatter = HtmlFormatter(style="friendly")
 PYGMENTS_CSS = _tdl_formatter.get_style_defs(".highlight")
@@ -798,6 +799,22 @@ def dat_path_for(grm):
     return dat if os.path.isfile(dat) and os.path.getsize(dat) > 0 else None
 
 
+def grammar_meta(grm):
+    """Return a grammar's metadata dict, or {} if its .db is missing/unreadable.
+
+    Guards against sqlite creating an empty database for a non-existent file and
+    against grammars whose .db has no meta table, so callers can rely on a plain
+    dict. Used to pick an input preprocessor for the parse demo.
+    """
+    path = os.path.join(current_directory, "db", grm)
+    if not os.path.isfile(path) or os.path.getsize(path) == 0:
+        return {}
+    try:
+        return get_md(get_db(current_directory, grm))
+    except Exception:
+        return {}
+
+
 @app.route("/demo")
 def demo():
     """Show the interactive parsing demo page."""
@@ -862,6 +879,11 @@ def parse_sentence():
     if len(input_text) > MAX_PARSE_CHARS:
         return jsonify({"error": f"Input is too long (max {MAX_PARSE_CHARS} characters)"}), 400
 
+    # analyze=off lets a user paste already-segmented input and skip the
+    # per-grammar analyzer; the analysis itself runs later, under the ACE
+    # concurrency guard, so it can't be used to spawn work before admission.
+    analyze_off = request.form.get("analyze") == "off"
+
     results_raw = request.form.get("results", "5")
     try:
         n_results = int(results_raw)
@@ -878,14 +900,20 @@ def parse_sentence():
         return jsonify({"error": "ACE is busy; please try again in a moment."}), 503
 
     try:
+        # Run the per-grammar analyzer / segmenter now that we hold an ACE
+        # slot, so external analyzer processes and in-process jieba/KARMA are
+        # bounded by the same admission control as parsing. Grammars without a
+        # registered analyzer (e.g. the ERG) pass through unchanged.
+        pp = preprocess_for({} if analyze_off else grammar_meta(grm), input_text)
         # --udx=all annotates every node with its type (lexical type for
         # lexemes, phrase type for rules); --rooted-derivations puts the
         # matching root condition at the top of the tree
         response = _ace.parse(
             dat,
-            input_text,
+            pp.ace_input,
             executable=find_ace(),
-            cmdargs=[f"-n{n_results}", "--udx=all", "--rooted-derivations"],
+            cmdargs=[f"-n{n_results}", "--udx=all", "--rooted-derivations"]
+            + pp.extra_cmdargs,
         )
     except Exception as e:
         return jsonify({"error": _ace_error_message(e, dat)}), 500
@@ -940,6 +968,10 @@ def parse_sentence():
     return jsonify(
         {
             "input": input_text,
+            "ace_input": pp.ace_input,
+            "analyzer": pp.analyzer,
+            "tokens": pp.tokens,
+            "note": pp.note,
             "readings": len(results),
             "results": results,
             "errors": errors,
