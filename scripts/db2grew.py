@@ -367,7 +367,7 @@ def _export_profile(item):
     )
 
 
-def export(conn, out_dir, grm, args):
+def export(conn, out_dir, grm, args, snippets=None):
     """Export the gold table to grew corpora under out_dir.
 
     Profiles are independent (one profile -> one tree file and one
@@ -383,6 +383,11 @@ def export(conn, out_dir, grm, args):
         out_dir: Output directory (created if needed)
         grm: Sanitized grammar name used in corpus ids
         args: Parsed command-line arguments
+        snippets: Value for each corpus's ``snippets`` key; grew-match loads
+            ``<snippets_url>/<snippets>.html`` as the query-example pane for
+            that corpus (falling back to ``_default.html`` when the file is
+            absent). Version-independent so one pane serves every release of a
+            grammar. Falls back to *grm* when None.
 
     Returns:
         The list of corpora written (as corpora.json dictionaries)
@@ -448,6 +453,10 @@ def export(conn, out_dir, grm, args):
                     "files": sorted(files),
                     "n_graphs": n_graphs,
                     "grammar_url": grammar_url,
+                    # grew-match loads <snippets_url>/<snippets>.html as this
+                    # corpus's query-example pane; provide one per grammar in
+                    # etc/grew_snippets/ (else grew-match uses _default.html)
+                    "snippets": snippets if snippets is not None else grm,
                 }
             )
     return corpora
@@ -500,7 +509,14 @@ def main(argv=None):
     # which duplicates the grammar name -- e.g. ERG's Version is
     # "ERG (2025)", so that pair sanitized to "ERG_ERG_2025")
     grm = sanitize(args.db.stem)
-    corpora = export(conn, out_dir, grm, args)
+    # snippets key is the grammar's short name (version-independent), so one
+    # etc/grew_snippets/<name>.html pane serves every release; fall back to the
+    # (versioned) corpus id when the database has no SHORT_GRAMMAR_NAME.
+    row = conn.execute(
+        "SELECT val FROM meta WHERE att = 'SHORT_GRAMMAR_NAME'"
+    ).fetchone()
+    snippets = sanitize(row[0]) if row and row[0] else grm
+    corpora = export(conn, out_dir, grm, args, snippets=snippets)
     conn.close()
 
     if not corpora:
