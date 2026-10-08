@@ -35,7 +35,7 @@
         <div class="demo-input-wrap">
           <input type="text" id="inputText" name="input" class="form-control"
                  list="exampleList" placeholder="Type or choose an example…"
-                 maxlength="{{ max_parse_chars }}" required>
+                 maxlength="{{ max_parse_chars }}" required autocomplete="off">
           <button type="button" id="clearInput" tabindex="-1"
                   class="input-clear">&#215;</button>
           <div class="demo-char-count">
@@ -178,25 +178,29 @@
     const history = [sentence, ..._storedHistory(grm).filter(s => s !== sentence)]
       .slice(0, _MAX_HISTORY);
     localStorage.setItem(_historyKey(grm), JSON.stringify(history));
-    _updateDatalist(_mergeExamples(grm, history));
+    _updateExampleList(_mergeExamples(grm, history));
   }
 
   let _currentItemCount = 0;
 
-  function _updateDatalist(items) {
+  function _updateExampleList(items) {
+    _currentItemCount = items.length;
+    // Native <datalist>: a browser filters its popup to options matching
+    // what's already typed, which is exactly wrong right after a grammar
+    // switch -- the box auto-fills with one *complete* example, so the
+    // popup would filter down to just that one sentence matching itself.
+    // Clearing the box first (the x/caret button below) avoids the trap:
+    // an empty value matches everything, so the full list shows.
     const dl = document.getElementById('exampleList');
     dl.innerHTML = items.map(s => `<option value="${s.replace(/"/g, '&quot;')}">`).join('');
-    _currentItemCount = items.length;
     _updateClearButton();
   }
 
   // #clearInput does double duty at the same spot inside the input: "x" to
-  // clear when there's text, or a "v" caret hinting there are more
-  // examples/history to browse when the box is empty -- a browser only
-  // shows an <input list=...> datalist's suggestions once the input has
-  // focus, and the box auto-fills with the most recent entry on grammar
-  // select (see _initGrammar), so without this there's no visible sign
-  // there's anything to browse at all, let alone how many.
+  // clear when there's text, or a "v" caret hinting there's a (now browsable,
+  // since the box is empty) history/examples list for this grammar.
+  // Either way, clicking it just clears + focuses -- simplest thing that
+  // reliably makes the datalist popup show everything.
   function _updateClearButton() {
     const btn = $('#clearInput');
     const hasText = $('#inputText').val().length > 0;
@@ -223,7 +227,7 @@
   function _initGrammar(grm) {
     _updateGrammarTitle();
     const history = _getHistory(grm);
-    _updateDatalist(history);
+    _updateExampleList(history);
     if (!$('#inputText').val() && history.length > 0) {
       $('#inputText').val(history[0]);
     }

@@ -141,12 +141,14 @@ table row is a poor fit for prose, especially anything multi-paragraph); see
 `_grammar_description`/`_table_meta` in `web/routes.py`.
 
 The `EXAMPLES` field is especially useful for the demo page: the most recent one is
-pre-loaded into the input box, and the full list stays in the browser-side history dropdown
-every time that grammar is selected -- merged in fresh client-side (not stored in
-`localStorage`), so it can never get evicted as the user tries their own sentences, and a
-METADATA change takes effect immediately. The input box's clear button doubles as a hint
-that there's more to see: a down-caret (rather than the usual "x") when the box is empty
-but there's a non-empty history/examples list for the selected grammar.
+pre-loaded into the input box, and the full list stays available via the input's native
+`<datalist>` suggestion popup every time that grammar is selected -- merged in fresh
+client-side (not stored in `localStorage`), so it can never get evicted as the user tries
+their own sentences, and a METADATA change takes effect immediately. A browser filters that
+popup to options matching whatever's already typed, so the input box's clear button doubles
+as a hint that there's more to see: a down-caret (rather than the usual "x") when the box is
+empty but there's a non-empty history/examples list for the selected grammar -- clicking it
+clears the box (an empty value matches everything, so the full list shows) and focuses it.
 
 Example `METADATA`:
 
