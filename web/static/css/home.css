@@ -172,6 +172,15 @@ a {
     padding: 0;
 }
 
+/* #exampleDropdown is shown/hidden with a plain class toggle (no Bootstrap
+   JS/Popper), so it needs its own position: the base .dropdown-menu class
+   alone only sets position:absolute, with no top/left -- that's normally
+   supplied by Popper. */
+#exampleDropdown {
+    top: calc(100% + 0.25rem);
+    left: 0;
+}
+
 .result-card {
     margin-bottom: 1.25rem;
     border-radius: 6px;

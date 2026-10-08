@@ -36,11 +36,21 @@
           <input type="text" id="inputText" name="input" class="form-control"
                  list="exampleList" placeholder="Type or choose an example…"
                  maxlength="{{ max_parse_chars }}" required autocomplete="off">
-          <button type="button" id="clearInput" tabindex="-1"
-                  class="input-clear">&#215;</button>
+          <button type="button" id="exampleToggle" tabindex="-1"
+                  class="input-clear" style="display:none">&#9662;</button>
           <div class="demo-char-count">
             <span id="charCount">0</span> / {{ max_parse_chars }}
           </div>
+          <!-- Self-built and fully controlled, rather than relying on the
+               native <input list=...> datalist's own suggestion popup
+               (kept below for keyboard typing/autocomplete): that popup
+               only opens on a direct user click on the input itself (a
+               script-triggered .focus() from this button doesn't reliably
+               count), and filters to options matching whatever's already
+               typed -- wrong the moment the box auto-fills with one
+               *complete* example, filtering the popup down to just that
+               one sentence matching itself. -->
+          <ul id="exampleDropdown" class="dropdown-menu w-100" style="max-height: 320px; overflow-y: auto;"></ul>
         </div>
         <datalist id="exampleList"></datalist>
       </div>
@@ -182,37 +192,46 @@
   }
 
   let _currentItemCount = 0;
+  let _currentItems = [];
 
   function _updateExampleList(items) {
     _currentItemCount = items.length;
-    // Native <datalist>: a browser filters its popup to options matching
-    // what's already typed, which is exactly wrong right after a grammar
-    // switch -- the box auto-fills with one *complete* example, so the
-    // popup would filter down to just that one sentence matching itself.
-    // Clearing the box first (the x/caret button below) avoids the trap:
-    // an empty value matches everything, so the full list shows.
+    _currentItems = items;
+    // Native <datalist>, kept only for keyboard typing/autocomplete --
+    // #exampleDropdown (below) is the click-to-browse-everything path.
     const dl = document.getElementById('exampleList');
     dl.innerHTML = items.map(s => `<option value="${s.replace(/"/g, '&quot;')}">`).join('');
-    _updateClearButton();
+    _updateExampleDropdown();
+    _updateExampleToggle();
   }
 
-  // #clearInput does double duty at the same spot inside the input: "x" to
-  // clear when there's text, or a "v" caret hinting there's a (now browsable,
-  // since the box is empty) history/examples list for this grammar.
-  // Either way, clicking it just clears + focuses -- simplest thing that
-  // reliably makes the datalist popup show everything.
-  function _updateClearButton() {
-    const btn = $('#clearInput');
-    const hasText = $('#inputText').val().length > 0;
-    if (hasText) {
-      btn.html('&#215;').attr('title', 'Clear to browse examples').show();
-    } else if (_currentItemCount > 0) {
+  function _closeExampleDropdown() {
+    $('#exampleDropdown').removeClass('show');
+  }
+
+  function _updateExampleDropdown() {
+    const menu = $('#exampleDropdown');
+    menu.html(_currentItems.map(s =>
+      `<li><a class="dropdown-item" href="#">${escHtml(s)}</a></li>`
+    ).join(''));
+    menu.find('.dropdown-item').on('click', function (e) {
+      e.preventDefault();
+      $('#inputText').val($(this).text()).focus();
+      _closeExampleDropdown();
+      _updateCharCount();
+    });
+  }
+
+  function _updateExampleToggle() {
+    const btn = $('#exampleToggle');
+    if (_currentItemCount > 0) {
       const label = _currentItemCount === 1
         ? '1 example available -- click to browse it'
         : _currentItemCount + ' examples available -- click to browse them';
-      btn.html('&#9662;').attr('title', label).show();
+      btn.attr('title', label).show();
     } else {
       btn.hide();
+      _closeExampleDropdown();
     }
   }
 
@@ -231,7 +250,6 @@
     if (!$('#inputText').val() && history.length > 0) {
       $('#inputText').val(history[0]);
     }
-    _updateClearButton();
     _updateAnalyzerToggle(grm);
   }
 
@@ -244,13 +262,21 @@
   _updateCharCount();
 
   $('#inputText').on('input', function () {
-    _updateClearButton();
+    _closeExampleDropdown();
     _updateCharCount();
   });
 
-  $('#clearInput').on('click', function () {
-    $('#inputText').val('').focus();
-    _updateClearButton();
+  $('#exampleToggle').on('click', function (e) {
+    e.stopPropagation();
+    $('#exampleDropdown').toggleClass('show');
+  });
+
+  // Click anywhere outside the dropdown (or press Escape) to close it.
+  $(document).on('click', function (e) {
+    if (!$(e.target).closest('.demo-input-wrap').length) _closeExampleDropdown();
+  });
+  $('#inputText').on('keydown', function (e) {
+    if (e.key === 'Escape') _closeExampleDropdown();
   });
 
   $('#grammarSelect').on('change', function () {
