@@ -494,7 +494,8 @@ def grammar():
     return render_template(
         "grammar.html",
         title=md["GRAMMAR_NAME"],
-        meta=md,
+        meta=_table_meta(md),
+        description=_grammar_description(md),
         grm=grm,
         summ=summ,
         tsumm=tsumm,
@@ -517,12 +518,26 @@ def _render_grammar(grm):
     return render_template(
         "grammar.html",
         title=md["GRAMMAR_NAME"],
-        meta=md,
+        meta=_table_meta(md),
+        description=_grammar_description(md),
         grm=grm,
         summ=summ,
         tsumm=tsumm,
         analyzer=_installed_analyzer(md),
     )
+
+
+def _grammar_description(md):
+    """Render the grammar's optional free-form DESCRIPTION as HTML, or None."""
+    text = (md.get("DESCRIPTION") or "").strip()
+    return render_markdown(text) if text else None
+
+
+def _table_meta(md):
+    """Return *md* without DESCRIPTION, which gets its own rendered block
+    above the Grammar Meta-data table rather than a raw-markdown table row.
+    """
+    return {k: v for k, v in md.items() if k != "DESCRIPTION"}
 
 
 def _installed_analyzer(md):

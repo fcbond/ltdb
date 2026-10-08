@@ -133,6 +133,12 @@ Each grammar needs a TOML-formatted `METADATA` file. The fields recognised by lt
 | `TSDB_ROOTS` | list of strings | | Directories containing treebank profiles (default: `["tsdb/gold/"]`) |
 | `PROFILES` | list of strings | | Specific profile names to include (default: all found under `TSDB_ROOTS`) |
 | `EXAMPLES` | list of strings | | Example sentences shown in the parse demo and always available in its history dropdown |
+| `DESCRIPTION` | string (Markdown) | | Free-form prose shown at the top of the grammar page, above the metadata table |
+
+`DESCRIPTION` is rendered with the same Markdown-to-HTML pipeline as docstrings
+(`web/ltdb.py`'s `render_markdown`) and kept out of the generic metadata table (a raw-text
+table row is a poor fit for prose, especially anything multi-paragraph); see
+`_grammar_description`/`_table_meta` in `web/routes.py`.
 
 The `EXAMPLES` field is especially useful for the demo page: the most recent one is
 pre-loaded into the input box, and the full list stays in the browser-side history dropdown
@@ -156,6 +162,11 @@ EXAMPLES = [
   "The dog chases the cat.",
   "Kim arrived.",
 ]
+DESCRIPTION = """
+A broad-coverage, linguistically precise grammar of English, developed since
+1993 within the LinGO Lab at Stanford's CSLI. See the [ERG
+docs](https://delph-in.github.io/docs/erg/HomePage/) for background.
+"""
 ```
 
 ## URL grammar selection

@@ -11,6 +11,14 @@ body {
     padding: 0.4rem 1rem;
 }
 
+.grammar-description {
+    margin-bottom: 1.25rem;
+}
+
+.grammar-description > :last-child {
+    margin-bottom: 0;
+}
+
 .brand-mark {
     margin-right: 0.5rem;
     vertical-align: middle;

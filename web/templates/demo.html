@@ -340,7 +340,7 @@
       if (data.analyzer && data.ace_input && data.ace_input !== data.input) {
         const shown = (data.tokens && data.tokens.length)
           ? data.tokens.join(' ') : data.ace_input;
-        return '<div class="alert alert-secondary py-2 small">Analyzed with <b>' +
+        return '<div class="alert alert-secondary py-2 small">Preprocessed with <b>' +
           escHtml(data.analyzer) + '</b>: <code>' + escHtml(shown) + '</code></div>';
       }
       return '';

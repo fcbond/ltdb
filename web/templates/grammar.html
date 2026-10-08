@@ -4,6 +4,10 @@
 <section>
   <h1>{{meta['GRAMMAR_NAME']}} ({{meta['SHORT_GRAMMAR_NAME']}})</h1>
 
+ {% if description %}
+ <div class="grammar-description">{{ description | safe }}</div>
+ {% endif %}
+
  <div class="table-responsive">
  <table class="table table-hover table-borderless table-sm caption-top">
     <caption>Grammar Meta-data</caption>

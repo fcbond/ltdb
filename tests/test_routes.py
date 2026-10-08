@@ -59,6 +59,39 @@ class TestGrammarPage:
         assert b"Test Grammar" in grm_client.get("/grammar.html").data
 
 
+class TestGrammarDescription:
+    """DESCRIPTION is optional free-form Markdown shown above the metadata
+    table, not as a raw-text row within it (see _grammar_description/
+    _table_meta in web/routes.py)."""
+
+    def _db_path(self, routes_mod):
+        return os.path.join(routes_mod.current_directory, "db", "test-grammar_1.0.db")
+
+    def test_no_description_shows_no_block(self, grm_client):
+        data = grm_client.get("/grammar.html").data
+        assert b"grammar-description" not in data
+
+    def test_description_rendered_as_markdown_and_excluded_from_table(
+        self, grm_client
+    ):
+        import web.routes as routes_mod
+
+        conn = sqlite3.connect(self._db_path(routes_mod))
+        conn.execute(
+            "INSERT INTO meta VALUES ('DESCRIPTION', ?)",
+            ("A grammar for **testing** things.",),
+        )
+        conn.commit()
+        conn.close()
+
+        data = grm_client.get("/grammar.html").data
+        assert b'<div class="grammar-description">' in data
+        # Markdown rendered to HTML, not shown as raw source...
+        assert b"<strong>testing</strong>" in data
+        # ...and not duplicated as a row in the generic metadata table
+        assert b"<td>Description</td>" not in data
+
+
 class TestBuildLogs:
     """Build-log download links on /grammar.html (see routes.download_log
     and _available_logs); logs are only shown/served when the
