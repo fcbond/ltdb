@@ -211,12 +211,15 @@
 
   function _updateExampleDropdown() {
     const menu = $('#exampleDropdown');
-    menu.html(_currentItems.map(s =>
+    const clearItem = '<li><a class="dropdown-item fst-italic text-muted" href="#" data-clear>Clear</a></li>'
+      + '<li><hr class="dropdown-divider"></li>';
+    menu.html(clearItem + _currentItems.map(s =>
       `<li><a class="dropdown-item" href="#">${escHtml(s)}</a></li>`
     ).join(''));
     menu.find('.dropdown-item').on('click', function (e) {
       e.preventDefault();
-      $('#inputText').val($(this).text()).focus();
+      const text = $(this).is('[data-clear]') ? '' : $(this).text();
+      $('#inputText').val(text).focus();
       _closeExampleDropdown();
       _updateCharCount();
     });
