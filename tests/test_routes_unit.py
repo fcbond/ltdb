@@ -56,6 +56,8 @@ class TestDatPathFor:
 # ---------------------------------------------------------------------------
 
 _RAW_MRS = "[ TOP: h0 INDEX: e2 [ e SF: prop ] RELS: < > HCONS: < h0 qeq e2 > ]"
+# Genuinely unparsable (truncated) even after clean_mrs_str()'s cleanup.
+_MALFORMED_MRS = "[ TOP: h0 INDEX"
 
 
 def _make_ace_result(*, mrs_raises=False, raw_mrs=None):
@@ -98,8 +100,11 @@ def _post_parse(client, *, grm="fake.db", sentence="test", mrs="json"):
 
 class TestMrsRawFallback:
     def test_fallback_sets_mrs_str_on_pydelphin_failure(self, client):
-        """When result.mrs() raises, the raw ACE string is used as mrs_str."""
-        mock_result = _make_ace_result(mrs_raises=True, raw_mrs=_RAW_MRS)
+        """When the raw ACE string is unparsable even after cleanup, the raw
+        string itself is still used as mrs_str (result.mrs()'s side effect is
+        irrelevant here since the route decodes result.get("mrs") directly --
+        see clean_mrs_str())."""
+        mock_result = _make_ace_result(mrs_raises=True, raw_mrs=_MALFORMED_MRS)
         mock_response = MagicMock()
         mock_response.results.return_value = [mock_result]
 
@@ -114,8 +119,7 @@ class TestMrsRawFallback:
         data = r.get_json()
         assert r.status_code == 200
         assert len(data["errors"]) == 1
-        assert "MRSSyntaxError" in data["errors"][0]
-        assert data["results"][0].get("mrs_str") == _RAW_MRS
+        assert data["results"][0].get("mrs_str") == _MALFORMED_MRS
 
     def test_no_fallback_when_raw_mrs_absent(self, client):
         """When result.get('mrs') is None there is no mrs_str in the response."""

@@ -8,6 +8,24 @@ from delphin import dmrs as _dmrs
 from delphin.codecs import dmrsjson, mrsjson, simplemrs
 from markdown_it import MarkdownIt
 
+# ACE quotes predicate names that contain characters invalid in a bare atom
+# (non-ASCII letters, '*', ...) but keeps their <-1:-1> null link immediately
+# after the closing quote, e.g. `"_dødshjelp_n_rel"<-1:-1>`. pydelphin's
+# simplemrs.decode() cannot parse that combination on its own ("expected: a
+# feature"), only a bare, unquoted predicate followed by a lnk, or a quoted
+# predicate with no lnk at all. Stripping null links (which carry no real
+# position info anyway) and quoting any remaining bare surface predicates
+# works around it. Mirrors scripts/db2grew.py's dmrs_to_grew, which hit the
+# same ACE output quirk first.
+_NULL_LNK = re.compile(r"<-1:-1>")
+_SURFACE_PRED = re.compile(r'(\[\s+)(_[^\s"<]+)')
+
+
+def clean_mrs_str(mrs_str: str) -> str:
+    """Normalise a raw ACE SimpleMRS string so it decodes reliably."""
+    return _SURFACE_PRED.sub(r'\1"\2"', _NULL_LNK.sub("", mrs_str))
+
+
 def sanitize_grm(grm: str) -> str | None:
     """Return a safe grammar filename, or None if the name is invalid.
 
@@ -165,7 +183,7 @@ def mrs_to_dicts(mrs_str):
     if not mrs_str:
         return None, None
     try:
-        mrs_obj = simplemrs.decode(mrs_str)
+        mrs_obj = simplemrs.decode(clean_mrs_str(mrs_str))
         mrs_d = json.loads(mrsjson.encode(mrs_obj))
     except Exception as e:
         _log.warning("MRS parse failed: %s", e)

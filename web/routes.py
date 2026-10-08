@@ -54,12 +54,13 @@ from .db import (
     search_for,
 )
 from .ltdb import (
+    clean_mrs_str,
     deriv_word_span_to_char_span,
     docstring2html,
     render_markdown,
     sanitize_grm,
 )
-from .preprocess import preprocess_for
+from .preprocess import analyzer_for, preprocess_for
 
 _tdl_formatter = HtmlFormatter(style="friendly")
 PYGMENTS_CSS = _tdl_formatter.get_style_defs(".highlight")
@@ -460,6 +461,7 @@ def grammar():
         summ=summ,
         tsumm=tsumm,
         logs=_available_logs(grm),
+        analyzer=_installed_analyzer(md),
     )
 
 
@@ -481,7 +483,18 @@ def _render_grammar(grm):
         grm=grm,
         summ=summ,
         tsumm=tsumm,
+        analyzer=_installed_analyzer(md),
     )
+
+
+def _installed_analyzer(md):
+    """Return the grammar's analyzer if one is registered and available, else None.
+
+    Used by the grammar page to list its preprocessor only when it would
+    actually run (not just configured but missing its backing tool).
+    """
+    analyzer = analyzer_for(md)
+    return analyzer if analyzer is not None and analyzer.available() else None
 
 
 @app.route("/log/<path:grm>/<kind>")
@@ -829,6 +842,7 @@ def demo():
 
     examples = {}
     can_generate = {}
+    analyzer_info = {}
     for g in grammars_with_dat:
         dbpath = os.path.join(current_directory, "db", g)
         with sqlite3.connect(dbpath) as conn:
@@ -838,11 +852,18 @@ def demo():
                     "WHERE att IN ('EXAMPLES', 'CAN_GENERATE')"
                 )
             )
+            md = get_md(conn)
         try:
             examples[g] = json.loads(rows.get("EXAMPLES", "[]"))
         except (json.JSONDecodeError, TypeError):
             examples[g] = []
         can_generate[g] = bool(rows.get("CAN_GENERATE"))
+        # Only grammars with an analyzer that is actually installed get the
+        # "Preprocess" toggle in the demo -- for everything else it would be
+        # inert clutter.
+        analyzer = _installed_analyzer(md)
+        if analyzer is not None:
+            analyzer_info[g] = {"name": analyzer.name, "description": analyzer.description}
 
     return render_template(
         "demo.html",
@@ -852,6 +873,7 @@ def demo():
         max_parse_chars=MAX_PARSE_CHARS,
         examples=examples,
         can_generate=can_generate,
+        analyzer_info=analyzer_info,
     )
 
 
@@ -938,7 +960,15 @@ def parse_sentence():
         if want_mrs or want_dmrs:
             mrs_obj = None
             try:
-                mrs_obj = result.mrs()
+                raw_mrs = result.get("mrs")
+                # result.mrs() calls pydelphin's simplemrs.decode() on ACE's
+                # raw output with no cleanup; clean_mrs_str() works around an
+                # ACE output quirk it can't parse on its own (see its docstring).
+                mrs_obj = (
+                    _simplemrs.decode(clean_mrs_str(raw_mrs))
+                    if isinstance(raw_mrs, str)
+                    else result.mrs()
+                )
                 if want_mrs:
                     # mrs_str: simplemrs string for browser-side LTDBMrs rendering
                     # mrs: mrsjson dict kept for the generate endpoint

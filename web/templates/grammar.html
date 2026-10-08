@@ -29,6 +29,12 @@
  </table>
  </div>
 
+ {% if analyzer %}
+ <p class="text-muted">
+   <strong>Preprocessor:</strong> {{ analyzer.name }} &mdash; {{ analyzer.description }}
+ </p>
+ {% endif %}
+
  <div class="table-responsive">
 	 <table class="table table-hover table-borderless table-sm caption-top w-auto">
     <caption>Grammar Summary</caption>
@@ -84,6 +90,7 @@
  </div>
  {% endif %}
 
+ {% if tsumm.get('Sents') %}
  <div class="table-responsive">
 	 <table class="table table-hover table-borderless table-sm caption-top w-auto">
     <caption>Tree Bank Summary</caption>
@@ -110,8 +117,6 @@
         </tbody>
     </table>
  </div>
-
- 
-  
+ {% endif %}
 </section>
 {% endblock %}
