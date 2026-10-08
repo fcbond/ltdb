@@ -561,3 +561,139 @@ class TestSentPageSpanHighlighting:
         html = self._get(app, tmp_path, monkeypatch, "?kara=2&made=3")
         assert 'data-hl-cfrom="10"' in html
         assert 'data-hl-cto="24"' in html
+
+
+# ---------------------------------------------------------------------------
+# /parse morphological-analyzer hook (web.preprocess)
+# ---------------------------------------------------------------------------
+
+class _StubAnalyzer:
+    """Fake analyzer that records nothing but returns a canned result."""
+
+    def __init__(self, name, result, avail=True):
+        self.name = name
+        self._result = result
+        self._avail = avail
+
+    def available(self):
+        return self._avail
+
+    def run(self, text):
+        return self._result
+
+
+class TestParsePreprocess:
+    """The /parse route routes input through a per-grammar analyzer."""
+
+    def _make_grammar(self, tmp_path, iso):
+        """Create db/g.db (meta with ISO_CODE) and a non-empty db/g.dat."""
+        import sqlite3
+
+        db_dir = tmp_path / "db"
+        db_dir.mkdir(exist_ok=True)
+        (db_dir / "g.dat").write_bytes(b"x" * 512)
+        conn = sqlite3.connect(db_dir / "g.db")
+        conn.execute("CREATE TABLE meta (att TEXT, val TEXT)")
+        conn.execute("INSERT INTO meta VALUES ('ISO_CODE', ?)", (iso,))
+        conn.commit()
+        conn.close()
+
+    def _client(self, app, tmp_path, monkeypatch):
+        import web.routes as routes
+        monkeypatch.setattr(routes, "current_directory", str(tmp_path))
+        return app.test_client()
+
+    def _run_parse(self, client, grm="g.db", sentence="x", analyze=None):
+        mock_result = _make_ace_result(mrs_raises=False)
+        mock_response = MagicMock()
+        mock_response.results.return_value = [mock_result]
+        form = {"input": sentence, "grm": grm, "results": 1,
+                "derivation": "null", "mrs": "null", "dmrs": "null"}
+        if analyze is not None:
+            form["analyze"] = analyze
+        with patch("delphin.ace.ACEParser") as MockParser, \
+             patch("web.routes.find_ace", return_value="/bin/ace"):
+            MockParser.return_value.__enter__.return_value.interact.return_value = (
+                mock_response
+            )
+            MockParser.return_value.__exit__.return_value = False
+            r = client.post("/parse", data=form)
+        return r, MockParser
+
+    def test_segmenter_output_is_sent_to_ace(self, app, tmp_path, monkeypatch):
+        from web import preprocess
+        from web.preprocess import PreprocessResult
+        self._make_grammar(tmp_path, "jpn")
+        monkeypatch.setitem(
+            preprocess.REGISTRY, "jpn",
+            _StubAnalyzer("MeCab", PreprocessResult(
+                ace_input="犬 は 猫", tokens=["犬", "は", "猫"], analyzer="MeCab")),
+        )
+        client = self._client(app, tmp_path, monkeypatch)
+        r, MockParser = self._run_parse(client, sentence="犬は猫")
+        data = r.get_json()
+        assert r.status_code == 200
+        # the segmented string, not the raw input, reached ACE
+        interact = MockParser.return_value.__enter__.return_value.interact
+        assert interact.call_args.args[0] == "犬 は 猫"
+        assert data["analyzer"] == "MeCab"
+        assert data["ace_input"] == "犬 は 猫"
+        assert data["tokens"] == ["犬", "は", "猫"]
+
+    def test_yy_analyzer_adds_ace_flags(self, app, tmp_path, monkeypatch):
+        from web import preprocess
+        from web.preprocess import PreprocessResult
+        self._make_grammar(tmp_path, "spa")
+        monkeypatch.setitem(
+            preprocess.REGISTRY, "spa",
+            _StubAnalyzer("FreeLing", PreprocessResult(
+                ace_input="(1, 0, 1, ...)", yy=True,
+                extra_cmdargs=["-y", "--yy-rules"], analyzer="FreeLing")),
+        )
+        client = self._client(app, tmp_path, monkeypatch)
+        r, MockParser = self._run_parse(client, sentence="el perro")
+        assert r.status_code == 200
+        cmdargs = MockParser.call_args.kwargs["cmdargs"]
+        assert "-y" in cmdargs and "--yy-rules" in cmdargs
+
+    def test_unavailable_analyzer_falls_back_to_raw(self, app, tmp_path, monkeypatch):
+        from web import preprocess
+        from web.preprocess import PreprocessResult
+        self._make_grammar(tmp_path, "jpn")
+        monkeypatch.setitem(
+            preprocess.REGISTRY, "jpn",
+            _StubAnalyzer("MeCab", PreprocessResult(ace_input="unused"), avail=False),
+        )
+        client = self._client(app, tmp_path, monkeypatch)
+        r, MockParser = self._run_parse(client, sentence="犬は猫")
+        interact = MockParser.return_value.__enter__.return_value.interact
+        assert interact.call_args.args[0] == "犬は猫"  # raw text used
+        assert MockParser.call_args.kwargs["cmdargs"][-1] == "--rooted-derivations"
+
+    def test_analyze_off_bypasses_preprocessing(self, app, tmp_path, monkeypatch):
+        from web import preprocess
+        from web.preprocess import PreprocessResult
+        self._make_grammar(tmp_path, "jpn")
+        monkeypatch.setitem(
+            preprocess.REGISTRY, "jpn",
+            _StubAnalyzer("MeCab", PreprocessResult(
+                ace_input="SHOULD NOT APPEAR", analyzer="MeCab")),
+        )
+        client = self._client(app, tmp_path, monkeypatch)
+        r, MockParser = self._run_parse(client, sentence="犬は猫", analyze="off")
+        interact = MockParser.return_value.__enter__.return_value.interact
+        assert interact.call_args.args[0] == "犬は猫"
+        assert r.get_json()["analyzer"] is None
+
+    def test_grammar_without_analyzer_is_unchanged(self, app, tmp_path, monkeypatch):
+        """An ERG-like grammar (no registered analyzer) parses raw text."""
+        self._make_grammar(tmp_path, "eng")
+        client = self._client(app, tmp_path, monkeypatch)
+        r, MockParser = self._run_parse(client, sentence="dogs bark")
+        interact = MockParser.return_value.__enter__.return_value.interact
+        assert interact.call_args.args[0] == "dogs bark"
+        data = r.get_json()
+        assert data["analyzer"] is None
+        assert MockParser.call_args.kwargs["cmdargs"] == [
+            "-n1", "--udx=all", "--rooted-derivations"
+        ]
