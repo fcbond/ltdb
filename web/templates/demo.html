@@ -148,7 +148,12 @@
     }
   }
 
-  function _historyKey(grm) { return 'ltdb-demo-history-' + grm; }
+  // v2: examples are no longer persisted into this key (merged in fresh at
+  // read time instead -- see _getHistory), so a v1 key could be a grammar's
+  // then-current EXAMPLES seeded as permanent "history" verbatim, including
+  // an empty [] from before a grammar had any. Versioning the key, rather
+  // than migrating v1 values, means that stale state is just never read.
+  function _historyKey(grm) { return 'ltdb-demo-history-v2-' + grm; }
 
   // The grammarian's EXAMPLES are merged in at read time, not stored in
   // localStorage -- that way they always show up in the datalist (and can
